@@ -7,19 +7,30 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
-embedded-hal = { version = "1.0.0" }
+embedded-hal-async = "1.0"
 
 defmt = "1"
 defmt-rtt = "1"
 panic-probe = { version = "1", features = ["print-defmt"] }
 
+# Matrix and linear algebra libraries for embedded systems
+nalgebra = { version = "0.34.1", default-features = false, features = ["macros", "libm"] }
+heapless = "0.9.1"
+micromath = "2.1"
+libm = "0.2"
+static_cell = "2.1.1"
+
 # For Pico W with WiFi support using embassy
+embassy-embedded-hal = "0.5.0"
 embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt"] }
 embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
-embassy-rp = { version = "0.8", features = ["rp2040", "defmt", "unstable-pac", "time-driver", "critical-section-impl"] }
+embassy-rp = { version = "0.8", features = ["rp2040", "defmt", "unstable-pac", "time-driver", "critical-section-impl","intrinsics", "rom-v2-intrinsics"] }
+embassy-sync = "0.7"
+embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+
+# WiFi driver for the CYW43 chip on the Pico W
 cyw43 = "0.5"
 cyw43-pio = "0.8"
-embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
 
 # Alternative: Use rp-pico but you'll need to handle CYW43 separately
 rp-pico = "0.9"
@@ -30,6 +41,16 @@ rp-pico = "0.9"
 # If you're not going to use a Board Support Package you'll need these:
 # rp2040-hal = { version="0.11", features=["rt", "critical-section-impl"] }
 # rp2040-boot2 = "0.3"
+
+# SSD1306 led display driver - compatible with embedded-hal-async 1.0
+ssd1306 = { version = "0.10", features = ["async"] }
+
+# Embedded graphics support
+embedded-graphics = "0.8"
+
+# Critical section and atomics for embedded
+portable-atomic = { version = "1.11.1", features = ["critical-section"] }
+critical-section = "1.2.0"
 
 # cargo build/run
 [profile.dev]
