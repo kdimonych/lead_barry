@@ -4,7 +4,13 @@
 #![no_std]
 #![no_main]
 
+mod ina3221_sensor;
 mod matrix_ops;
+mod precise_timing;
+mod sync_examples;
+mod ui;
+mod units;
+mod units_examples;
 
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
@@ -15,113 +21,103 @@ use embassy_rp::{
     i2c::{self, I2c, InterruptHandler},
     peripherals::I2C0,
 };
+use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex, watch::Watch};
 use embassy_time::{Duration, Timer};
-use micromath::F32Ext;
 
-// Display driver imports
-use embedded_graphics::{
-    pixelcolor::BinaryColor,
-    prelude::*,
-    primitives::{Circle, PrimitiveStyleBuilder, Rectangle, Triangle},
-    text::{Baseline, Text, TextStyleBuilder},
-};
-use ssd1306::I2CDisplayInterface;
-use ssd1306::Ssd1306Async;
-use ssd1306::prelude::*;
-
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
-use embassy_sync::mutex::Mutex;
 use static_cell::StaticCell;
 
+use crate::units::{FrequencyExt, TimeExt};
+use micromath::F32Ext;
+use ui::*;
+
+// Display driver imports
 use {defmt_rtt as _, panic_probe as _};
 
 // Shared interfaces
 type I2cBus = Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>>;
+
+/// Watch for broadcasting system state
+static UI_STATE: Watch<ThreadModeRawMutex, ScreenSet, 1> = Watch::new();
+
 bind_interrupts!(struct Irqs {
     I2C0_IRQ => InterruptHandler<I2C0>;
 });
 
-fn rotate(angle_rad: f32, pivot: Point, point: Point) -> Point {
-    let cos_a = (angle_rad.cos() * 10000.0) as i32;
-    let sin_a = (angle_rad.sin() * 10000.0) as i32;
+#[embassy_executor::task]
+async fn display(i2c_bus: &'static I2cBus) {
+    let i2c_dev = I2cDevice::new(i2c_bus);
 
-    let translated_x = point.x - pivot.x;
-    let translated_y = point.y - pivot.y;
+    let state_receiver = UI_STATE.dyn_receiver().unwrap();
+    let mut ui = UiInterface::new(i2c_dev, ssd1306::size::DisplaySize128x64, state_receiver);
 
-    let rotated_x = (translated_x * cos_a - translated_y * sin_a) / 10000;
-    let rotated_y = (translated_x * sin_a + translated_y * cos_a) / 10000;
+    // Initialize the display
+    ui.init().await;
+    ui.draw_once().await;
 
-    Point::new(rotated_x + pivot.x, rotated_y + pivot.y)
+    // Draw loop for animation screen. This will run indefinitely.
+    ui.draw_loop().await;
 }
 
 #[embassy_executor::task]
-async fn display(i2c_bus: &'static I2cBus) {
-    use matrix_ops::*;
-    let i2c_dev = I2cDevice::new(i2c_bus);
-    let interface = I2CDisplayInterface::new(i2c_dev);
-    let mut disp = Ssd1306Async::new(
-        interface,
-        ssd1306::prelude::DisplaySize128x64,
-        ssd1306::prelude::DisplayRotation::Rotate0,
-    )
-    .into_buffered_graphics_mode();
+async fn precise_sensor_task() {
+    use embassy_time::{Duration, Instant, Ticker};
 
-    disp.init().await.unwrap();
-    disp.flush().await.unwrap();
+    // Create a precise 100Hz ticker for sensor readings
+    let mut sensor_ticker = Ticker::every(Duration::from_millis(10));
+    let mut counter = 0u32;
+    let mut max_jitter = Duration::from_micros(0);
+    let mut last_time = Instant::now();
 
-    info!("Display initialized");
+    info!("Starting precise sensor task at 100Hz");
 
-    let mut angle = 0.0f32;
     loop {
-        let yoffset = 8;
+        sensor_ticker.next().await;
 
-        disp.clear_buffer();
+        let now = Instant::now();
+        let elapsed = now.duration_since(last_time);
+        let expected = Duration::from_millis(10);
 
-        let style = PrimitiveStyleBuilder::new()
-            .stroke_width(1)
-            .stroke_color(BinaryColor::On)
-            .build();
+        // Measure timing jitter
+        let jitter = if elapsed > expected {
+            elapsed - expected
+        } else {
+            expected - elapsed
+        };
 
-        // screen outline
-        // default display size is 128x64 if you don't pass a _DisplaySize_
-        // enum to the _Builder_ struct
-        Rectangle::new(Point::new(0, 0), Size::new(127, 31))
-            .into_styled(style)
-            .draw(&mut disp)
-            .unwrap();
-
-        // triangle
-        let tr_pivot = Point::new(16 + 8, yoffset + 8);
-        Triangle::new(
-            rotate(angle, tr_pivot, Point::new(16, 16 + yoffset)),
-            rotate(angle, tr_pivot, Point::new(16 + 16, 16 + yoffset)),
-            rotate(angle, tr_pivot, Point::new(16 + 8, yoffset)),
-        )
-        .into_styled(style)
-        .draw(&mut disp)
-        .unwrap();
-
-        // square
-        Rectangle::new(Point::new(52, yoffset), Size::new_equal(16))
-            .into_styled(style)
-            .draw(&mut disp)
-            .unwrap();
-
-        // circle
-        Circle::new(Point::new(88, yoffset), 16)
-            .into_styled(style)
-            .draw(&mut disp)
-            .unwrap();
-        disp.flush().await.unwrap();
-
-        angle += 0.2;
-        if angle > core::f32::consts::TAU {
-            // 2π
-            angle = 0.0;
+        if jitter > max_jitter {
+            max_jitter = jitter;
         }
-        Timer::after(Duration::from_millis(2)).await;
+
+        counter += 1;
+
+        // Simulate precise sensor work
+        let work_start = Instant::now();
+
+        // Your precise sensor reading code here
+        // Keep this fast - target <5ms to maintain 100Hz
+        simulate_precise_sensor_work().await;
+
+        let work_duration = Instant::now().duration_since(work_start);
+
+        // Log performance every 1000 iterations (10 seconds)
+        if counter % 1000 == 0 {
+            info!(
+                "Sensor task: {} cycles, max jitter: {}μs, last work: {}μs",
+                counter,
+                max_jitter.as_micros(),
+                work_duration.as_micros()
+            );
+            max_jitter = Duration::from_micros(0); // Reset max jitter
+        }
+
+        last_time = now;
     }
-    // You can add more display code here, e.g., drawing graphics or text
+}
+
+async fn simulate_precise_sensor_work() {
+    // Simulate sensor I2C transaction + processing
+    // In real code, this would be your INA3221 readings or other sensors
+    embassy_time::Timer::after(Duration::from_micros(500)).await;
 }
 
 #[embassy_executor::task]
@@ -181,7 +177,7 @@ async fn matrix_operations_task() {
         }
         angle_deg = (angle * 180.0 / core::f32::consts::PI) as i32;
 
-        Timer::after(Duration::from_millis(50)).await;
+        Timer::after(Duration::from_millis(500)).await;
     }
 }
 
@@ -193,22 +189,53 @@ async fn main(spawner: Spawner) {
     // For regular GPIO LED (if you connect an external LED to a GPIO pin)
     let mut led_pin = Output::new(p.PIN_22, Level::Low);
 
-    // Setup I2C
-    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c::Config::default());
+    // Setup I2C with standard frequency for sensors
+    let mut i2c_cfg = i2c::Config::default();
+    i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
+    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_cfg);
     static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
     let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
 
     spawner.spawn(display(i2c_bus)).unwrap();
     spawner.spawn(matrix_operations_task()).unwrap();
+    spawner.spawn(precise_sensor_task()).unwrap();
+
+    // Initialize and spawn synchronization example tasks
+    sync_examples::init_sync_system();
+    spawner.spawn(sync_examples::mutex_example_task()).unwrap();
+    spawner
+        .spawn(sync_examples::sensor_producer_task())
+        .unwrap();
+    spawner
+        .spawn(sync_examples::sensor_consumer_task())
+        .unwrap();
+    spawner.spawn(sync_examples::event_handler_task()).unwrap();
+    spawner.spawn(sync_examples::state_monitor_task()).unwrap();
+    spawner.spawn(sync_examples::data_writer_task()).unwrap();
+    spawner.spawn(sync_examples::data_reader_task()).unwrap();
+
+    // Trigger a test event after 1 seconds
+    Timer::after(1.s()).await;
+    sync_examples::trigger_test_event();
 
     // Note: For the onboard LED on Pico W, you'd need to use the CYW43 driver
     // This example uses a regular GPIO pin. See the embassy examples for CYW43 usage.
     loop {
         info!("on!");
+        // Start with the welcome screen
+        UI_STATE
+            .sender()
+            .send(ScreenSet::Welcome(WelcomeScreen::new()));
+
         led_pin.set_high();
-        Timer::after(Duration::from_millis(1500)).await;
+        Timer::after(5.s()).await;
         info!("off!");
+        // Start with the animation screen
+        UI_STATE
+            .sender()
+            .send(ScreenSet::Animation(AnimationScreen::new()));
+
         led_pin.set_low();
-        Timer::after(Duration::from_millis(1500)).await;
+        Timer::after(5.s()).await;
     }
 }
