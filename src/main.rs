@@ -6,6 +6,7 @@
 
 mod ina3221_sensor;
 mod matrix_ops;
+mod optimization_demo;
 mod precise_timing;
 mod sync_examples;
 mod ui;
