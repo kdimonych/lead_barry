@@ -43,6 +43,7 @@ rp-pico = "0.9"
 # rp2040-hal = { version="0.11", features=["rt", "critical-section-impl"] }
 # rp2040-boot2 = "0.3"
 
+# Prerepherial drivers
 # SSD1306 led display driver - compatible with embedded-hal-async 1.0
 ssd1306 = { version = "0.10", features = ["async"] }
 
@@ -52,7 +53,7 @@ embedded-graphics = "0.8"
 # Critical section and atomics for embedded
 portable-atomic = { version = "1.11.1", features = ["critical-section"] }
 critical-section = "1.2.0"
-ina3221 = "0.4.5"
+ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "DmytroKrasnianskyi/async" }
 
 # cargo build/run
 [profile.dev]

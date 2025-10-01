@@ -1,1 +1,1 @@
-use ina3221::INA3221;
+use ina3221_async::INA3221Async;

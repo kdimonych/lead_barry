@@ -129,18 +129,39 @@ static UI_STATE: Watch<ThreadModeRawMutex, ScreenCollection, 1> = Watch::new();
 //     }
 // }
 
+// #[embassy_executor::task]
+// async fn simulate_voltage_reading(voltage_reading: &'static VoltageReading) -> ! {
+//     // Simulate reading a voltage value from a sensor
+//     // In real code, this would be an I2C transaction with the INA3221
+//     let mut ticker = Ticker::every(40.ms());
+
+//     loop {
+//         {
+//             let mut v = voltage_reading.lock().await;
+//             *v = 5.0 * (embassy_time::Instant::now().as_millis() as f32 / 1000.0).sin();
+//         }
+
+//         ticker.next().await;
+//     }
+// }
+
+use ina3221_async::INA3221Async;
 #[embassy_executor::task]
-async fn simulate_voltage_reading(voltage_reading: &'static VoltageReading) -> ! {
-    // Simulate reading a voltage value from a sensor
-    // In real code, this would be an I2C transaction with the INA3221
+async fn INA3221_voltage_read_task(
+    i2c_bus: &'static I2cBus,
+    voltage_reading: &'static VoltageReading,
+) {
+    let i2c_dev = I2cDevice::new(i2c_bus);
+    let ina = INA3221Async::new(i2c_dev, 0x40);
+
     let mut ticker = Ticker::every(40.ms());
 
     loop {
+        let voltage = ina.get_bus_voltage(0).await.unwrap();
         {
             let mut v = voltage_reading.lock().await;
-            *v = 5.0 * (embassy_time::Instant::now().as_millis() as f32 / 1000.0).sin();
+            *v = voltage.volts();
         }
-
         ticker.next().await;
     }
 }
@@ -149,21 +170,26 @@ async fn simulate_voltage_reading(voltage_reading: &'static VoltageReading) -> !
 async fn screen_iterate_task(voltage_reading: &'static VoltageReading) -> ! {
     let mut ticker = Ticker::every(10.s());
 
+    UI_STATE.sender().send(ScreenCollection::VIP(VIPScreen::new(
+        voltage_reading,
+        BaseUnits::Volts,
+    )));
+
     loop {
-        UI_STATE
-            .sender()
-            .send(ScreenCollection::Welcome(WelcomeScreen::new()));
-        ticker.next().await;
+        // UI_STATE
+        //     .sender()
+        //     .send(ScreenCollection::Welcome(WelcomeScreen::new()));
+        // ticker.next().await;
 
-        UI_STATE.sender().send(ScreenCollection::VIP(VIPScreen::new(
-            voltage_reading,
-            BaseUnits::Volts,
-        )));
-        ticker.next().await;
+        // UI_STATE.sender().send(ScreenCollection::VIP(VIPScreen::new(
+        //     voltage_reading,
+        //     BaseUnits::Volts,
+        // )));
+        // ticker.next().await;
 
-        UI_STATE
-            .sender()
-            .send(ScreenCollection::Animation(AnimationScreen::new()));
+        // UI_STATE
+        //     .sender()
+        //     .send(ScreenCollection::Animation(AnimationScreen::new()));
         ticker.next().await;
     }
 }
@@ -201,7 +227,10 @@ fn core0_init(resources: ResourcesCore0) {
     // Spawn the voltage reading simulation task on Core 0
     resources
         .spawner
-        .spawn(simulate_voltage_reading(resources.voltage_reading))
+        .spawn(INA3221_voltage_read_task(
+            resources.i2c_bus,
+            resources.voltage_reading,
+        ))
         .unwrap();
 
     //resources.spawner.spawn(matrix_operations_task()).unwrap();
