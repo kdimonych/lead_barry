@@ -107,38 +107,38 @@ fn main() -> ! {
 /// Watch for broadcasting system state
 static UI_STATE: Watch<ThreadModeRawMutex, ScreenCollection, 1> = Watch::new();
 
-struct StateMachine<T> {
-    state: Option<T>,
-}
+// struct StateMachine<T> {
+//     state: Option<T>,
+// }
 
-impl<T> StateMachine<T> {
-    fn new(state: T) -> Self {
-        StateMachine { state: Some(state) }
-    }
+// impl<T> StateMachine<T> {
+//     fn new(state: T) -> Self {
+//         StateMachine { state: Some(state) }
+//     }
 
-    fn transition<U>(self, state: U) -> StateMachine<U> {
-        StateMachine { state: Some(state) }
-    }
+//     fn transition<U>(self, state: U) -> StateMachine<U> {
+//         StateMachine { state: Some(state) }
+//     }
 
-    fn take(&mut self) -> T {
-        self.state.take().unwrap()
-    }
+//     fn take(&mut self) -> T {
+//         self.state.take().unwrap()
+//     }
 
-    fn is_empty(&self) -> bool {
-        self.state.is_none()
-    }
-}
+//     fn is_empty(&self) -> bool {
+//         self.state.is_none()
+//     }
+// }
 
 #[embassy_executor::task]
 async fn simulate_voltage_reading(voltage_reading: &'static VoltageReading) -> ! {
     // Simulate reading a voltage value from a sensor
     // In real code, this would be an I2C transaction with the INA3221
-    let mut ticker = Ticker::every(20.ms());
+    let mut ticker = Ticker::every(40.ms());
 
     loop {
         {
             let mut v = voltage_reading.lock().await;
-            *v = 3.0 + (0.5 * (embassy_time::Instant::now().as_millis() as f32 / 1000.0).sin());
+            *v = 5.0 * (embassy_time::Instant::now().as_millis() as f32 / 1000.0).sin();
         }
 
         ticker.next().await;
@@ -147,7 +147,7 @@ async fn simulate_voltage_reading(voltage_reading: &'static VoltageReading) -> !
 
 #[embassy_executor::task]
 async fn screen_iterate_task(voltage_reading: &'static VoltageReading) -> ! {
-    let mut ticker = Ticker::every(5.s());
+    let mut ticker = Ticker::every(10.s());
 
     loop {
         UI_STATE
@@ -155,11 +155,10 @@ async fn screen_iterate_task(voltage_reading: &'static VoltageReading) -> ! {
             .send(ScreenCollection::Welcome(WelcomeScreen::new()));
         ticker.next().await;
 
-        UI_STATE
-            .sender()
-            .send(ScreenCollection::Voltage(VoltageScreen::new(
-                voltage_reading,
-            )));
+        UI_STATE.sender().send(ScreenCollection::VIP(VIPScreen::new(
+            voltage_reading,
+            BaseUnits::Volts,
+        )));
         ticker.next().await;
 
         UI_STATE
@@ -205,8 +204,8 @@ fn core0_init(resources: ResourcesCore0) {
         .spawn(simulate_voltage_reading(resources.voltage_reading))
         .unwrap();
 
-    resources.spawner.spawn(matrix_operations_task()).unwrap();
-    resources.spawner.spawn(precise_sensor_task()).unwrap();
+    //resources.spawner.spawn(matrix_operations_task()).unwrap();
+    //resources.spawner.spawn(precise_sensor_task()).unwrap();
 }
 
 fn core1_init(resources: ResourcesCore1) {
@@ -303,11 +302,6 @@ async fn precise_sensor_task() {
 
         // Simulate precise sensor work
         let work_start = Instant::now();
-
-        // Your precise sensor reading code here
-        // Keep this fast - target <5ms to maintain 100Hz
-        simulate_precise_sensor_work().await;
-
         let work_duration = Instant::now().duration_since(work_start);
 
         // Log performance every 1000 iterations (10 seconds)
@@ -323,12 +317,6 @@ async fn precise_sensor_task() {
 
         last_time = now;
     }
-}
-
-async fn simulate_precise_sensor_work() {
-    // Simulate sensor I2C transaction + processing
-    // In real code, this would be your INA3221 readings or other sensors
-    embassy_time::Timer::after(Duration::from_micros(500)).await;
 }
 
 #[embassy_executor::task]

@@ -3,14 +3,14 @@ mod data_model;
 mod screen;
 mod screen_animation;
 mod screen_collection;
-mod screen_voltage;
+mod screen_vip;
 mod screen_welcome;
 
 pub use crate::ui::data_model::DataModel;
 pub use crate::ui::screen::Screen;
 pub use crate::ui::screen_animation::AnimationScreen;
 pub use crate::ui::screen_collection::ScreenCollection;
-pub use crate::ui::screen_voltage::VoltageScreen;
+pub use crate::ui::screen_vip::{BaseUnits, VIPScreen};
 pub use crate::ui::screen_welcome::WelcomeScreen;
 
 use ssd1306::I2CDisplayInterface;
