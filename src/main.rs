@@ -15,8 +15,9 @@ mod units_examples;
 
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_executor::Spawner;
+use embassy_executor::{Executor, Spawner};
 use embassy_rp::bind_interrupts;
+use embassy_rp::multicore::Stack;
 use embassy_rp::{
     gpio::{Level, Output},
     i2c::{self, I2c, InterruptHandler},
@@ -36,6 +37,124 @@ use {defmt_rtt as _, panic_probe as _};
 
 // Shared interfaces
 type I2cBus = Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>>;
+
+static CORE1_STACK: StaticCell<Stack<4096>> = StaticCell::new();
+static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
+static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
+static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
+static LED_PIN: StaticCell<Output> = StaticCell::new();
+
+struct ResourcesCore0 {
+    spawner: Spawner,
+    i2c_bus: &'static I2cBus,
+    led: &'static mut Output<'static>,
+}
+
+struct ResourcesCore1 {
+    spawner: Spawner,
+    i2c_bus: &'static I2cBus,
+}
+
+#[embassy_executor::task]
+async fn led_task(led: &'static mut Output<'static>) {
+    loop {
+        info!("on!");
+        // Start with the welcome screen
+        UI_STATE
+            .sender()
+            .send(ScreenSet::Welcome(WelcomeScreen::new()));
+
+        led.set_high();
+        Timer::after(5.s()).await;
+        info!("off!");
+        // Start with the animation screen
+        UI_STATE
+            .sender()
+            .send(ScreenSet::Animation(AnimationScreen::new()));
+
+        led.set_low();
+        Timer::after(5.s()).await;
+    }
+}
+
+fn core0_init(resources: ResourcesCore0) {
+    // Spawn the LED blink task on Core 0
+    resources.spawner.spawn(led_task(resources.led)).unwrap();
+
+    resources.spawner.spawn(matrix_operations_task()).unwrap();
+    resources.spawner.spawn(precise_sensor_task()).unwrap();
+}
+
+fn core1_init(resources: ResourcesCore1) {
+    // Spawn the display task on Core 1
+    resources.spawner.spawn(display(resources.i2c_bus)).unwrap();
+
+    // Initialize and spawn synchronization example tasks
+    sync_examples::init_sync_system();
+    resources
+        .spawner
+        .spawn(sync_examples::mutex_example_task())
+        .unwrap();
+    resources
+        .spawner
+        .spawn(sync_examples::sensor_producer_task())
+        .unwrap();
+    resources
+        .spawner
+        .spawn(sync_examples::sensor_consumer_task())
+        .unwrap();
+    resources
+        .spawner
+        .spawn(sync_examples::event_handler_task())
+        .unwrap();
+    resources
+        .spawner
+        .spawn(sync_examples::state_monitor_task())
+        .unwrap();
+    resources
+        .spawner
+        .spawn(sync_examples::data_writer_task())
+        .unwrap();
+    resources
+        .spawner
+        .spawn(sync_examples::data_reader_task())
+        .unwrap();
+
+    sync_examples::trigger_test_event();
+}
+
+#[cortex_m_rt::entry]
+fn main() -> ! {
+    let p = embassy_rp::init(Default::default());
+
+    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
+    let led = LED_PIN.init(Output::new(p.PIN_22, Level::Low));
+
+    // Setup I2C with standard frequency for sensors
+    let mut i2c_cfg = i2c::Config::default();
+    i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
+    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_cfg);
+    static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
+    let i2c_bus: &'static Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>> =
+        I2C_BUS.init(Mutex::new(i2c));
+
+    // Initialize the stack
+    let stack = CORE1_STACK.init(Stack::new());
+
+    embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
+        let executor1 = EXECUTOR1.init(Executor::new());
+        executor1.run(|spawner| core1_init(ResourcesCore1 { spawner, i2c_bus }));
+    });
+
+    let executor0 = EXECUTOR0.init(Executor::new());
+    executor0.run(|spawner| {
+        core0_init(ResourcesCore0 {
+            spawner,
+            i2c_bus,
+            led,
+        })
+    });
+}
 
 /// Watch for broadcasting system state
 static UI_STATE: Watch<ThreadModeRawMutex, ScreenSet, 1> = Watch::new();
@@ -179,64 +298,5 @@ async fn matrix_operations_task() {
         angle_deg = (angle * 180.0 / core::f32::consts::PI) as i32;
 
         Timer::after(Duration::from_millis(500)).await;
-    }
-}
-
-#[embassy_executor::main]
-async fn main(spawner: Spawner) {
-    info!("Program start");
-    let p = embassy_rp::init(Default::default());
-
-    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
-    let mut led_pin = Output::new(p.PIN_22, Level::Low);
-
-    // Setup I2C with standard frequency for sensors
-    let mut i2c_cfg = i2c::Config::default();
-    i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
-    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_cfg);
-    static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
-    let i2c_bus = I2C_BUS.init(Mutex::new(i2c));
-
-    spawner.spawn(display(i2c_bus)).unwrap();
-    spawner.spawn(matrix_operations_task()).unwrap();
-    spawner.spawn(precise_sensor_task()).unwrap();
-
-    // Initialize and spawn synchronization example tasks
-    sync_examples::init_sync_system();
-    spawner.spawn(sync_examples::mutex_example_task()).unwrap();
-    spawner
-        .spawn(sync_examples::sensor_producer_task())
-        .unwrap();
-    spawner
-        .spawn(sync_examples::sensor_consumer_task())
-        .unwrap();
-    spawner.spawn(sync_examples::event_handler_task()).unwrap();
-    spawner.spawn(sync_examples::state_monitor_task()).unwrap();
-    spawner.spawn(sync_examples::data_writer_task()).unwrap();
-    spawner.spawn(sync_examples::data_reader_task()).unwrap();
-
-    // Trigger a test event after 1 seconds
-    Timer::after(1.s()).await;
-    sync_examples::trigger_test_event();
-
-    // Note: For the onboard LED on Pico W, you'd need to use the CYW43 driver
-    // This example uses a regular GPIO pin. See the embassy examples for CYW43 usage.
-    loop {
-        info!("on!");
-        // Start with the welcome screen
-        UI_STATE
-            .sender()
-            .send(ScreenSet::Welcome(WelcomeScreen::new()));
-
-        led_pin.set_high();
-        Timer::after(5.s()).await;
-        info!("off!");
-        // Start with the animation screen
-        UI_STATE
-            .sender()
-            .send(ScreenSet::Animation(AnimationScreen::new()));
-
-        led_pin.set_low();
-        Timer::after(5.s()).await;
     }
 }
