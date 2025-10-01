@@ -16,11 +16,11 @@ mod units_examples;
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
-use embassy_rp::bind_interrupts;
-use embassy_rp::multicore::Stack;
 use embassy_rp::{
+    bind_interrupts,
     gpio::{Level, Output},
-    i2c::{self, I2c, InterruptHandler},
+    i2c::{self, I2c, InterruptHandler as I2cInterruptHandler},
+    multicore::Stack,
     peripherals::I2C0,
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex, watch::Watch};
@@ -35,9 +35,15 @@ use ui::*;
 // Display driver imports
 use {defmt_rtt as _, panic_probe as _};
 
+// Interrupt handlers
+bind_interrupts!(struct Irqs {
+    I2C0_IRQ => I2cInterruptHandler<I2C0>;
+});
+
 // Shared interfaces
 type I2cBus = Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>>;
 
+// Static resources
 static CORE1_STACK: StaticCell<Stack<4096>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
@@ -54,6 +60,42 @@ struct ResourcesCore1 {
     spawner: Spawner,
     i2c_bus: &'static I2cBus,
 }
+
+#[cortex_m_rt::entry]
+fn main() -> ! {
+    let p = embassy_rp::init(Default::default());
+
+    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
+    let led = LED_PIN.init(Output::new(p.PIN_22, Level::Low));
+
+    // Setup I2C with standard frequency for sensors
+    let mut i2c_cfg = i2c::Config::default();
+    i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
+    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_cfg);
+
+    let i2c_bus: &'static Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>> =
+        I2C_BUS.init(Mutex::new(i2c));
+
+    // Initialize the stack
+    let stack = CORE1_STACK.init(Stack::new());
+
+    embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
+        let executor1 = EXECUTOR1.init(Executor::new());
+        executor1.run(|spawner| core1_init(ResourcesCore1 { spawner, i2c_bus }));
+    });
+
+    let executor0 = EXECUTOR0.init(Executor::new());
+    executor0.run(|spawner| {
+        core0_init(ResourcesCore0 {
+            spawner,
+            i2c_bus,
+            led,
+        })
+    });
+}
+
+/// Watch for broadcasting system state
+static UI_STATE: Watch<ThreadModeRawMutex, ScreenSet, 1> = Watch::new();
 
 #[embassy_executor::task]
 async fn led_task(led: &'static mut Output<'static>) {
@@ -122,46 +164,6 @@ fn core1_init(resources: ResourcesCore1) {
 
     sync_examples::trigger_test_event();
 }
-
-#[cortex_m_rt::entry]
-fn main() -> ! {
-    let p = embassy_rp::init(Default::default());
-
-    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
-    let led = LED_PIN.init(Output::new(p.PIN_22, Level::Low));
-
-    // Setup I2C with standard frequency for sensors
-    let mut i2c_cfg = i2c::Config::default();
-    i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
-    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_cfg);
-    static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
-    let i2c_bus: &'static Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>> =
-        I2C_BUS.init(Mutex::new(i2c));
-
-    // Initialize the stack
-    let stack = CORE1_STACK.init(Stack::new());
-
-    embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
-        let executor1 = EXECUTOR1.init(Executor::new());
-        executor1.run(|spawner| core1_init(ResourcesCore1 { spawner, i2c_bus }));
-    });
-
-    let executor0 = EXECUTOR0.init(Executor::new());
-    executor0.run(|spawner| {
-        core0_init(ResourcesCore0 {
-            spawner,
-            i2c_bus,
-            led,
-        })
-    });
-}
-
-/// Watch for broadcasting system state
-static UI_STATE: Watch<ThreadModeRawMutex, ScreenSet, 1> = Watch::new();
-
-bind_interrupts!(struct Irqs {
-    I2C0_IRQ => InterruptHandler<I2C0>;
-});
 
 #[embassy_executor::task]
 async fn display(i2c_bus: &'static I2cBus) {
