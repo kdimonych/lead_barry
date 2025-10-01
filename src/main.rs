@@ -6,12 +6,10 @@
 
 mod ina3221_sensor;
 mod matrix_ops;
-mod optimization_demo;
 mod precise_timing;
 mod sync_examples;
 mod ui;
 mod units;
-mod units_examples;
 
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
@@ -107,47 +105,9 @@ fn main() -> ! {
 /// Watch for broadcasting system state
 static UI_STATE: Watch<ThreadModeRawMutex, ScreenCollection, 1> = Watch::new();
 
-// struct StateMachine<T> {
-//     state: Option<T>,
-// }
-
-// impl<T> StateMachine<T> {
-//     fn new(state: T) -> Self {
-//         StateMachine { state: Some(state) }
-//     }
-
-//     fn transition<U>(self, state: U) -> StateMachine<U> {
-//         StateMachine { state: Some(state) }
-//     }
-
-//     fn take(&mut self) -> T {
-//         self.state.take().unwrap()
-//     }
-
-//     fn is_empty(&self) -> bool {
-//         self.state.is_none()
-//     }
-// }
-
-// #[embassy_executor::task]
-// async fn simulate_voltage_reading(voltage_reading: &'static VoltageReading) -> ! {
-//     // Simulate reading a voltage value from a sensor
-//     // In real code, this would be an I2C transaction with the INA3221
-//     let mut ticker = Ticker::every(40.ms());
-
-//     loop {
-//         {
-//             let mut v = voltage_reading.lock().await;
-//             *v = 5.0 * (embassy_time::Instant::now().as_millis() as f32 / 1000.0).sin();
-//         }
-
-//         ticker.next().await;
-//     }
-// }
-
 use ina3221_async::INA3221Async;
 #[embassy_executor::task]
-async fn INA3221_voltage_read_task(
+async fn ina3221_voltage_read_task(
     i2c_bus: &'static I2cBus,
     voltage_reading: &'static VoltageReading,
 ) {
@@ -227,14 +187,11 @@ fn core0_init(resources: ResourcesCore0) {
     // Spawn the voltage reading simulation task on Core 0
     resources
         .spawner
-        .spawn(INA3221_voltage_read_task(
+        .spawn(ina3221_voltage_read_task(
             resources.i2c_bus,
             resources.voltage_reading,
         ))
         .unwrap();
-
-    //resources.spawner.spawn(matrix_operations_task()).unwrap();
-    //resources.spawner.spawn(precise_sensor_task()).unwrap();
 }
 
 fn core1_init(resources: ResourcesCore1) {

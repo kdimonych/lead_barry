@@ -4,7 +4,6 @@
 //! for coordinating between async tasks.
 
 use defmt::*;
-use embassy_executor;
 use embassy_sync::{
     blocking_mutex::raw::ThreadModeRawMutex, channel::Channel, mutex::Mutex, pipe::Pipe,
     signal::Signal, watch::Watch,
