@@ -24,7 +24,7 @@ use embassy_rp::{
     peripherals::I2C0,
 };
 use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex, watch::Watch};
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Ticker, Timer};
 
 use static_cell::StaticCell;
 
@@ -50,10 +50,16 @@ static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
 static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 
+// Global data models
+// Voltage reading model
+type VoltageReading = DataModel<f32>;
+static VOLTAGE_READING_MODEL: StaticCell<VoltageReading> = StaticCell::new();
+
 struct ResourcesCore0 {
     spawner: Spawner,
     i2c_bus: &'static I2cBus,
     led: &'static mut Output<'static>,
+    voltage_reading: &'static VoltageReading,
 }
 
 struct ResourcesCore1 {
@@ -79,6 +85,9 @@ fn main() -> ! {
     // Initialize the stack
     let stack = CORE1_STACK.init(Stack::new());
 
+    // Initialize global data models
+    let voltage_reading: &'static VoltageReading = VOLTAGE_READING_MODEL.init(DataModel::new(0.0));
+
     embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
         let executor1 = EXECUTOR1.init(Executor::new());
         executor1.run(|spawner| core1_init(ResourcesCore1 { spawner, i2c_bus }));
@@ -90,32 +99,93 @@ fn main() -> ! {
             spawner,
             i2c_bus,
             led,
+            voltage_reading,
         })
     });
 }
 
 /// Watch for broadcasting system state
-static UI_STATE: Watch<ThreadModeRawMutex, ScreenSet, 1> = Watch::new();
+static UI_STATE: Watch<ThreadModeRawMutex, ScreenCollection, 1> = Watch::new();
+
+struct StateMachine<T> {
+    state: Option<T>,
+}
+
+impl<T> StateMachine<T> {
+    fn new(state: T) -> Self {
+        StateMachine { state: Some(state) }
+    }
+
+    fn transition<U>(self, state: U) -> StateMachine<U> {
+        StateMachine { state: Some(state) }
+    }
+
+    fn take(&mut self) -> T {
+        self.state.take().unwrap()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.state.is_none()
+    }
+}
 
 #[embassy_executor::task]
-async fn led_task(led: &'static mut Output<'static>) {
+async fn simulate_voltage_reading(voltage_reading: &'static VoltageReading) -> ! {
+    // Simulate reading a voltage value from a sensor
+    // In real code, this would be an I2C transaction with the INA3221
+    let mut ticker = Ticker::every(20.ms());
+
     loop {
-        info!("on!");
-        // Start with the welcome screen
+        {
+            let mut v = voltage_reading.lock().await;
+            *v = 3.0 + (0.5 * (embassy_time::Instant::now().as_millis() as f32 / 1000.0).sin());
+        }
+
+        ticker.next().await;
+    }
+}
+
+#[embassy_executor::task]
+async fn screen_iterate_task(voltage_reading: &'static VoltageReading) -> ! {
+    let mut ticker = Ticker::every(5.s());
+
+    loop {
         UI_STATE
             .sender()
-            .send(ScreenSet::Welcome(WelcomeScreen::new()));
+            .send(ScreenCollection::Welcome(WelcomeScreen::new()));
+        ticker.next().await;
 
-        led.set_high();
-        Timer::after(5.s()).await;
-        info!("off!");
-        // Start with the animation screen
         UI_STATE
             .sender()
-            .send(ScreenSet::Animation(AnimationScreen::new()));
+            .send(ScreenCollection::Voltage(VoltageScreen::new(
+                voltage_reading,
+            )));
+        ticker.next().await;
 
-        led.set_low();
-        Timer::after(5.s()).await;
+        UI_STATE
+            .sender()
+            .send(ScreenCollection::Animation(AnimationScreen::new()));
+        ticker.next().await;
+    }
+}
+
+#[embassy_executor::task]
+async fn led_task(led: &'static mut Output<'static>) -> ! {
+    let mut ticker = Ticker::every(500.ms());
+
+    let mut led_state = false;
+
+    loop {
+        if led_state {
+            info!("off!");
+            led.set_low();
+        } else {
+            info!("on!");
+            led.set_high();
+        }
+        led_state = !led_state;
+
+        ticker.next().await;
     }
 }
 
@@ -123,13 +193,28 @@ fn core0_init(resources: ResourcesCore0) {
     // Spawn the LED blink task on Core 0
     resources.spawner.spawn(led_task(resources.led)).unwrap();
 
+    // Spawn the screen iteration task on Core 0
+    resources
+        .spawner
+        .spawn(screen_iterate_task(resources.voltage_reading))
+        .unwrap();
+
+    // Spawn the voltage reading simulation task on Core 0
+    resources
+        .spawner
+        .spawn(simulate_voltage_reading(resources.voltage_reading))
+        .unwrap();
+
     resources.spawner.spawn(matrix_operations_task()).unwrap();
     resources.spawner.spawn(precise_sensor_task()).unwrap();
 }
 
 fn core1_init(resources: ResourcesCore1) {
     // Spawn the display task on Core 1
-    resources.spawner.spawn(display(resources.i2c_bus)).unwrap();
+    resources
+        .spawner
+        .spawn(display_task(resources.i2c_bus))
+        .unwrap();
 
     // Initialize and spawn synchronization example tasks
     sync_examples::init_sync_system();
@@ -166,15 +251,19 @@ fn core1_init(resources: ResourcesCore1) {
 }
 
 #[embassy_executor::task]
-async fn display(i2c_bus: &'static I2cBus) {
+async fn display_task(i2c_bus: &'static I2cBus) {
     let i2c_dev = I2cDevice::new(i2c_bus);
 
     let state_receiver = UI_STATE.dyn_receiver().unwrap();
-    let mut ui = UiInterface::new(i2c_dev, ssd1306::size::DisplaySize128x64, state_receiver);
+    let mut ui = UiInterface::new(
+        i2c_dev,
+        ssd1306::size::DisplaySize128x64,
+        state_receiver,
+        ScreenCollection::Empty,
+    );
 
     // Initialize the display
     ui.init().await;
-    ui.draw_once().await;
 
     // Draw loop for animation screen. This will run indefinitely.
     ui.draw_loop().await;

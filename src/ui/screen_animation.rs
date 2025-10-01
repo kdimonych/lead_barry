@@ -21,7 +21,7 @@ impl AnimationScreen {
 }
 
 impl Screen for AnimationScreen {
-    fn draw<D>(&mut self, draw_target: &mut D)
+    fn redraw<D>(&mut self, draw_target: &mut D)
     where
         D: DrawTarget<Color = BinaryColor>,
     {
