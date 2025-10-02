@@ -78,8 +78,12 @@ where
     I2cDevice: embedded_hal_async::i2c::I2c,
 {
     pub async fn init(&mut self) {
-        self.display.init().await.unwrap();
-        self.display.flush().await.unwrap();
+        self.display.init().await.unwrap_or_else(|e| {
+            error!("Init error: {:?}", e);
+        });
+        self.display.flush().await.unwrap_or_else(|e| {
+            error!("Flush error: {:?}", e);
+        });
     }
 
     fn switch_screen(&mut self) {
@@ -99,7 +103,9 @@ where
         loop {
             self.switch_screen();
             self.active_screen.redraw(&mut self.display);
-            self.display.flush().await.unwrap();
+            self.display.flush().await.unwrap_or_else(|e| {
+                error!("Flush error: {:?}", e);
+            });
             ticker.next().await;
         }
     }

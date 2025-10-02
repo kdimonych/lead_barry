@@ -28,4 +28,22 @@ fn main() {
     // here, we ensure the build script is only re-run when
     // `memory.x` is changed.
     println!("cargo:rerun-if-changed=memory.x");
+
+    // Load .env file if it exists
+    if dotenvy::dotenv().is_ok() {
+        println!("cargo:warning=Loaded .env file");
+    } else {
+        println!("cargo:warning=No .env file found, using defaults");
+    }
+
+    // Read environment variables and pass them to rustc
+    if let Ok(wifi_ssid) = env::var("WIFI_SSID") {
+        println!("cargo:rustc-env=WIFI_SSID={}", wifi_ssid);
+    }
+    if let Ok(wifi_password) = env::var("WIFI_PASSWORD") {
+        println!("cargo:rustc-env=WIFI_PASSWORD={}", wifi_password);
+    }
+
+    // Rebuild if .env file changes
+    println!("cargo:rerun-if-changed=.env");
 }

@@ -102,7 +102,7 @@ pub async fn wifi_task(spawner: Spawner, wifi_cfg: WiFiSubsystemConfig) -> ! {
     let seed = rng.next_u64();
 
     // Init network stack
-    static RESOURCES: StaticCell<StackResources<5>> = StaticCell::new();
+    static RESOURCES: StaticCell<StackResources<6>> = StaticCell::new();
     let (stack, runner) = embassy_net::new(
         net_device,
         config,
@@ -145,11 +145,14 @@ impl HttpHandler for MyHandler {
         request: &HttpRequest<'_>,
     ) -> Result<HttpResponse<'_>, nanofish::Error> {
         match request.path {
-            "/" => Ok(HttpResponse {
-                status_code: StatusCode::Ok,
-                headers: HVec::new(),
-                body: ResponseBody::Text("<h1>Hello World!</h1>"),
-            }),
+            "/" => {
+                debug!("Received request for path: {}", request.path);
+                Ok(HttpResponse {
+                    status_code: StatusCode::Ok,
+                    headers: HVec::new(),
+                    body: ResponseBody::Text("<h1>Hello World!</h1>"),
+                })
+            }
             "/api/status" => Ok(HttpResponse {
                 status_code: StatusCode::Ok,
                 headers: HVec::new(),

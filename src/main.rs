@@ -106,8 +106,14 @@ fn main() -> ! {
         wifi_password: heapless::String::new(),
     };
 
-    wifi_config.wifi_network.push_str("_").unwrap();
-    wifi_config.wifi_password.push_str("_").unwrap();
+    wifi_config
+        .wifi_network
+        .push_str(env!("WIFI_SSID"))
+        .unwrap();
+    wifi_config
+        .wifi_password
+        .push_str(env!("WIFI_PASSWORD"))
+        .unwrap();
 
     let executor0 = EXECUTOR0.init(Executor::new());
     executor0.run(|spawner| {
@@ -136,11 +142,15 @@ async fn ina3221_voltage_read_task(
     let mut ticker = Ticker::every(40.ms());
 
     loop {
-        let voltage = ina.get_bus_voltage(0).await.unwrap();
-        {
-            let mut v = voltage_reading.lock().await;
-            *v = voltage.volts();
-        }
+        match ina.get_bus_voltage(0).await {
+            Err(e) => {
+                error!("INA3221 read error: {:?}", e);
+            }
+            Ok(voltage) => {
+                let mut v = voltage_reading.lock().await;
+                *v = voltage.volts();
+            }
+        };
         ticker.next().await;
     }
 }
@@ -181,10 +191,8 @@ async fn led_task(led: &'static mut Output<'static>) -> ! {
 
     loop {
         if led_state {
-            info!("off!");
             led.set_low();
         } else {
-            info!("on!");
             led.set_high();
         }
         led_state = !led_state;
@@ -226,38 +234,38 @@ fn core1_init(resources: ResourcesCore1) {
         .spawn(display_task(resources.i2c_bus))
         .unwrap();
 
-    // Initialize and spawn synchronization example tasks
-    sync_examples::init_sync_system();
-    resources
-        .spawner
-        .spawn(sync_examples::mutex_example_task())
-        .unwrap();
-    resources
-        .spawner
-        .spawn(sync_examples::sensor_producer_task())
-        .unwrap();
-    resources
-        .spawner
-        .spawn(sync_examples::sensor_consumer_task())
-        .unwrap();
-    resources
-        .spawner
-        .spawn(sync_examples::event_handler_task())
-        .unwrap();
-    resources
-        .spawner
-        .spawn(sync_examples::state_monitor_task())
-        .unwrap();
-    resources
-        .spawner
-        .spawn(sync_examples::data_writer_task())
-        .unwrap();
-    resources
-        .spawner
-        .spawn(sync_examples::data_reader_task())
-        .unwrap();
+    // // Initialize and spawn synchronization example tasks
+    // sync_examples::init_sync_system();
+    // resources
+    //     .spawner
+    //     .spawn(sync_examples::mutex_example_task())
+    //     .unwrap();
+    // resources
+    //     .spawner
+    //     .spawn(sync_examples::sensor_producer_task())
+    //     .unwrap();
+    // resources
+    //     .spawner
+    //     .spawn(sync_examples::sensor_consumer_task())
+    //     .unwrap();
+    // resources
+    //     .spawner
+    //     .spawn(sync_examples::event_handler_task())
+    //     .unwrap();
+    // resources
+    //     .spawner
+    //     .spawn(sync_examples::state_monitor_task())
+    //     .unwrap();
+    // resources
+    //     .spawner
+    //     .spawn(sync_examples::data_writer_task())
+    //     .unwrap();
+    // resources
+    //     .spawner
+    //     .spawn(sync_examples::data_reader_task())
+    //     .unwrap();
 
-    sync_examples::trigger_test_event();
+    // sync_examples::trigger_test_event();
 }
 
 #[embassy_executor::task]
