@@ -3,6 +3,7 @@
 //! This will blink the onboard LED on a Pico W, which is controlled via the CYW43 WiFi chip.
 #![no_std]
 #![no_main]
+#![allow(async_fn_in_trait)]
 
 mod ina3221_sensor;
 mod matrix_ops;
@@ -10,6 +11,7 @@ mod precise_timing;
 mod sync_examples;
 mod ui;
 mod units;
+mod wifi;
 
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
@@ -29,6 +31,7 @@ use static_cell::StaticCell;
 use crate::units::{FrequencyExt, TimeExt};
 use micromath::F32Ext;
 use ui::*;
+use wifi::*;
 
 // Display driver imports
 use {defmt_rtt as _, panic_probe as _};
@@ -58,6 +61,7 @@ struct ResourcesCore0 {
     i2c_bus: &'static I2cBus,
     led: &'static mut Output<'static>,
     voltage_reading: &'static VoltageReading,
+    wifi_config: WiFiSubsystemConfig,
 }
 
 struct ResourcesCore1 {
@@ -91,6 +95,20 @@ fn main() -> ! {
         executor1.run(|spawner| core1_init(ResourcesCore1 { spawner, i2c_bus }));
     });
 
+    let mut wifi_config = WiFiSubsystemConfig {
+        pwr_pin: p.PIN_23, // Power pin, pin 23
+        cs_pin: p.PIN_25,  // Chip select pin, pin 25
+        dio_pin: p.PIN_24, // Data In/Out pin, pin 24
+        clk_pin: p.PIN_29, // Clock pin, pin 29
+        pio: p.PIO0,       // PIO instance
+        dma_ch: p.DMA_CH0, // DMA channel
+        wifi_network: heapless::String::new(),
+        wifi_password: heapless::String::new(),
+    };
+
+    wifi_config.wifi_network.push_str("_").unwrap();
+    wifi_config.wifi_password.push_str("_").unwrap();
+
     let executor0 = EXECUTOR0.init(Executor::new());
     executor0.run(|spawner| {
         core0_init(ResourcesCore0 {
@@ -98,6 +116,7 @@ fn main() -> ! {
             i2c_bus,
             led,
             voltage_reading,
+            wifi_config,
         })
     });
 }
@@ -191,6 +210,12 @@ fn core0_init(resources: ResourcesCore0) {
             resources.i2c_bus,
             resources.voltage_reading,
         ))
+        .unwrap();
+
+    //Spawn wifi task
+    resources
+        .spawner
+        .spawn(wifi_task(resources.spawner, resources.wifi_config))
         .unwrap();
 }
 
@@ -291,7 +316,7 @@ async fn precise_sensor_task() {
         let work_duration = Instant::now().duration_since(work_start);
 
         // Log performance every 1000 iterations (10 seconds)
-        if counter % 1000 == 0 {
+        if counter.is_multiple_of(1000) {
             info!(
                 "Sensor task: {} cycles, max jitter: {}μs, last work: {}μs",
                 counter,
