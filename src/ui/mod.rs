@@ -88,10 +88,11 @@ where
 
     fn switch_screen(&mut self) {
         if let Some(new_screen) = self.state_watch_receiver.try_changed() {
-            info!("Switching to new screen");
+            debug!("Switching to new screen ...");
             self.active_screen.exit(&mut self.display);
             self.active_screen = new_screen;
             self.active_screen.enter(&mut self.display);
+            debug!("Switching to new screen complete");
         }
     }
 

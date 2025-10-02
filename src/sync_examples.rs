@@ -5,25 +5,25 @@
 
 use defmt::*;
 use embassy_sync::{
-    blocking_mutex::raw::ThreadModeRawMutex, channel::Channel, mutex::Mutex, pipe::Pipe,
+    blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, mutex::Mutex, pipe::Pipe,
     signal::Signal, watch::Watch,
 };
 use embassy_time::{Duration, Timer};
 
 /// Shared counter protected by mutex
-static COUNTER: Mutex<ThreadModeRawMutex, u32> = Mutex::new(0);
+static COUNTER: Mutex<CriticalSectionRawMutex, u32> = Mutex::new(0);
 
 /// Channel for sending sensor data between tasks
-static SENSOR_CHANNEL: Channel<ThreadModeRawMutex, SensorData, 8> = Channel::new();
+static SENSOR_CHANNEL: Channel<CriticalSectionRawMutex, SensorData, 8> = Channel::new();
 
 /// Signal for system events
-static SYSTEM_EVENT: Signal<ThreadModeRawMutex, SystemEvent> = Signal::new();
+static SYSTEM_EVENT: Signal<CriticalSectionRawMutex, SystemEvent> = Signal::new();
 
 /// Watch for broadcasting system state
-static SYSTEM_STATE: Watch<ThreadModeRawMutex, SystemState, 3> = Watch::new();
+static SYSTEM_STATE: Watch<CriticalSectionRawMutex, SystemState, 3> = Watch::new();
 
 /// Pipe for streaming data
-static DATA_PIPE: Pipe<ThreadModeRawMutex, 256> = Pipe::new();
+static DATA_PIPE: Pipe<CriticalSectionRawMutex, 256> = Pipe::new();
 
 #[derive(Clone, Copy, Debug, defmt::Format)]
 pub struct SensorData {

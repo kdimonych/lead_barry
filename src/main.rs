@@ -23,7 +23,7 @@ use embassy_rp::{
     multicore::Stack,
     peripherals::I2C0,
 };
-use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, mutex::Mutex, watch::Watch};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, watch::Watch};
 use embassy_time::{Duration, Ticker, Timer};
 
 use static_cell::StaticCell;
@@ -42,7 +42,7 @@ bind_interrupts!(struct Irqs {
 });
 
 // Shared interfaces
-type I2cBus = Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>>;
+type I2cBus = Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>;
 
 // Static resources
 static CORE1_STACK: StaticCell<Stack<4096>> = StaticCell::new();
@@ -81,7 +81,7 @@ fn main() -> ! {
     i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
     let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_cfg);
 
-    let i2c_bus: &'static Mutex<ThreadModeRawMutex, I2c<'static, I2C0, i2c::Async>> =
+    let i2c_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
         I2C_BUS.init(Mutex::new(i2c));
 
     // Initialize the stack
@@ -128,7 +128,7 @@ fn main() -> ! {
 }
 
 /// Watch for broadcasting system state
-static UI_STATE: Watch<ThreadModeRawMutex, ScreenCollection, 1> = Watch::new();
+static UI_STATE: Watch<CriticalSectionRawMutex, ScreenCollection, 1> = Watch::new();
 
 use ina3221_async::INA3221Async;
 #[embassy_executor::task]
