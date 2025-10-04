@@ -17,13 +17,13 @@ use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
 use embassy_rp::{
-    bind_interrupts, config,
+    bind_interrupts,
     gpio::{Level, Output},
     i2c::{self, I2c, InterruptHandler as I2cInterruptHandler},
     multicore::Stack,
     peripherals::I2C0,
 };
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex, watch::Watch};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker, Timer};
 
 use static_cell::StaticCell;
@@ -43,11 +43,14 @@ bind_interrupts!(struct Irqs {
 
 // Shared interfaces
 type I2cBus = Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>;
+pub type UiControlHandle<'a, ScreenSet> = Mutex<CriticalSectionRawMutex, UiControl<'a, ScreenSet>>;
 
 // Static resources
 static CORE1_STACK: StaticCell<Stack<4096>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
+static UI_SHARED_STATE: StaticCell<UiSharedState<ScreenCollection>> = StaticCell::new();
+static UI_CONTROL: StaticCell<UiControlHandle<ScreenCollection>> = StaticCell::new();
 static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 
@@ -58,15 +61,24 @@ static VOLTAGE_READING_MODEL: StaticCell<VoltageReading> = StaticCell::new();
 
 struct ResourcesCore0 {
     spawner: Spawner,
+
     i2c_bus: &'static I2cBus,
     led: &'static mut Output<'static>,
+    ui_control: &'static mut UiControlHandle<'static, ScreenCollection>,
+
     voltage_reading: &'static VoltageReading,
     wifi_config: WiFiSubsystemConfig,
 }
 
+type UiRunnerType<'a> = UiRunner<
+    'a,
+    I2cDevice<'a, CriticalSectionRawMutex, I2c<'a, I2C0, i2c::Async>>,
+    ssd1306::size::DisplaySize128x64,
+    ScreenCollection,
+>;
 struct ResourcesCore1 {
-    spawner: Spawner,
     i2c_bus: &'static I2cBus,
+    ui_runner: Option<UiRunnerType<'static>>,
 }
 
 fn log_system_frequencies() {
@@ -89,13 +101,6 @@ fn log_system_frequencies() {
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
-    let mut cfg = config::Config::default();
-    cfg.clocks.xosc.iter_mut().for_each(|xosc| {
-        xosc.sys_pll.iter_mut().for_each(|pll| {
-            pll.fbdiv = 100;
-        });
-    });
-
     let p = embassy_rp::init(Default::default());
 
     log_system_frequencies();
@@ -117,11 +122,19 @@ fn main() -> ! {
     // Initialize global data models
     let voltage_reading: &'static VoltageReading = VOLTAGE_READING_MODEL.init(DataModel::new(0.0));
 
-    embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
-        let executor1 = EXECUTOR1.init(Executor::new());
-        executor1.run(|spawner| core1_init(ResourcesCore1 { spawner, i2c_bus }));
-    });
+    // Initialize the ui
+    let ui_shared_state = UiSharedState::new();
+    let state_ref = UI_SHARED_STATE.init(ui_shared_state);
+    let (ui_control, ui_runner) = UiInterface::new(
+        I2cDevice::new(i2c_bus),
+        ssd1306::size::DisplaySize128x64,
+        state_ref,
+        ScreenCollection::Empty,
+    );
+    let ui_control: &'static mut Mutex<CriticalSectionRawMutex, UiControl<'_, ScreenCollection>> =
+        UI_CONTROL.init(Mutex::new(ui_control));
 
+    // WiFi configuration
     let mut wifi_config = WiFiSubsystemConfig {
         pwr_pin: p.PIN_23, // Power pin, pin 23
         cs_pin: p.PIN_25,  // Chip select pin, pin 25
@@ -142,20 +155,36 @@ fn main() -> ! {
         .push_str(env!("WIFI_PASSWORD"))
         .unwrap();
 
+    // Spawn core threads
+    embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
+        let executor1 = EXECUTOR1.init(Executor::new());
+        debug!("Starting executor on core 1");
+        executor1.run(|spawner| {
+            spawner
+                .spawn(core1_init(
+                    spawner,
+                    ResourcesCore1 {
+                        i2c_bus,
+                        ui_runner: Some(ui_runner),
+                    },
+                ))
+                .unwrap();
+        });
+    });
+
     let executor0 = EXECUTOR0.init(Executor::new());
-    executor0.run(|spawner| {
+    executor0.run(move |spawner| {
+        debug!("Starting executor on core 0");
         core0_init(ResourcesCore0 {
             spawner,
             i2c_bus,
             led,
             voltage_reading,
             wifi_config,
+            ui_control,
         })
     });
 }
-
-/// Watch for broadcasting system state
-static UI_STATE: Watch<CriticalSectionRawMutex, ScreenCollection, 1> = Watch::new();
 
 use ina3221_async::INA3221Async;
 #[embassy_executor::task]
@@ -183,36 +212,30 @@ async fn ina3221_voltage_read_task(
 }
 
 #[embassy_executor::task]
-async fn screen_iterate_task(voltage_reading: &'static VoltageReading) -> ! {
+async fn screen_iterate_task(
+    ui_control: &'static mut UiControlHandle<'static, ScreenCollection>,
+    voltage_reading: &'static VoltageReading,
+) -> ! {
+    debug!("Starting screen iteration task...");
     let mut ticker = Ticker::every(10.s());
 
-    UI_STATE.sender().send(ScreenCollection::VIP(VIPScreen::new(
-        voltage_reading,
-        BaseUnits::Volts,
-    )));
+    ui_control
+        .lock()
+        .await
+        .switch_screen(ScreenCollection::VIP(VIPScreen::new(
+            voltage_reading,
+            BaseUnits::Volts,
+        )))
+        .await;
 
     loop {
-        // UI_STATE
-        //     .sender()
-        //     .send(ScreenCollection::Welcome(WelcomeScreen::new()));
-        // ticker.next().await;
-
-        // UI_STATE.sender().send(ScreenCollection::VIP(VIPScreen::new(
-        //     voltage_reading,
-        //     BaseUnits::Volts,
-        // )));
-        // ticker.next().await;
-
-        // UI_STATE
-        //     .sender()
-        //     .send(ScreenCollection::Animation(AnimationScreen::new()));
         ticker.next().await;
     }
 }
 
 #[embassy_executor::task]
 async fn led_task(led: &'static mut Output<'static>) -> ! {
-    let mut ticker = Ticker::every(500.ms());
+    let mut ticker = Ticker::every(1500.ms());
 
     let mut led_state = false;
 
@@ -230,13 +253,18 @@ async fn led_task(led: &'static mut Output<'static>) -> ! {
 
 fn core0_init(resources: ResourcesCore0) {
     // Spawn the LED blink task on Core 0
+    debug!("Spawn LED task on core 0");
     resources.spawner.spawn(led_task(resources.led)).unwrap();
 
-    // // Spawn the screen iteration task on Core 0
-    // resources
-    //     .spawner
-    //     .spawn(screen_iterate_task(resources.voltage_reading))
-    //     .unwrap();
+    // Spawn the screen iteration task on Core 0
+    debug!("Spawn screen iteration task on core 0");
+    resources
+        .spawner
+        .spawn(screen_iterate_task(
+            resources.ui_control,
+            resources.voltage_reading,
+        ))
+        .unwrap();
 
     // // Spawn the voltage reading simulation task on Core 0
     // resources
@@ -247,26 +275,25 @@ fn core0_init(resources: ResourcesCore0) {
     //     ))
     //     .unwrap();
 
-    //Spawn wifi task
-    resources
-        .spawner
-        .spawn(wifi_task(resources.spawner, resources.wifi_config))
-        .unwrap();
-}
-
-fn core1_init(resources: ResourcesCore1) {
-    // Spawn the display task on Core 1
-    resources
-        .spawner
-        .spawn(display_task(resources.i2c_bus))
-        .unwrap();
-
-    // // Initialize and spawn synchronization example tasks
-    // sync_examples::init_sync_system();
+    // //Spawn wifi task
     // resources
     //     .spawner
-    //     .spawn(sync_examples::mutex_example_task())
+    //     .spawn(wifi_task(resources.spawner, resources.wifi_config))
     //     .unwrap();
+}
+
+#[embassy_executor::task]
+async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
+    if let Some(ui_runner) = resources.ui_runner {
+        // Spawn the display task on Core 1
+        debug!("Spawn display task on core 1");
+        spawner.spawn(display_task(ui_runner)).unwrap();
+    }
+
+    // Initialize and spawn synchronization example tasks
+    sync_examples::init_sync_system();
+
+    spawner.spawn(sync_examples::mutex_example_task()).unwrap();
     // resources
     //     .spawner
     //     .spawn(sync_examples::sensor_producer_task())
@@ -296,22 +323,16 @@ fn core1_init(resources: ResourcesCore1) {
 }
 
 #[embassy_executor::task]
-async fn display_task(i2c_bus: &'static I2cBus) {
-    let i2c_dev = I2cDevice::new(i2c_bus);
-
-    let state_receiver = UI_STATE.dyn_receiver().unwrap();
-    let mut ui = UiInterface::new(
-        i2c_dev,
+async fn display_task(
+    mut ui_runner: UiRunner<
+        'static,
+        I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>,
         ssd1306::size::DisplaySize128x64,
-        state_receiver,
-        ScreenCollection::Empty,
-    );
-
-    // Initialize the display
-    ui.init().await;
-
-    // Draw loop for animation screen. This will run indefinitely.
-    ui.draw_loop().await;
+        ScreenCollection,
+    >,
+) -> ! {
+    debug!("Starting display task...");
+    ui_runner.run().await;
 }
 
 #[embassy_executor::task]
