@@ -17,7 +17,7 @@ use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
 use embassy_rp::{
-    bind_interrupts,
+    bind_interrupts, config,
     gpio::{Level, Output},
     i2c::{self, I2c, InterruptHandler as I2cInterruptHandler},
     multicore::Stack,
@@ -69,9 +69,36 @@ struct ResourcesCore1 {
     i2c_bus: &'static I2cBus,
 }
 
+fn log_system_frequencies() {
+    let sys_freq = embassy_rp::clocks::clk_sys_freq();
+    let peri_freq = embassy_rp::clocks::clk_peri_freq();
+    let usb_freq = embassy_rp::clocks::clk_usb_freq();
+    let adc_freq = embassy_rp::clocks::clk_adc_freq();
+    let rtc_freq = embassy_rp::clocks::clk_rtc_freq();
+    let xosc_freq = embassy_rp::clocks::xosc_freq();
+
+    info!("=== System Clock Frequencies ===");
+    info!("System Clock:     {} MHz", sys_freq / 1_000_000);
+    info!("Peripheral Clock: {} MHz", peri_freq / 1_000_000);
+    info!("USB Clock:        {} MHz", usb_freq / 1_000_000);
+    info!("ADC Clock:        {} MHz", adc_freq / 1_000_000);
+    info!("RTC Clock:        {} Hz", rtc_freq);
+    info!("XOSC Clock:       {} MHz", xosc_freq / 1_000_000);
+    info!("================================");
+}
+
 #[cortex_m_rt::entry]
 fn main() -> ! {
+    let mut cfg = config::Config::default();
+    cfg.clocks.xosc.iter_mut().for_each(|xosc| {
+        xosc.sys_pll.iter_mut().for_each(|pll| {
+            pll.fbdiv = 100;
+        });
+    });
+
     let p = embassy_rp::init(Default::default());
+
+    log_system_frequencies();
 
     // For regular GPIO LED (if you connect an external LED to a GPIO pin)
     let led = LED_PIN.init(Output::new(p.PIN_22, Level::Low));
@@ -205,20 +232,20 @@ fn core0_init(resources: ResourcesCore0) {
     // Spawn the LED blink task on Core 0
     resources.spawner.spawn(led_task(resources.led)).unwrap();
 
-    // Spawn the screen iteration task on Core 0
-    resources
-        .spawner
-        .spawn(screen_iterate_task(resources.voltage_reading))
-        .unwrap();
+    // // Spawn the screen iteration task on Core 0
+    // resources
+    //     .spawner
+    //     .spawn(screen_iterate_task(resources.voltage_reading))
+    //     .unwrap();
 
-    // Spawn the voltage reading simulation task on Core 0
-    resources
-        .spawner
-        .spawn(ina3221_voltage_read_task(
-            resources.i2c_bus,
-            resources.voltage_reading,
-        ))
-        .unwrap();
+    // // Spawn the voltage reading simulation task on Core 0
+    // resources
+    //     .spawner
+    //     .spawn(ina3221_voltage_read_task(
+    //         resources.i2c_bus,
+    //         resources.voltage_reading,
+    //     ))
+    //     .unwrap();
 
     //Spawn wifi task
     resources
