@@ -17,11 +17,11 @@ use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
 use embassy_rp::{
-    bind_interrupts,
+    Peri, bind_interrupts,
     gpio::{Level, Output},
     i2c::{self, I2c, InterruptHandler as I2cInterruptHandler},
     multicore::Stack,
-    peripherals::I2C0,
+    peripherals::{I2C0, PIN_22},
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker, Timer};
@@ -45,6 +45,11 @@ bind_interrupts!(struct Irqs {
 type I2cBus = Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>;
 pub type UiControlHandle<'a, ScreenSet> = Mutex<CriticalSectionRawMutex, UiControl<'a, ScreenSet>>;
 
+struct SharedResources {
+    i2c_bus: &'static I2cBus,
+    ui_control: &'static mut UiControlHandle<'static, ScreenCollection>,
+}
+
 // Static resources
 static CORE1_STACK: StaticCell<Stack<4096>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
@@ -53,6 +58,7 @@ static UI_SHARED_STATE: StaticCell<UiSharedState<ScreenCollection>> = StaticCell
 static UI_CONTROL: StaticCell<UiControlHandle<ScreenCollection>> = StaticCell::new();
 static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
+static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
 
 // Global data models
 // Voltage reading model
@@ -60,14 +66,13 @@ type VoltageReading = DataModel<f32>;
 static VOLTAGE_READING_MODEL: StaticCell<VoltageReading> = StaticCell::new();
 
 struct ResourcesCore0 {
-    spawner: Spawner,
-
-    i2c_bus: &'static I2cBus,
-    led: &'static mut Output<'static>,
-    ui_control: &'static mut UiControlHandle<'static, ScreenCollection>,
-
+    // Owned resources
     voltage_reading: &'static VoltageReading,
     wifi_config: WiFiSubsystemConfig,
+    led_pin: Peri<'static, PIN_22>,
+
+    // Shared resources
+    shared_resources: &'static SharedResources,
 }
 
 type UiRunnerType<'a> = UiRunner<
@@ -77,8 +82,11 @@ type UiRunnerType<'a> = UiRunner<
     ScreenCollection,
 >;
 struct ResourcesCore1 {
-    i2c_bus: &'static I2cBus,
+    // Owned resources
     ui_runner: Option<UiRunnerType<'static>>,
+
+    // Shared resources
+    shared_resources: &'static SharedResources,
 }
 
 fn log_system_frequencies() {
@@ -104,9 +112,6 @@ fn main() -> ! {
     let p = embassy_rp::init(Default::default());
 
     log_system_frequencies();
-
-    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
-    let led = LED_PIN.init(Output::new(p.PIN_22, Level::Low));
 
     // Setup I2C with standard frequency for sensors
     let mut i2c_cfg = i2c::Config::default();
@@ -155,6 +160,11 @@ fn main() -> ! {
         .push_str(env!("WIFI_PASSWORD"))
         .unwrap();
 
+    let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
+        i2c_bus,
+        ui_control,
+    });
+
     // Spawn core threads
     embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
         let executor1 = EXECUTOR1.init(Executor::new());
@@ -164,8 +174,8 @@ fn main() -> ! {
                 .spawn(core1_init(
                     spawner,
                     ResourcesCore1 {
-                        i2c_bus,
                         ui_runner: Some(ui_runner),
+                        shared_resources,
                     },
                 ))
                 .unwrap();
@@ -175,14 +185,17 @@ fn main() -> ! {
     let executor0 = EXECUTOR0.init(Executor::new());
     executor0.run(move |spawner| {
         debug!("Starting executor on core 0");
-        core0_init(ResourcesCore0 {
-            spawner,
-            i2c_bus,
-            led,
-            voltage_reading,
-            wifi_config,
-            ui_control,
-        })
+        spawner
+            .spawn(core0_init(
+                spawner,
+                ResourcesCore0 {
+                    led_pin: p.PIN_22,
+                    voltage_reading,
+                    wifi_config,
+                    shared_resources,
+                },
+            ))
+            .unwrap();
     });
 }
 
@@ -213,7 +226,7 @@ async fn ina3221_voltage_read_task(
 
 #[embassy_executor::task]
 async fn screen_iterate_task(
-    ui_control: &'static mut UiControlHandle<'static, ScreenCollection>,
+    ui_control: &'static UiControlHandle<'static, ScreenCollection>,
     voltage_reading: &'static VoltageReading,
 ) -> ! {
     debug!("Starting screen iteration task...");
@@ -251,33 +264,33 @@ async fn led_task(led: &'static mut Output<'static>) -> ! {
     }
 }
 
-fn core0_init(resources: ResourcesCore0) {
+#[embassy_executor::task]
+async fn core0_init(spawner: Spawner, resources: ResourcesCore0) {
     // Spawn the LED blink task on Core 0
     debug!("Spawn LED task on core 0");
-    resources.spawner.spawn(led_task(resources.led)).unwrap();
+    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
+    let led = LED_PIN.init(Output::new(resources.led_pin, Level::Low));
+    spawner.spawn(led_task(led)).unwrap();
 
     // Spawn the screen iteration task on Core 0
     debug!("Spawn screen iteration task on core 0");
-    resources
-        .spawner
+    spawner
         .spawn(screen_iterate_task(
-            resources.ui_control,
+            resources.shared_resources.ui_control,
             resources.voltage_reading,
         ))
         .unwrap();
 
-    // // Spawn the voltage reading simulation task on Core 0
-    // resources
-    //     .spawner
-    //     .spawn(ina3221_voltage_read_task(
-    //         resources.i2c_bus,
-    //         resources.voltage_reading,
-    //     ))
-    //     .unwrap();
+    // Spawn the voltage reading simulation task on Core 0
+    spawner
+        .spawn(ina3221_voltage_read_task(
+            resources.shared_resources.i2c_bus,
+            resources.voltage_reading,
+        ))
+        .unwrap();
 
     // //Spawn wifi task
-    // resources
-    //     .spawner
+    // spawner
     //     .spawn(wifi_task(resources.spawner, resources.wifi_config))
     //     .unwrap();
 }
