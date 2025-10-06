@@ -1,6 +1,6 @@
 use crate::ui::Screen;
 use crate::ui::screen_animation::AnimationScreen;
-use crate::ui::screen_vip::VIPScreen;
+use crate::ui::screen_vcp::VIPScreen;
 use crate::ui::screen_welcome::WelcomeScreen;
 
 use embedded_graphics::pixelcolor::BinaryColor;
