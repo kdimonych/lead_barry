@@ -134,7 +134,7 @@ fn main() -> ! {
         I2cDevice::new(i2c_bus),
         ssd1306::size::DisplaySize128x64,
         state_ref,
-        ScreenCollection::Empty,
+        None,
     );
     let ui_control: &'static mut Mutex<CriticalSectionRawMutex, UiControl<'_, ScreenCollection>> =
         UI_CONTROL.init(Mutex::new(ui_control));
