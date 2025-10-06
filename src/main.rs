@@ -5,12 +5,12 @@
 #![no_main]
 #![allow(async_fn_in_trait)]
 
-mod ina3221_sensor;
 mod matrix_ops;
 mod precise_timing;
 mod sync_examples;
 mod ui;
 mod units;
+mod vcp_sensors;
 mod wifi;
 
 use defmt::*;
@@ -31,6 +31,7 @@ use static_cell::StaticCell;
 use crate::units::{FrequencyExt, TimeExt};
 use micromath::F32Ext;
 use ui::*;
+use vcp_sensors::*;
 use wifi::*;
 
 // Display driver imports
