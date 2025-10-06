@@ -1,4 +1,5 @@
 use defmt::*;
+use embassy_futures::*;
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
     channel::{Channel, Receiver, SendFuture, Sender},
@@ -7,15 +8,16 @@ use embassy_sync::{
         Sender as PrioritySender,
     },
 };
+
 use embassy_time::Ticker;
-use ina3221_async::INA3221Async;
+use ina3221_async::*;
 
 use crate::{
     units::TimeExt, vcp_sensors::config::*, vcp_sensors::data_model::*, vcp_sensors::error::*,
     vcp_sensors::events::*,
 };
 
-enum VcpCommand {
+pub enum VcpCommand {
     EnableChannel(ChannelNum),
     DisableChannel(ChannelNum),
 }
@@ -188,14 +190,71 @@ where
         })
     }
 
+    async fn configure(&mut self, ina: &mut INA3221Async<SharedI2cDevice>) -> Result<(), VcpError> {
+        // Set operating mode to continuous
+        ina.set_mode(OperatingMode::Continuous).await.map_err(|e| {
+            error!("INA3221 set mode error: {:?}", e);
+            VcpError::I2cError("INA3221 set mode error")
+        })?;
+
+        // Enable selected channels
+        for (i, enable) in self.config.enabled_channels.iter().enumerate() {
+            ina.set_channel_enabled(i as u8, *enable)
+                .await
+                .map_err(|e| {
+                    error!("INA3221 set channel {} enabled error: {:?}", i, e);
+                    VcpError::I2cError("INA3221 set channel enabled error")
+                })?;
+        }
+
+        Ok(())
+    }
+
+    fn handle_command(&mut self, ina: &mut INA3221Async<SharedI2cDevice>, command: VcpCommand) {
+        match command {
+            VcpCommand::EnableChannel(channel) => {
+                if (channel as usize) < self.config.enabled_channels.len() {
+                    self.config.enabled_channels[channel as usize] = true;
+                    info!("Enabled channel {}", channel);
+                } else {
+                    warn!("Invalid channel number: {}", channel);
+                }
+            }
+            VcpCommand::DisableChannel(channel) => {
+                if (channel as usize) < self.config.enabled_channels.len() {
+                    self.config.enabled_channels[channel as usize] = false;
+                    info!("Disabled channel {}", channel);
+                } else {
+                    warn!("Invalid channel number: {}", channel);
+                }
+            }
+        }
+    }
+
     pub async fn run(&mut self) -> ! {
         let i2c_dev = self.i2c_dev.take().expect("I2C device already taken");
         // Initialize the sensors here using self.i2c_dev
-        let ina: INA3221Async<SharedI2cDevice> = INA3221Async::new(i2c_dev, 0x40);
+        let mut ina: INA3221Async<SharedI2cDevice> = INA3221Async::new(i2c_dev, 0x40);
+
+        // Configure the INA3221
+        if let Err(e) = self.configure(&mut ina).await {
+            error!("Failed to configure INA3221: {:?}", e);
+            self.event_sender
+                .send(VcpSensorsEvents::Error(
+                    e.error_description().unwrap_or("Unknown error"),
+                ))
+                .await;
+        }
 
         let mut ticker = Ticker::every(40.ms());
-
         loop {
+            match select::select(self.command_sender.receive(), ticker.next()).await {
+                select::Either::First(command) => {
+                    // Handle incoming command
+                    self.handle_command(&mut ina, command);
+                }
+                select::Either::Second(_) => {}
+            }
             // The sensor reading and processing logic here
             for ch in 0u8..3u8 {
                 if !self.config.enabled_channels[ch as usize] {
@@ -219,7 +278,13 @@ where
                     }
                 };
             }
-            ticker.next().await;
         }
     }
+}
+
+mod private {
+    pub trait Sealed {}
+
+    // Implement Sealed for the enum itself
+    impl Sealed for super::VcpCommand {}
 }

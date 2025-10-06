@@ -7,7 +7,6 @@
 
 mod matrix_ops;
 mod precise_timing;
-mod sync_examples;
 mod ui;
 mod units;
 mod vcp_sensors;
@@ -229,6 +228,9 @@ async fn screen_iterate_task(
     debug!("Starting screen iteration task...");
     //let mut ticker = Ticker::every(100.ms());
 
+    vcp_control.disable_channel(1).await;
+    vcp_control.disable_channel(2).await;
+
     ui_control
         .switch_screen(ScreenCollection::VIP(VIPScreen::new(
             voltage_reading,
@@ -297,20 +299,10 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) {
         ))
         .unwrap();
 
-    // // Spawn the voltage reading simulation task on Core 0
-    // spawner
-    //     .spawn(ina3221_voltage_read_task(
-    //         resources.shared_resources.i2c_bus,
-    //         resources.voltage_reading,
-    //     ))
-    //     .unwrap();
-
-    // Spawn the VCP sensors task on Core 0
-
-    // //Spawn wifi task
-    // spawner
-    //     .spawn(wifi_task(resources.spawner, resources.wifi_config))
-    //     .unwrap();
+    //Spawn wifi task
+    spawner
+        .spawn(wifi_task(spawner, resources.wifi_config))
+        .unwrap();
 }
 
 #[embassy_executor::task]
@@ -320,37 +312,6 @@ async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
         debug!("Spawn display task on core 1");
         spawner.spawn(display_runner_task(ui_runner)).unwrap();
     }
-
-    // // Initialize and spawn synchronization example tasks
-    // sync_examples::init_sync_system();
-
-    // spawner.spawn(sync_examples::mutex_example_task()).unwrap();
-    // resources
-    //     .spawner
-    //     .spawn(sync_examples::sensor_producer_task())
-    //     .unwrap();
-    // resources
-    //     .spawner
-    //     .spawn(sync_examples::sensor_consumer_task())
-    //     .unwrap();
-    // resources
-    //     .spawner
-    //     .spawn(sync_examples::event_handler_task())
-    //     .unwrap();
-    // resources
-    //     .spawner
-    //     .spawn(sync_examples::state_monitor_task())
-    //     .unwrap();
-    // resources
-    //     .spawner
-    //     .spawn(sync_examples::data_writer_task())
-    //     .unwrap();
-    // resources
-    //     .spawner
-    //     .spawn(sync_examples::data_reader_task())
-    //     .unwrap();
-
-    // sync_examples::trigger_test_event();
 }
 
 #[embassy_executor::task]
