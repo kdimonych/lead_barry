@@ -3,8 +3,6 @@ pub enum VcpState {
     Normal(f32),
     Low(f32),
     High(f32),
-    Critical(f32),
-    Error,
 }
 
 pub type ChannelNum = u8;
@@ -16,9 +14,10 @@ pub struct VcpReading {
     pub channel: ChannelNum,
 }
 
-#[derive(Debug, Copy, Clone, defmt::Format)]
-pub enum VcpSensorsEvents {
-    Reading(VcpReading),
-    Alert,
-    Error,
+impl VcpState {
+    pub fn value(&self) -> f32 {
+        match self {
+            VcpState::Normal(v) | VcpState::Low(v) | VcpState::High(v) => *v,
+        }
+    }
 }

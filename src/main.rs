@@ -37,26 +37,42 @@ use wifi::*;
 // Display driver imports
 use {defmt_rtt as _, panic_probe as _};
 
+// Constants
+const CORE1_STACK_SIZE: usize = 4096;
+const VCP_SENSORS_EVENT_QUEUE_SIZE: usize = 8;
+
+// Global types
+type I2cBus = Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>;
+type I2cDeviceType<'a> = I2cDevice<'a, CriticalSectionRawMutex, I2c<'a, I2C0, i2c::Async>>;
+type UiRunnerType<'a> =
+    UiRunner<'a, I2cDeviceType<'a>, ssd1306::size::DisplaySize128x64, ScreenCollection>;
+type UiControlType<'a> = UiControl<'a, ScreenCollection>;
+type VcpSensorsRunnerType<'a> =
+    VcpSensorsRunner<'a, I2cDeviceType<'a>, VCP_SENSORS_EVENT_QUEUE_SIZE>;
+type VcpControlType<'a> = VcpControl<'a, VCP_SENSORS_EVENT_QUEUE_SIZE>;
+
 // Interrupt handlers
 bind_interrupts!(struct Irqs {
     I2C0_IRQ => I2cInterruptHandler<I2C0>;
 });
 
 // Shared interfaces
-type I2cBus = Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>;
-pub type UiControlHandle<'a, ScreenSet> = Mutex<CriticalSectionRawMutex, UiControl<'a, ScreenSet>>;
 
 struct SharedResources {
     i2c_bus: &'static I2cBus,
-    ui_control: &'static mut UiControlHandle<'static, ScreenCollection>,
+    ui_control: &'static UiControlType<'static>,
+    vcp_control: &'static VcpControlType<'static>,
 }
 
 // Static resources
-static CORE1_STACK: StaticCell<Stack<4096>> = StaticCell::new();
+static CORE1_STACK: StaticCell<Stack<CORE1_STACK_SIZE>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
 static UI_SHARED_STATE: StaticCell<UiSharedState<ScreenCollection>> = StaticCell::new();
-static UI_CONTROL: StaticCell<UiControlHandle<ScreenCollection>> = StaticCell::new();
+static UI_CONTROL: StaticCell<UiControlType> = StaticCell::new();
+static VCP_SENSORS_STATE: StaticCell<VcpSensorsState<VCP_SENSORS_EVENT_QUEUE_SIZE>> =
+    StaticCell::new();
+static VCP_SENSORS_CONTROL: StaticCell<VcpControlType> = StaticCell::new();
 static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
@@ -72,16 +88,12 @@ struct ResourcesCore0 {
     wifi_config: WiFiSubsystemConfig,
     led_pin: Peri<'static, PIN_22>,
 
+    vcp_runner: Option<VcpSensorsRunnerType<'static>>,
+
     // Shared resources
     shared_resources: &'static SharedResources,
 }
 
-type UiRunnerType<'a> = UiRunner<
-    'a,
-    I2cDevice<'a, CriticalSectionRawMutex, I2c<'a, I2C0, i2c::Async>>,
-    ssd1306::size::DisplaySize128x64,
-    ScreenCollection,
->;
 struct ResourcesCore1 {
     // Owned resources
     ui_runner: Option<UiRunnerType<'static>>,
@@ -137,8 +149,14 @@ fn main() -> ! {
         state_ref,
         None,
     );
-    let ui_control: &'static mut Mutex<CriticalSectionRawMutex, UiControl<'_, ScreenCollection>> =
-        UI_CONTROL.init(Mutex::new(ui_control));
+    let ui_control: &'static UiControlType = UI_CONTROL.init(ui_control);
+
+    // Initialize the VCP sensors
+    let vcp_sensors_state = VcpSensorsState::new();
+    let vcp_state_ref = VCP_SENSORS_STATE.init(vcp_sensors_state);
+    let (vcp_runner, vcp_control) =
+        VcpSensorsService::new(I2cDevice::new(i2c_bus), vcp_state_ref, VcpConfig::default());
+    let vcp_control: &'static VcpControlType = VCP_SENSORS_CONTROL.init(vcp_control);
 
     // WiFi configuration
     let mut wifi_config = WiFiSubsystemConfig {
@@ -164,6 +182,7 @@ fn main() -> ! {
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
         i2c_bus,
         ui_control,
+        vcp_control,
     });
 
     // Spawn core threads
@@ -190,6 +209,7 @@ fn main() -> ! {
             .spawn(core0_init(
                 spawner,
                 ResourcesCore0 {
+                    vcp_runner: Some(vcp_runner),
                     led_pin: p.PIN_22,
                     voltage_reading,
                     wifi_config,
@@ -200,42 +220,16 @@ fn main() -> ! {
     });
 }
 
-use ina3221_async::INA3221Async;
-#[embassy_executor::task]
-async fn ina3221_voltage_read_task(
-    i2c_bus: &'static I2cBus,
-    voltage_reading: &'static VoltageReading,
-) {
-    let i2c_dev = I2cDevice::new(i2c_bus);
-    let ina = INA3221Async::new(i2c_dev, 0x40);
-
-    let mut ticker = Ticker::every(40.ms());
-
-    loop {
-        match ina.get_bus_voltage(0).await {
-            Err(e) => {
-                error!("INA3221 read error: {:?}", e);
-            }
-            Ok(voltage) => {
-                let mut v = voltage_reading.lock().await;
-                *v = voltage.volts();
-            }
-        };
-        ticker.next().await;
-    }
-}
-
 #[embassy_executor::task]
 async fn screen_iterate_task(
-    ui_control: &'static UiControlHandle<'static, ScreenCollection>,
+    ui_control: &'static UiControlType<'static>,
+    vcp_control: &'static VcpControlType<'static>,
     voltage_reading: &'static VoltageReading,
 ) -> ! {
     debug!("Starting screen iteration task...");
-    let mut ticker = Ticker::every(10.s());
+    //let mut ticker = Ticker::every(100.ms());
 
     ui_control
-        .lock()
-        .await
         .switch_screen(ScreenCollection::VIP(VIPScreen::new(
             voltage_reading,
             BaseUnits::Volts,
@@ -243,7 +237,20 @@ async fn screen_iterate_task(
         .await;
 
     loop {
-        ticker.next().await;
+        let event: VcpSensorsEvents = vcp_control.receive_event().await;
+        match event {
+            VcpSensorsEvents::Reading(reading) => {
+                trace!("Reading: {}", reading);
+                if reading.channel == 0 {
+                    let mut voltage = voltage_reading.lock().await;
+                    *voltage = reading.voltage.value();
+                }
+            }
+            VcpSensorsEvents::Error(description) => {
+                error!("VCP Event: Error: {}", description);
+            }
+        }
+        //ticker.next().await;
     }
 }
 
@@ -273,22 +280,32 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) {
     let led = LED_PIN.init(Output::new(resources.led_pin, Level::Low));
     spawner.spawn(led_task(led)).unwrap();
 
+    // Spawn the VCP sensors task on Core 0
+    if let Some(vcp_runner) = resources.vcp_runner {
+        // Spawn the display task on Core 1
+        debug!("Spawn display task on core 1");
+        spawner.spawn(vcp_sensors_runner_task(vcp_runner)).unwrap();
+    }
+
     // Spawn the screen iteration task on Core 0
     debug!("Spawn screen iteration task on core 0");
     spawner
         .spawn(screen_iterate_task(
             resources.shared_resources.ui_control,
+            resources.shared_resources.vcp_control,
             resources.voltage_reading,
         ))
         .unwrap();
 
-    // Spawn the voltage reading simulation task on Core 0
-    spawner
-        .spawn(ina3221_voltage_read_task(
-            resources.shared_resources.i2c_bus,
-            resources.voltage_reading,
-        ))
-        .unwrap();
+    // // Spawn the voltage reading simulation task on Core 0
+    // spawner
+    //     .spawn(ina3221_voltage_read_task(
+    //         resources.shared_resources.i2c_bus,
+    //         resources.voltage_reading,
+    //     ))
+    //     .unwrap();
+
+    // Spawn the VCP sensors task on Core 0
 
     // //Spawn wifi task
     // spawner
@@ -301,13 +318,13 @@ async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
     if let Some(ui_runner) = resources.ui_runner {
         // Spawn the display task on Core 1
         debug!("Spawn display task on core 1");
-        spawner.spawn(display_task(ui_runner)).unwrap();
+        spawner.spawn(display_runner_task(ui_runner)).unwrap();
     }
 
-    // Initialize and spawn synchronization example tasks
-    sync_examples::init_sync_system();
+    // // Initialize and spawn synchronization example tasks
+    // sync_examples::init_sync_system();
 
-    spawner.spawn(sync_examples::mutex_example_task()).unwrap();
+    // spawner.spawn(sync_examples::mutex_example_task()).unwrap();
     // resources
     //     .spawner
     //     .spawn(sync_examples::sensor_producer_task())
@@ -337,16 +354,15 @@ async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
 }
 
 #[embassy_executor::task]
-async fn display_task(
-    mut ui_runner: UiRunner<
-        'static,
-        I2cDevice<'static, CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>,
-        ssd1306::size::DisplaySize128x64,
-        ScreenCollection,
-    >,
-) -> ! {
+async fn display_runner_task(mut ui_runner: UiRunnerType<'static>) -> ! {
     debug!("Starting display task...");
     ui_runner.run().await;
+}
+
+#[embassy_executor::task]
+async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunnerType<'static>) -> ! {
+    debug!("Starting VCP sensors task...");
+    vcp_sensors_runner.run().await;
 }
 
 #[embassy_executor::task]
