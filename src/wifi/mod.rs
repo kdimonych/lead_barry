@@ -166,6 +166,7 @@ pub async fn wifi_task(spawner: Spawner, wifi_cfg: WiFiSubsystemConfig) -> ! {
     socket.set_keep_alive(Some(Duration::from_secs(5)));
 
     loop {
+        info!("Accepting connection...");
         if let Err(e) = socket.accept(80).await {
             defmt::warn!("Accept error: {:?}", e);
             Timer::after(Duration::from_millis(100)).await;
@@ -205,14 +206,29 @@ pub async fn wifi_task(spawner: Spawner, wifi_cfg: WiFiSubsystemConfig) -> ! {
         socket.flush().await.unwrap();
         info!("Flushed socket.");
         let mut old_state = socket.state();
-        info!("State before abort {:?}", old_state);
-        socket.abort();
+        info!("State before close {:?}", old_state);
+        socket.close();
         old_state = socket.state();
-        info!("State after abort {:?}", old_state);
+        info!("State after close {:?}", old_state);
         socket.flush().await.unwrap();
         old_state = socket.state();
         info!("State after flush {:?}", old_state);
         // Wait until the socket is fully closed
+        while socket.state() != State::FinWait2
+            && socket.state() != State::Closed
+            && socket.state() != State::TimeWait
+        {
+            let new_state = socket.state();
+            if new_state != old_state {
+                info!("Socket state changed to {:?}", new_state);
+                old_state = new_state;
+            }
+            Timer::after(Duration::from_millis(40)).await;
+        }
+        socket.abort();
+        info!("Aborted socket.");
+        old_state = socket.state();
+        info!("State after abort {:?}", old_state);
         while socket.state() != State::Closed {
             let new_state = socket.state();
             if new_state != old_state {
@@ -221,11 +237,6 @@ pub async fn wifi_task(spawner: Spawner, wifi_cfg: WiFiSubsystemConfig) -> ! {
             }
             Timer::after(Duration::from_millis(40)).await;
         }
-        //Timer::after(Duration::from_millis(200)).await;
-        info!("Closed socket.");
-        // socket.abort();
-        // info!("Aborted socket.");
-        //Timer::after(Duration::from_millis(200)).await;
     }
 
     // This runs forever, handling requests
