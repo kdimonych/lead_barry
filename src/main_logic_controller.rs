@@ -142,6 +142,7 @@ pub async fn main_logic_controller(
     }
 }
 
+/* Tasks */
 #[embassy_executor::task]
 async fn net_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'static>>) -> ! {
     runner.run().await

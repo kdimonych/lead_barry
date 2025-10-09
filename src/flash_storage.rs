@@ -1,4 +1,4 @@
-use defmt::debug;
+use defmt::info;
 use embassy_rp::Peri;
 use embassy_rp::dma::Channel;
 use embassy_rp::flash::{ASYNC_READ_SIZE, Async, ERASE_SIZE, Flash};
@@ -66,6 +66,7 @@ pub fn get_user_flash_size() -> u32 {
 impl<'a> Storage<'a> {
     pub fn new(flash_peripheral: Peri<'static, FLASH>, dma: Peri<'static, impl Channel>) -> Self {
         let flash = FlashType::new(flash_peripheral, dma);
+        info!("Flash storage capacity:  size={:#X}", flash.capacity());
         Self { flash }
     }
 
@@ -112,15 +113,6 @@ impl<'a> Storage<'a> {
 
         let u32_buffer = bytemuck::cast_slice_mut::<u8, u32>(buffer);
 
-        debug!(
-            "Flash capacity: start={:#X}, size={:#X}",
-            get_user_flash_start(),
-            get_user_flash_size()
-        );
-        debug!(
-            "Flash capacity by FLASH:  size={:#X}",
-            self.flash.capacity()
-        );
         self.flash
             .background_read((FLASH_STORAGE_START_OFFSET + offset) as u32, u32_buffer)?
             .await;
