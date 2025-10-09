@@ -62,7 +62,7 @@ pub async fn main_logic_controller(
     spawner: Spawner,
     vcp_control: &'static VcpControlType<'_>,
     ui_control: &'static UiControlType<'_>,
-    wifi_control: ReadyState<'_>,
+    wifi_control: IdleState<'_>,
     wifi_network_driver: NetDriver<'static>,
     shared_storage: &'static Mutex<CriticalSectionRawMutex, Storage<'static>>,
 ) -> ! {
@@ -89,57 +89,66 @@ pub async fn main_logic_controller(
     let (stack, runner) = embassy_net::new(wifi_network_driver, config, stack_resources, seed);
 
     spawner.spawn(net_task(runner)).unwrap();
-    let mut state = WiFiController::Ready(wifi_control);
+    let mut state = WiFiController::Idle(wifi_control);
 
     if !settings.wifi_ssid.is_empty() {
-        info!("Joining WiFi network: {}", settings.wifi_ssid);
-
-        for try_count in 0..5 {
-            state = match state {
-                WiFiController::Ready(s) => {
-                    ui_control
-                        .switch_screen(ScreenCollection::WiFiStatus(WifiStatsScreen::new(
-                            settings.wifi_ssid.clone(),
-                            WifiState::Connecting,
-                            try_count,
-                        )))
-                        .await;
-
-                    let mut join_options = JoinOptions::new(settings.wifi_password.as_bytes());
-                    join_options.auth = if settings.wifi_password.is_empty() {
-                        JoinAuth::Open
-                    } else {
-                        JoinAuth::Wpa2
-                    };
-
-                    match s.join(&settings.wifi_ssid, join_options).await {
-                        Ok(s) => WiFiController::Joined(s),
-                        Err((s, e)) => {
-                            error!("Join failed with status={}", e.status);
-                            WiFiController::Ready(s)
-                        }
-                    }
-                }
-
-                WiFiController::Joined(s) => {
-                    info!(
-                        "WiFi controller is in Joined to {}",
-                        settings.wifi_ssid.as_str()
-                    );
-                    break;
-                }
-                WiFiController::Ap(_) => {
-                    error!("Unexpected state: Ap");
-                    state
-                }
-            }
-        }
+        state = join_wifi_network(state, &settings, ui_control).await;
     }
 
     loop {
         // Main logic goes here
         Timer::after(Duration::from_secs(60)).await;
     }
+}
+
+async fn join_wifi_network<'a>(
+    state: WiFiController<'a>,
+    settings: &Settings,
+    ui_control: &'static UiControlType<'_>,
+) -> WiFiController<'a> {
+    info!("Joining WiFi network: {}", settings.wifi_ssid);
+    let mut state = state;
+    for try_count in 0..5 {
+        state = match state {
+            WiFiController::Idle(s) => {
+                ui_control
+                    .switch_screen(ScreenCollection::WiFiStatus(WifiStatsScreen::new(
+                        settings.wifi_ssid.clone(),
+                        WifiState::Connecting,
+                        try_count,
+                    )))
+                    .await;
+
+                let mut join_options = JoinOptions::new(settings.wifi_password.as_bytes());
+                join_options.auth = if settings.wifi_password.is_empty() {
+                    JoinAuth::Open
+                } else {
+                    JoinAuth::Wpa2
+                };
+
+                match s.join(&settings.wifi_ssid, join_options).await {
+                    Ok(s) => WiFiController::Joined(s),
+                    Err((s, e)) => {
+                        error!("Join failed with status={}", e.status);
+                        WiFiController::Idle(s)
+                    }
+                }
+            }
+
+            WiFiController::Joined(_) => {
+                break;
+            }
+            _ => {
+                error!("Unexpected state");
+                return state;
+            }
+        }
+    }
+    info!(
+        "WiFi controller is in Joined to {}",
+        settings.wifi_ssid.as_str()
+    );
+    state
 }
 
 /* Tasks */

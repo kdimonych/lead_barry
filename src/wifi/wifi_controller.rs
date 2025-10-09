@@ -25,7 +25,7 @@ use crate::wifi::config::*;
 
 pub enum WiFiState {
     Uninitialized,
-    Ready,
+    Idle,
     Joined,
     Ap,
 }
@@ -44,7 +44,7 @@ pub struct InitializedState<'a> {
     control: Control<'a>,
 }
 
-pub struct ReadyState<'a> {
+pub struct IdleState<'a> {
     control: Control<'a>,
 }
 
@@ -76,7 +76,7 @@ impl Default for WiFiStaticData {
 }
 
 pub enum WiFiController<'a> {
-    Ready(ReadyState<'a>),
+    Idle(IdleState<'a>),
     Joined(JoinedState<'a>),
     Ap(ApState<'a>),
 }
@@ -136,7 +136,7 @@ where
     DMA: embassy_rp::dma::Channel + 'static,
     PIO: embassy_rp::pio::Instance + 'static,
 {
-    /// Initialize the WiFi hardware and transition to Ready state
+    /// Initialize the WiFi hardware and transition to Idle state
     pub async fn initialize(
         self,
         wifi_static_state: &'_ mut WiFiStaticData,
@@ -159,20 +159,20 @@ where
 }
 
 impl<'a> InitializedState<'a> {
-    /// Initialize the WiFi hardware and transition to Ready state
-    pub async fn initialize_controller(mut self) -> ReadyState<'a> {
+    /// Initialize the WiFi hardware and transition to Idle state
+    pub async fn initialize_controller(mut self) -> IdleState<'a> {
         let clm = CYW43_43439A0_CLM; // CLM binary included in the cyw43_firmware crate;
         self.control.init(clm).await;
         self.control
             .set_power_management(cyw43::PowerManagementMode::Performance)
             .await;
-        ReadyState {
+        IdleState {
             control: self.control,
         }
     }
 }
 
-impl<'a> ReadyState<'a> {
+impl<'a> IdleState<'a> {
     /// Initialize the WiFi hardware and transition to Joined state
     pub async fn join(
         mut self,
@@ -232,10 +232,10 @@ impl<'a> ReadyState<'a> {
 }
 
 impl<'a> JoinedState<'a> {
-    /// Disconnect from the current WiFi network and transition to Ready state
-    pub async fn leave(mut self) -> ReadyState<'a> {
+    /// Disconnect from the current WiFi network and transition to Idle state
+    pub async fn leave(mut self) -> IdleState<'a> {
         self.control.leave().await;
-        ReadyState {
+        IdleState {
             control: self.control,
         }
     }
@@ -268,10 +268,10 @@ impl<'a> JoinedState<'a> {
 }
 
 impl<'a> ApState<'a> {
-    /// Close the access point and transition to Ready state
-    pub async fn close_ap(mut self) -> ReadyState<'a> {
+    /// Close the access point and transition to Idle state
+    pub async fn close_ap(mut self) -> IdleState<'a> {
         self.control.close_ap().await;
-        ReadyState {
+        IdleState {
             control: self.control,
         }
     }
