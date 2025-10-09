@@ -1,4 +1,5 @@
 use crate::flash_storage::*;
+use crc::{CRC_32_ISCSI, Crc};
 use defmt::*;
 use serde::{Deserialize, Serialize};
 
@@ -41,32 +42,24 @@ impl Settings {
         }
     }
 
-    fn deserialize(data: &[u8]) -> Result<(Self, &[u8]), postcard::Error> {
-        postcard::take_from_bytes(data)
-    }
-
-    fn serialize_to_slice(&self, buffer: &mut [u8]) -> Result<usize, postcard::Error> {
-        let used = postcard::to_slice(self, buffer)?;
-        Ok(used.len())
-    }
-
     pub fn save(&self, storage: &mut Storage) -> Result<(), Error> {
-        let mut buffer = [0u8; Storage::storage_size() - 4]; // Reserve 4 bytes for checksum
-        let used = self
-            .serialize_to_slice(&mut buffer)
+        let mut buffer = [0u8; Storage::storage_size()]; // Reserve 4 bytes for checksum
+
+        let crc = Crc::<u32>::new(&CRC_32_ISCSI);
+        let used = postcard::to_slice_crc32(self, &mut buffer, crc.digest())
             .map_err(|_| Error::Serialization)?;
+
+        debug!(
+            "Used during save size: {} , \n\tdata: {:?}",
+            used.len(),
+            &used
+        );
 
         storage.blocking_erase().map_err(Error::StorageErase)?;
         storage
-            .blocking_write(0, &buffer[..used])
+            .blocking_write(0, used)
             .map_err(Error::StorageWrite)?;
 
-        // Write checksum
-        let checksum = crc32_checksum(&buffer[..used]);
-        let checksum_bytes = checksum.to_le_bytes();
-        storage
-            .blocking_write(used, &checksum_bytes)
-            .map_err(Error::StorageCrcWrite)?;
         Ok(())
     }
 
@@ -77,27 +70,9 @@ impl Settings {
             .blocking_read(0, &mut buffer)
             .map_err(Error::StorageRead)?;
 
-        let data_len = buffer.len() - CRC_SUM_SIZE;
-
-        let (settings, crc_block) =
-            Self::deserialize(&buffer[..data_len]).map_err(|_| Error::Deserialization)?;
-        let parsed_block_size = buffer.len() - crc_block.len();
-
-        if crc_block.len() < CRC_SUM_SIZE {
-            error!("CRC block is too small");
-            return Err(Error::Deserialization);
-        }
-
-        let stored_checksum =
-            u32::from_le_bytes([crc_block[0], crc_block[1], crc_block[3], crc_block[4]]);
-
-        // Verify checksum
-        let calculated_checksum = crc32_checksum(&buffer[..parsed_block_size]);
-        if stored_checksum != calculated_checksum {
-            return Err(Error::Crc);
-        }
-
-        Ok(settings)
+        let crc = Crc::<u32>::new(&CRC_32_ISCSI);
+        postcard::from_bytes_crc32::<Self>(&buffer, crc.digest())
+            .map_err(|_| Error::Deserialization)
     }
 
     pub async fn load_async<'a>(storage: &mut Storage<'a>) -> Result<Self, Error> {
@@ -108,45 +83,8 @@ impl Settings {
             .await
             .map_err(Error::StorageRead)?;
 
-        let data_len = buffer.len() - CRC_SUM_SIZE;
-
-        let (settings, crc_block) =
-            Self::deserialize(&buffer[..data_len]).map_err(|_| Error::Deserialization)?;
-        let parsed_block_size = buffer.len() - crc_block.len();
-
-        if crc_block.len() < CRC_SUM_SIZE {
-            return Err(Error::Deserialization);
-        }
-
-        let stored_checksum =
-            u32::from_le_bytes([crc_block[0], crc_block[1], crc_block[3], crc_block[4]]);
-
-        // Verify checksum
-        let calculated_checksum = crc32_checksum(&buffer[..parsed_block_size]);
-        if stored_checksum != calculated_checksum {
-            return Err(Error::Crc);
-        }
-
-        Ok(settings)
+        let crc = Crc::<u32>::new(&CRC_32_ISCSI);
+        postcard::from_bytes_crc32::<Self>(&buffer, crc.digest())
+            .map_err(|_| Error::Deserialization)
     }
-}
-
-// TODO: Implement with hardware CRC32 if available
-// Simple CRC32 implementation
-fn crc32_checksum(data: &[u8]) -> u32 {
-    const CRC32_POLYNOMIAL: u32 = 0xEDB88320;
-    let mut crc = 0xFFFFFFFF;
-
-    for &byte in data {
-        crc ^= byte as u32;
-        for _ in 0..8 {
-            if crc & 1 != 0 {
-                crc = (crc >> 1) ^ CRC32_POLYNOMIAL;
-            } else {
-                crc >>= 1;
-            }
-        }
-    }
-
-    !crc
 }

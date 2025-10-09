@@ -39,7 +39,7 @@ critical-section = "1.2.0"
 static_cell = "2.1.1"
 # For safe casting of types
 bytemuck = { version = "1.24.0", features = ["derive"] }
-postcard = { version = "1.1", default-features = false }
+postcard = { version = "1.1", default-features = false, features = ["use-crc"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 # Embassy
@@ -73,6 +73,7 @@ cyw43-firmware = { version = "0.1.0", features = ["bluetooth", "wifi"] }
 # Prerepherial device drivers
 ssd1306 = { version = "0.10", features = ["async"] }
 ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "DmytroKrasnianskyi/async" }
+crc = "3.3.0"
 
 # cargo build/run
 [profile.dev]
