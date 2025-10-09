@@ -5,16 +5,22 @@
 #![no_main]
 #![allow(async_fn_in_trait)]
 
+mod flash_storage;
+mod main_logic_controller;
 mod matrix_ops;
 mod precise_timing;
+mod settings;
 mod ui;
 mod units;
 mod vcp_sensors;
 mod wifi;
 
+use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
+use embassy_rp::peripherals::{DMA_CH0, PIO0};
+use embassy_rp::pio::InterruptHandler as PioInterruptHandler;
 use embassy_rp::{
     Peri, bind_interrupts,
     gpio::{Level, Output},
@@ -28,6 +34,8 @@ use embassy_time::{Duration, Ticker, Timer};
 use static_cell::StaticCell;
 
 use crate::units::{FrequencyExt, TimeExt};
+use flash_storage::*;
+use main_logic_controller::*;
 use micromath::F32Ext;
 use ui::*;
 use vcp_sensors::*;
@@ -48,11 +56,16 @@ type UiRunnerType<'a> =
 type UiControlType<'a> = UiControl<'a, ScreenCollection>;
 type VcpSensorsRunnerType<'a> =
     VcpSensorsRunner<'a, I2cDeviceType<'a>, VCP_SENSORS_EVENT_QUEUE_SIZE>;
-type VcpControlType<'a> = VcpControl<'a, VCP_SENSORS_EVENT_QUEUE_SIZE>;
+type WiFiUninitializedControllerType = WiFiDriverCreatedState<PIO0, DMA_CH0>;
+type SharedStorageType = Mutex<CriticalSectionRawMutex, Storage<'static>>; // 4KB storage
 
 // Interrupt handlers
-bind_interrupts!(struct Irqs {
+bind_interrupts!(struct I2c0Irqs {
     I2C0_IRQ => I2cInterruptHandler<I2C0>;
+});
+
+bind_interrupts!(struct Pio0Irqs {
+    PIO0_IRQ_0 => PioInterruptHandler<PIO0>;
 });
 
 // Shared interfaces
@@ -61,6 +74,7 @@ struct SharedResources {
     i2c_bus: &'static I2cBus,
     ui_control: &'static UiControlType<'static>,
     vcp_control: &'static VcpControlType<'static>,
+    shared_storage: &'static SharedStorageType,
 }
 
 // Static resources
@@ -75,6 +89,8 @@ static VCP_SENSORS_CONTROL: StaticCell<VcpControlType> = StaticCell::new();
 static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
+static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
+static SHARED_STORAGE: StaticCell<SharedStorageType> = StaticCell::new();
 
 // Global data models
 // Voltage reading model
@@ -84,10 +100,10 @@ static VOLTAGE_READING_MODEL: StaticCell<VoltageReading> = StaticCell::new();
 struct ResourcesCore0 {
     // Owned resources
     voltage_reading: &'static VoltageReading,
-    wifi_config: WiFiSubsystemConfig,
     led_pin: Peri<'static, PIN_22>,
 
     vcp_runner: Option<VcpSensorsRunnerType<'static>>,
+    wifi_controller: WiFiUninitializedControllerType,
 
     // Shared resources
     shared_resources: &'static SharedResources,
@@ -125,10 +141,14 @@ fn main() -> ! {
 
     log_system_frequencies();
 
+    //User FLASH storage
+    let storage = Storage::new(p.FLASH, p.DMA_CH1);
+    let shared_storage: &'static SharedStorageType = SHARED_STORAGE.init(Mutex::new(storage));
+
     // Setup I2C with standard frequency for sensors
     let mut i2c_cfg = i2c::Config::default();
     i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
-    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_cfg);
+    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, I2c0Irqs, i2c_cfg);
 
     let i2c_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
         I2C_BUS.init(Mutex::new(i2c));
@@ -157,31 +177,38 @@ fn main() -> ! {
         VcpSensorsService::new(I2cDevice::new(i2c_bus), vcp_state_ref, VcpConfig::default());
     let vcp_control: &'static VcpControlType = VCP_SENSORS_CONTROL.init(vcp_control);
 
-    // WiFi configuration
-    let mut wifi_config = WiFiSubsystemConfig {
+    let wifi_cfg = WiFiConfig::<PIO0, DMA_CH0> {
         pwr_pin: p.PIN_23, // Power pin, pin 23
         cs_pin: p.PIN_25,  // Chip select pin, pin 25
         dio_pin: p.PIN_24, // Data In/Out pin, pin 24
         clk_pin: p.PIN_29, // Clock pin, pin 29
         pio: p.PIO0,       // PIO instance
         dma_ch: p.DMA_CH0, // DMA channel
-        wifi_network: heapless::String::new(),
-        wifi_password: heapless::String::new(),
     };
 
-    wifi_config
-        .wifi_network
-        .push_str(env!("WIFI_SSID"))
-        .unwrap();
-    wifi_config
-        .wifi_password
-        .push_str(env!("WIFI_PASSWORD"))
-        .unwrap();
+    let wifi_controller: WiFiDriverCreatedState<PIO0, DMA_CH0> =
+        new_wifi_service(wifi_cfg, Pio0Irqs);
+
+    // // WiFi configuration
+    // let mut wifi_config = WiFiSubsystemConfig {
+    //     wifi_network: heapless::String::new(),
+    //     wifi_password: heapless::String::new(),
+    // };
+
+    // wifi_config
+    //     .wifi_network
+    //     .push_str(env!("WIFI_SSID"))
+    //     .unwrap();
+    // wifi_config
+    //     .wifi_password
+    //     .push_str(env!("WIFI_PASSWORD"))
+    //     .unwrap();
 
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
         i2c_bus,
         ui_control,
         vcp_control,
+        shared_storage,
     });
 
     // Spawn core threads
@@ -211,7 +238,7 @@ fn main() -> ! {
                     vcp_runner: Some(vcp_runner),
                     led_pin: p.PIN_22,
                     voltage_reading,
-                    wifi_config,
+                    wifi_controller,
                     shared_resources,
                 },
             ))
@@ -275,7 +302,7 @@ async fn led_task(led: &'static mut Output<'static>) -> ! {
 }
 
 #[embassy_executor::task]
-async fn core0_init(spawner: Spawner, resources: ResourcesCore0) {
+async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     // Spawn the LED blink task on Core 0
     debug!("Spawn LED task on core 0");
     // For regular GPIO LED (if you connect an external LED to a GPIO pin)
@@ -284,25 +311,31 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) {
 
     // Spawn the VCP sensors task on Core 0
     if let Some(vcp_runner) = resources.vcp_runner {
-        // Spawn the display task on Core 1
-        debug!("Spawn display task on core 1");
+        // Spawn the VCP sensors task on core 0
+        debug!("Spawn vcp sensors task on core 0");
         spawner.spawn(vcp_sensors_runner_task(vcp_runner)).unwrap();
     }
 
-    // Spawn the screen iteration task on Core 0
-    debug!("Spawn screen iteration task on core 0");
-    spawner
-        .spawn(screen_iterate_task(
-            resources.shared_resources.ui_control,
-            resources.shared_resources.vcp_control,
-            resources.voltage_reading,
-        ))
-        .unwrap();
+    //Initialize wifi controller
+    info!("Create wifi controller");
+    let wifi_static_data = WIFI_STATIC_DATA.init(WiFiStaticData::new());
+    let (wifi_controller, wifi_runner, wifi_network_driver) =
+        resources.wifi_controller.initialize(wifi_static_data).await;
+    spawner.spawn(cyw43_task(wifi_runner)).unwrap();
 
-    //Spawn wifi task
-    spawner
-        .spawn(wifi_task(spawner, resources.wifi_config))
-        .unwrap();
+    info!("Initialize WiFi controller.");
+    let wifi_controller = wifi_controller.initialize_controller().await;
+
+    //Call main logic controller
+    main_logic_controller(
+        spawner,
+        resources.shared_resources.vcp_control,
+        resources.shared_resources.ui_control,
+        wifi_controller,
+        wifi_network_driver,
+        resources.shared_resources.shared_storage,
+    )
+    .await;
 }
 
 #[embassy_executor::task]
@@ -324,6 +357,14 @@ async fn display_runner_task(mut ui_runner: UiRunnerType<'static>) -> ! {
 async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunnerType<'static>) -> ! {
     debug!("Starting VCP sensors task...");
     vcp_sensors_runner.run().await;
+}
+
+#[embassy_executor::task]
+async fn cyw43_task(
+    runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>,
+) -> ! {
+    debug!("Starting CYW43 driver task...");
+    runner.run().await
 }
 
 #[embassy_executor::task]

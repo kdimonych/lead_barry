@@ -1,4 +1,3 @@
-use embassy_rp::pac::common::R;
 use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::FONT_10X20},
     pixelcolor::BinaryColor,

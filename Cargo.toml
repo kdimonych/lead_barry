@@ -29,7 +29,7 @@ panic-probe = { version = "1", features = ["print-defmt"] }
 
 # Matrix and linear algebra libraries for embedded systems
 nalgebra = { version = "0.34.1", default-features = false, features = ["macros", "libm"] }
-heapless = "0.9.1"
+heapless = { version = "0.8", features = ["serde"] }
 micromath = "2.1"
 libm = "0.2"
 
@@ -37,6 +37,10 @@ libm = "0.2"
 portable-atomic = { version = "1.11.1", features = ["critical-section"] }
 critical-section = "1.2.0"
 static_cell = "2.1.1"
+# For safe casting of types
+bytemuck = { version = "1.24.0", features = ["derive"] }
+postcard = { version = "1.1", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 # Embassy
 embassy-embedded-hal = { version = "0.5.0" , features = ["defmt"] }
@@ -46,9 +50,6 @@ embassy-rp = { version = "0.8", features = ["rp2040", "defmt", "unstable-pac", "
 embassy-sync = "0.7"
 embassy-futures = "0.1"
 embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
-
-# The http client/server library over the embassy-net
-nanofish = { version = "0.9.1", features = ["tls"] }
 
 # Alternative: Use rp-pico but you'll need to handle CYW43 separately
 # rp-pico = "0.9"
@@ -60,7 +61,7 @@ cyw43-pio = "0.8"
 cyw43-firmware = { version = "0.1.0", features = ["bluetooth", "wifi"] }
 
 # BLE stack
-trouble-host = "0.4.0"
+# trouble-host = "0.4.0"
 
 # but you can use any BSP. Uncomment this to use the pro_micro_rp2040 BSP instead
 # sparkfun-pro-micro-rp2040 = "0.8"
@@ -72,7 +73,6 @@ trouble-host = "0.4.0"
 # Prerepherial device drivers
 ssd1306 = { version = "0.10", features = ["async"] }
 ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "DmytroKrasnianskyi/async" }
-
 
 # cargo build/run
 [profile.dev]
