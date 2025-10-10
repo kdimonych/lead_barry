@@ -9,7 +9,7 @@ use embedded_graphics::{
 };
 
 #[derive(Clone)]
-pub enum State {
+pub enum ScvState {
     Disconnected,
     Connecting,
     Dhcp,
@@ -20,20 +20,20 @@ trait Verb {
     fn str(&self) -> &str;
 }
 
-impl Verb for State {
+impl Verb for ScvState {
     fn str(&self) -> &str {
         match self {
-            State::Disconnected => "Disconnected",
-            State::Connecting => "Connecting to:",
-            State::Dhcp => "Getting IP...",
-            State::Connected => "Connected to:",
+            ScvState::Disconnected => "Disconnected",
+            ScvState::Connecting => "Connecting to:",
+            ScvState::Dhcp => "Getting IP...",
+            ScvState::Connected => "Connected to:",
         }
     }
 }
 
 pub struct ScWifiStats {
     wifi_network_name: heapless::String<32>,
-    wifi_state: State,
+    wifi_state: ScvState,
     animation_iteration: u32,
     try_count: u8,
     buffer: heapless::String<32>,
@@ -42,7 +42,7 @@ pub struct ScWifiStats {
 impl ScWifiStats {
     pub const fn new(
         wifi_network_name: heapless::String<32>,
-        wifi_state: State,
+        wifi_state: ScvState,
         try_count: u8,
     ) -> Self {
         Self {

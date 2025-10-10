@@ -114,7 +114,7 @@ async fn join_wifi_network<'a>(
                 ui_control
                     .switch(ScCollection::WiFiStatus(ScWifiStats::new(
                         settings.wifi_ssid.clone(),
-                        State::Connecting,
+                        ScvState::Connecting,
                         try_count,
                     )))
                     .await;

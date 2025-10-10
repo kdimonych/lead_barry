@@ -4,22 +4,39 @@ mod welcome;
 mod wifi_ap;
 mod wifi_status;
 
-pub use crate::ui::screens::ip_satus::{IpState, ScIpStatus};
-pub use crate::ui::screens::vcp::{BaseUnits, ScVcp};
+pub use crate::ui::screens::ip_satus::{ScvIpState, ScvIpStatus};
+pub use crate::ui::screens::vcp::{ScVcp, ScvBaseUnits};
 pub use crate::ui::screens::welcome::ScWelcome;
 pub use crate::ui::screens::wifi_ap::ScWifiAp;
-pub use crate::ui::screens::wifi_status::{ScWifiStats, State};
+pub use crate::ui::screens::wifi_status::{ScWifiStats, ScvState};
 
 pub use crate::ui::screen::Screen;
 
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::DrawTarget;
+
+/// # Naming Conventions
+///
+/// This module follows specific naming conventions:
+///
+/// | Prefix | Description | Example |
+/// |--------|-------------|---------|
+/// | `Sc`   | Screen type | [`ScWelcome`] |
+/// | `Scv`  | Screen variable type | [`ScvState`] |
+///
+/// Screen types follow the pattern: `Sc` + ScreenName
+const _NAMING_CONVENTION_DOC: () = ();
+
+///
+/// Collection of all screens
+///
+/// See [`_NAMING_CONVENTION_DOC`] for naming conventions used in this module.
 pub enum ScCollection {
     Welcome(ScWelcome),
     Vcp(ScVcp),
     WiFiStatus(ScWifiStats),
     WiFiAp(ScWifiAp),
-    IpStatus(ScIpStatus),
+    IpStatus(ScvIpStatus),
     Empty,
 }
 

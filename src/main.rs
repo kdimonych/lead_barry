@@ -261,7 +261,7 @@ async fn screen_iterate_task(
     ui_control
         .switch(ScCollection::Vcp(ScVcp::new(
             voltage_reading,
-            BaseUnits::Volts,
+            ScvBaseUnits::Volts,
         )))
         .await;
 

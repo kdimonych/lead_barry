@@ -8,7 +8,7 @@ use embedded_graphics::{
     text::{Baseline, Text},
 };
 
-pub enum IpState {
+pub enum ScvIpState {
     GettingIp,
     IpAssigned,
 }
@@ -17,25 +17,25 @@ trait Verb {
     fn str(&self) -> &str;
 }
 
-impl Verb for IpState {
+impl Verb for ScvIpState {
     fn str(&self) -> &str {
         match self {
-            IpState::GettingIp => "Getting IP...",
-            IpState::IpAssigned => "My IP:",
+            ScvIpState::GettingIp => "Getting IP...",
+            ScvIpState::IpAssigned => "My IP:",
         }
     }
 }
 
-pub struct ScIpStatus {
+pub struct ScvIpStatus {
     ip: embassy_net::Ipv4Address,
-    ip_state: IpState,
+    ip_state: ScvIpState,
     animation_iteration: u32,
     try_count: u8,
     buffer: heapless::String<32>,
 }
 
-impl ScIpStatus {
-    pub const fn new(ip: embassy_net::Ipv4Address, ip_state: IpState, try_count: u8) -> Self {
+impl ScvIpStatus {
+    pub const fn new(ip: embassy_net::Ipv4Address, ip_state: ScvIpState, try_count: u8) -> Self {
         Self {
             ip,
             ip_state,
@@ -46,7 +46,7 @@ impl ScIpStatus {
     }
 }
 
-impl Screen for ScIpStatus {
+impl Screen for ScvIpStatus {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
         D: DrawTarget<Color = BinaryColor>,
@@ -69,7 +69,7 @@ impl Screen for ScIpStatus {
         .draw(draw_target)
         .ok();
 
-        if let IpState::IpAssigned = self.ip_state {
+        if let ScvIpState::IpAssigned = self.ip_state {
             core::fmt::write(&mut self.buffer, format_args!("{}", self.ip)).ok();
             Text::with_baseline(
                 self.buffer.as_str(),

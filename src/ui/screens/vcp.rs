@@ -34,7 +34,7 @@ const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::n
     .build();
 
 #[derive(PartialEq)]
-pub enum BaseUnits {
+pub enum ScvBaseUnits {
     Volts,
     Amps,
     Watts,
@@ -44,15 +44,15 @@ pub enum BaseUnits {
 pub struct ScVcp {
     voltage: &'static DataModel<f32>,
     voltage_cache: f32,
-    base_unit: BaseUnits,
+    base_unit: ScvBaseUnits,
     unit_prefix: &'static str,
 }
 
-const fn unit(base_unit: &BaseUnits) -> &'static str {
+const fn unit(base_unit: &ScvBaseUnits) -> &'static str {
     match base_unit {
-        BaseUnits::Volts => "V",
-        BaseUnits::Amps => "A",
-        BaseUnits::Watts => "W",
+        ScvBaseUnits::Volts => "V",
+        ScvBaseUnits::Amps => "A",
+        ScvBaseUnits::Watts => "W",
     }
 }
 
@@ -75,7 +75,7 @@ fn prefix(value: f32) -> (&'static str, f32) {
 }
 
 impl ScVcp {
-    pub fn new(voltage: &'static DataModel<f32>, base_unit: BaseUnits) -> Self {
+    pub fn new(voltage: &'static DataModel<f32>, base_unit: ScvBaseUnits) -> Self {
         let (unit_prefix, _) = prefix(0.0);
 
         Self {
