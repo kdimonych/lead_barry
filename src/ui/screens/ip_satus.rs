@@ -8,47 +8,37 @@ use embedded_graphics::{
     text::{Baseline, Text},
 };
 
-#[derive(Clone)]
-pub enum State {
-    Disconnected,
-    Connecting,
-    Dhcp,
-    Connected,
+pub enum IpState {
+    GettingIp,
+    IpAssigned,
 }
 
 trait Verb {
     fn str(&self) -> &str;
 }
 
-impl Verb for State {
+impl Verb for IpState {
     fn str(&self) -> &str {
         match self {
-            State::Disconnected => "Disconnected",
-            State::Connecting => "Connecting to:",
-            State::Dhcp => "Getting IP...",
-            State::Connected => "Connected to:",
+            IpState::GettingIp => "Getting IP...",
+            IpState::IpAssigned => "My IP:",
         }
     }
 }
 
-/// Example screen that draws a simple welcome message
-pub struct WifiStatsScreen {
-    wifi_network_name: heapless::String<32>,
-    wifi_state: State,
+pub struct ScIpStatus {
+    ip: embassy_net::Ipv4Address,
+    ip_state: IpState,
     animation_iteration: u32,
     try_count: u8,
     buffer: heapless::String<32>,
 }
 
-impl WifiStatsScreen {
-    pub const fn new(
-        wifi_network_name: heapless::String<32>,
-        wifi_state: State,
-        try_count: u8,
-    ) -> Self {
+impl ScIpStatus {
+    pub const fn new(ip: embassy_net::Ipv4Address, ip_state: IpState, try_count: u8) -> Self {
         Self {
-            wifi_network_name,
-            wifi_state,
+            ip,
+            ip_state,
             animation_iteration: 0,
             try_count,
             buffer: heapless::String::new(),
@@ -56,7 +46,7 @@ impl WifiStatsScreen {
     }
 }
 
-impl Screen for WifiStatsScreen {
+impl Screen for ScIpStatus {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
         D: DrawTarget<Color = BinaryColor>,
@@ -71,7 +61,7 @@ impl Screen for WifiStatsScreen {
             .build();
 
         Text::with_baseline(
-            self.wifi_state.str(),
+            self.ip_state.str(),
             Point::new(10, 20),
             text_style,
             Baseline::Top,
@@ -79,20 +69,27 @@ impl Screen for WifiStatsScreen {
         .draw(draw_target)
         .ok();
 
-        let msg: &'_ str = if self.try_count > 0 {
-            core::fmt::write(
-                &mut self.buffer,
-                format_args!("{}({})", self.wifi_network_name.as_str(), self.try_count),
+        if let IpState::IpAssigned = self.ip_state {
+            core::fmt::write(&mut self.buffer, format_args!("{}", self.ip)).ok();
+            Text::with_baseline(
+                self.buffer.as_str(),
+                Point::new(10, 35),
+                text_style,
+                Baseline::Top,
             )
-            .ok();
-            self.buffer.as_str()
-        } else {
-            self.wifi_network_name.as_str()
-        };
-
-        Text::with_baseline(msg, Point::new(10, 35), text_style, Baseline::Top)
             .draw(draw_target)
             .ok();
+        } else if self.try_count > 0 {
+            core::fmt::write(&mut self.buffer, format_args!("({})", self.try_count)).ok();
+            Text::with_baseline(
+                self.buffer.as_str(),
+                Point::new(10, 35),
+                text_style,
+                Baseline::Top,
+            )
+            .draw(draw_target)
+            .ok();
+        }
 
         // Draw a rectangle border
         let style = PrimitiveStyleBuilder::new()

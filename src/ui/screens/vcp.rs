@@ -2,9 +2,7 @@ use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::FONT_10X20},
     pixelcolor::BinaryColor,
     prelude::*,
-    primitives::{
-        Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment, Styled,
-    },
+    primitives::{Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment},
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
@@ -43,7 +41,7 @@ pub enum BaseUnits {
 }
 
 /// Example screen that draws a simple welcome message
-pub struct VIPScreen {
+pub struct ScVcp {
     voltage: &'static DataModel<f32>,
     voltage_cache: f32,
     base_unit: BaseUnits,
@@ -76,7 +74,7 @@ fn prefix(value: f32) -> (&'static str, f32) {
     }
 }
 
-impl VIPScreen {
+impl ScVcp {
     pub fn new(voltage: &'static DataModel<f32>, base_unit: BaseUnits) -> Self {
         let (unit_prefix, _) = prefix(0.0);
 
@@ -138,7 +136,7 @@ fn adaptive_precision_format<const N: usize>(
     Ok(())
 }
 
-impl Screen for VIPScreen {
+impl Screen for ScVcp {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
         D: DrawTarget<Color = BinaryColor>,

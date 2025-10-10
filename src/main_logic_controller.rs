@@ -29,7 +29,7 @@ const DEFAULT_AP_IP: Ipv4Address = Ipv4Address::new(192, 168, 1, 1);
 static NETWORK_RESOURCES: StaticCell<StackResources<NETWORK_RESOURCES_SIZE>> = StaticCell::new();
 
 pub type VcpControlType<'a> = VcpControl<'a, VCP_SENSORS_EVENT_QUEUE_SIZE>;
-pub type UiControlType<'a> = UiControl<'a, Collection>;
+pub type UiControlType<'a> = UiControl<'a, ScCollection>;
 
 async fn get_settings(shared_storage: &Mutex<CriticalSectionRawMutex, Storage<'_>>) -> Settings {
     let mut storage = shared_storage.lock().await;
@@ -67,7 +67,7 @@ pub async fn main_logic_controller(
     shared_storage: &'static Mutex<CriticalSectionRawMutex, Storage<'static>>,
 ) -> ! {
     ui_control
-        .switch(Collection::Welcome(WelcomeScreen::new()))
+        .switch(ScCollection::Welcome(ScWelcome::new()))
         .await;
     Timer::after(1.s()).await;
 
@@ -112,7 +112,7 @@ async fn join_wifi_network<'a>(
         state = match state {
             WiFiController::Idle(s) => {
                 ui_control
-                    .switch(Collection::WiFiStatus(WifiStatsScreen::new(
+                    .switch(ScCollection::WiFiStatus(ScWifiStats::new(
                         settings.wifi_ssid.clone(),
                         State::Connecting,
                         try_count,

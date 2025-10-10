@@ -31,16 +31,15 @@ const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::n
     .stroke_width(1)
     .build();
 
-/// Example screen that draws a simple welcome message
-pub struct WelcomeScreen {}
+pub struct ScWifiAp {}
 
-impl WelcomeScreen {
+impl ScWifiAp {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Screen for WelcomeScreen {
+impl Screen for ScWifiAp {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
         D: DrawTarget<Color = BinaryColor>,
