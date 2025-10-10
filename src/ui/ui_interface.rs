@@ -12,18 +12,12 @@ use ssd1306::prelude::*;
 use crate::units::TimeExt;
 use defmt::*;
 
-pub struct UiSharedState<ScreenSet>
-where
-    ScreenSet: Clone,
-{
+pub struct UiSharedState<ScreenSet> {
     screen_channel: Channel<CriticalSectionRawMutex, ScreenSet, 1>,
     active_screen: Option<ScreenSet>,
 }
 
-impl<ScreenSet> UiSharedState<ScreenSet>
-where
-    ScreenSet: Clone,
-{
+impl<ScreenSet> UiSharedState<ScreenSet> {
     pub fn new() -> Self {
         Self {
             screen_channel: Channel::new(),
@@ -32,32 +26,23 @@ where
     }
 }
 
-pub struct UiRunner<'a, SharedI2cDevice, DisplaySize, ScreenSet>
-where
-    ScreenSet: Clone,
-{
+pub struct UiRunner<'a, SharedI2cDevice, DisplaySize, ScreenSet> {
     i2c_dev: Option<SharedI2cDevice>,
     display_size: Option<DisplaySize>,
     screen_receiver: Receiver<'a, CriticalSectionRawMutex, ScreenSet, 1>,
     active_screen: &'a mut Option<ScreenSet>,
 }
 
-pub struct UiControl<'a, ScreenSet>
-where
-    ScreenSet: Clone,
-{
+pub struct UiControl<'a, ScreenSet> {
     screen_sender: Sender<'a, CriticalSectionRawMutex, ScreenSet, 1>,
 }
 
-impl<'a, ScreenSet> UiControl<'a, ScreenSet>
-where
-    ScreenSet: Clone,
-{
+impl<'a, ScreenSet> UiControl<'a, ScreenSet> {
     fn new(screen_sender: Sender<'a, CriticalSectionRawMutex, ScreenSet, 1>) -> Self {
         Self { screen_sender }
     }
 
-    pub fn switch_screen(
+    pub fn switch(
         &self,
         new_screen: ScreenSet,
     ) -> SendFuture<'a, CriticalSectionRawMutex, ScreenSet, 1> {
@@ -88,7 +73,6 @@ impl UiInterface {
     where
         SharedI2cDevice: embedded_hal_async::i2c::I2c,
         DisplaySize: ssd1306::size::DisplaySizeAsync,
-        ScreenSet: Clone,
     {
         state.active_screen = initial_screen;
         (
@@ -108,7 +92,6 @@ impl<'a, SharedI2cDevice, DisplaySize, ScreenSet>
 where
     DisplaySize: ssd1306::size::DisplaySizeAsync + Copy,
     SharedI2cDevice: embedded_hal_async::i2c::I2c,
-    ScreenSet: Clone,
 {
     pub async fn run(&mut self) -> !
     where

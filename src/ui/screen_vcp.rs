@@ -35,7 +35,7 @@ const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::n
     .stroke_width(1)
     .build();
 
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub enum BaseUnits {
     Volts,
     Amps,
@@ -43,7 +43,6 @@ pub enum BaseUnits {
 }
 
 /// Example screen that draws a simple welcome message
-#[derive(Clone)]
 pub struct VIPScreen {
     voltage: &'static DataModel<f32>,
     voltage_cache: f32,

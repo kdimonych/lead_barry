@@ -52,8 +52,8 @@ const VCP_SENSORS_EVENT_QUEUE_SIZE: usize = 8;
 type I2cBus = Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>;
 type I2cDeviceType<'a> = I2cDevice<'a, CriticalSectionRawMutex, I2c<'a, I2C0, i2c::Async>>;
 type UiRunnerType<'a> =
-    UiRunner<'a, I2cDeviceType<'a>, ssd1306::size::DisplaySize128x64, ScreenCollection>;
-type UiControlType<'a> = UiControl<'a, ScreenCollection>;
+    UiRunner<'a, I2cDeviceType<'a>, ssd1306::size::DisplaySize128x64, Collection>;
+type UiControlType<'a> = UiControl<'a, Collection>;
 type VcpSensorsRunnerType<'a> =
     VcpSensorsRunner<'a, I2cDeviceType<'a>, VCP_SENSORS_EVENT_QUEUE_SIZE>;
 type WiFiUninitializedControllerType = WiFiDriverCreatedState<PIO0, DMA_CH0>;
@@ -81,7 +81,7 @@ struct SharedResources {
 static CORE1_STACK: StaticCell<Stack<CORE1_STACK_SIZE>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
-static UI_SHARED_STATE: StaticCell<UiSharedState<ScreenCollection>> = StaticCell::new();
+static UI_SHARED_STATE: StaticCell<UiSharedState<Collection>> = StaticCell::new();
 static UI_CONTROL: StaticCell<UiControlType> = StaticCell::new();
 static VCP_SENSORS_STATE: StaticCell<VcpSensorsState<VCP_SENSORS_EVENT_QUEUE_SIZE>> =
     StaticCell::new();
@@ -259,7 +259,7 @@ async fn screen_iterate_task(
     vcp_control.disable_channel(2).await;
 
     ui_control
-        .switch_screen(ScreenCollection::VIP(VIPScreen::new(
+        .switch(Collection::VIP(VIPScreen::new(
             voltage_reading,
             BaseUnits::Volts,
         )))
