@@ -13,7 +13,6 @@ readme = "README.md"
 keywords = ["lead-acid", "battery"]
 categories = ["embedded", "no-std", "no-std::no-alloc"]
 
-
 [dependencies]
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
@@ -72,8 +71,10 @@ cyw43-firmware = { version = "0.1.0", features = ["bluetooth", "wifi"] }
 
 # Prerepherial device drivers
 ssd1306 = { version = "0.10", features = ["async"] }
-ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "main" }
+ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "DmytroKrasnianskyi/async_feature", features = ["async"] }
 crc = "3.3.0"
+
+common = { path = "./common" }
 
 # cargo build/run
 [profile.dev]

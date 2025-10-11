@@ -1,0 +1,21 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "common"
+path = "src/lib.rs"
+
+[dependencies]
+heapless = { version = "0.8", features = ["serde"] }
+
+[features]
+default = []
+std = []
+
+# Specifies that this is a no_std library by default
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

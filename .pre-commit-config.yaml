@@ -41,6 +41,7 @@ repos:
         exclude: '^(\.vscode/.*\.json|cargo-generate/launch\.json)$'
       - id: check-merge-conflict
       - id: check-shebang-scripts-are-executable
+        exclude: '^.*\.rs$'
       - id: check-symlinks
       - id: check-xml
       - id: check-yaml

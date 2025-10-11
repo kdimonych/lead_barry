@@ -1,14 +1,15 @@
+mod common;
 mod ip_satus;
 mod vcp;
 mod welcome;
 mod wifi_ap;
 mod wifi_status;
 
-pub use crate::ui::screens::ip_satus::{ScvIpState, ScvIpStatus};
-pub use crate::ui::screens::vcp::{ScVcp, ScvBaseUnits};
-pub use crate::ui::screens::welcome::ScWelcome;
-pub use crate::ui::screens::wifi_ap::ScWifiAp;
-pub use crate::ui::screens::wifi_status::{ScWifiStats, ScvState};
+pub use ip_satus::{ScvIpState, ScvIpStatus};
+pub use vcp::{ScVcp, ScvBaseUnits};
+pub use welcome::ScWelcome;
+pub use wifi_ap::{ScWifiAp, ScWifiApData, ScvClientInfo, ScvCredentials};
+pub use wifi_status::{ScWifiStats, ScWifiStatsData, ScvState};
 
 pub use crate::ui::screen::Screen;
 

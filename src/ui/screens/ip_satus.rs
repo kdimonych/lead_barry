@@ -1,3 +1,4 @@
+use super::common::{ScStatus, TrStatus};
 use crate::ui::Screen;
 use defmt::Str;
 use embedded_graphics::{
