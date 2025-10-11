@@ -41,6 +41,36 @@ pub enum ScCollection {
     Empty,
 }
 
+impl From<ScWelcome> for ScCollection {
+    fn from(value: ScWelcome) -> Self {
+        ScCollection::Welcome(value)
+    }
+}
+
+impl From<ScVcp> for ScCollection {
+    fn from(value: ScVcp) -> Self {
+        ScCollection::Vcp(value)
+    }
+}
+
+impl From<ScWifiStats> for ScCollection {
+    fn from(value: ScWifiStats) -> Self {
+        ScCollection::WiFiStatus(value)
+    }
+}
+
+impl From<ScWifiAp> for ScCollection {
+    fn from(value: ScWifiAp) -> Self {
+        ScCollection::WiFiAp(value)
+    }
+}
+
+impl From<ScvIpStatus> for ScCollection {
+    fn from(value: ScvIpStatus) -> Self {
+        ScCollection::IpStatus(value)
+    }
+}
+
 impl Screen for ScCollection {
     fn enter<D>(&mut self, draw_target: &mut D)
     where

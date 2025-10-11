@@ -166,7 +166,7 @@ fn main() -> ! {
         I2cDevice::new(i2c_bus),
         ssd1306::size::DisplaySize128x64,
         state_ref,
-        Some(ScCollection::Welcome(ScWelcome::new())),
+        Some(ScWelcome::new().into()),
     );
     let ui_control: &'static UiControlType = UI_CONTROL.init(ui_control);
 
@@ -188,12 +188,6 @@ fn main() -> ! {
 
     let wifi_controller: WiFiDriverCreatedState<PIO0, DMA_CH0> =
         new_wifi_service(wifi_cfg, Pio0Irqs);
-
-    // // WiFi configuration
-    // let mut wifi_config = WiFiSubsystemConfig {
-    //     wifi_network: heapless::String::new(),
-    //     wifi_password: heapless::String::new(),
-    // };
 
     // wifi_config
     //     .wifi_network

@@ -27,10 +27,10 @@ impl ScWifiStatsData {
 }
 
 impl TrStatus for ScWifiStatsData {
-    fn title<const SIZE: usize>(&self) -> AnyString<SIZE> {
+    fn title<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE> {
         "WiFi Status".into()
     }
-    fn status<const SIZE: usize>(&self) -> AnyString<SIZE> {
+    fn status<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE> {
         match self.wifi_state {
             ScvState::Disconnected => "Disconnected".into(),
             ScvState::Connecting => "Connecting to:".into(),
@@ -38,7 +38,7 @@ impl TrStatus for ScWifiStatsData {
             ScvState::Connected => "Connected to:".into(),
         }
     }
-    fn detail<const SIZE: usize>(&self) -> Option<AnyString<SIZE>> {
+    fn detail<const SIZE: usize>(&'_ self) -> Option<AnyString<'_, SIZE>> {
         self.wifi_network_name
             .as_ref()
             .map(|name| name.as_str().into())

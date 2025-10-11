@@ -19,7 +19,6 @@ use embassy_rp::{
     peripherals::PIN_23,
     pio::{InterruptHandler, Pio},
 };
-use serde::de;
 
 use crate::wifi::config::*;
 
