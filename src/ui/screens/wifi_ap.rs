@@ -39,7 +39,7 @@ impl TrStatus for ScWifiApData {
             ScWifiApData::LinkUp => "WiFi AP Init".into(),
             ScWifiApData::ConfigUp => "WiFi AP Init".into(),
             ScWifiApData::WaitingForClient(_) => "WiFi AP Ready".into(),
-            ScWifiApData::Connected(_) => "Client Connected".into(),
+            ScWifiApData::Connected(_) => "New Client".into(),
         }
     }
 
@@ -84,7 +84,7 @@ impl TrStatus for ScWifiApData {
                     core::fmt::write(
                         &mut status_str,
                         format_args!(
-                            "MAC: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+                            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
                             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
                         ),
                     )
