@@ -1,0 +1,3 @@
+[submodule "leasehund"]
+	path = leasehund
+	url = git@github.com:kdimonych/leasehund.git

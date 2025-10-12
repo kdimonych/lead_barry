@@ -51,7 +51,9 @@ embassy-futures = "0.1"
 embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
 
 # DHCP server
-leasehund = "0.2.0"
+#leasehund = "0.2.0"
+leasehund = { path = "./leasehund", features = ["defmt"] }
+
 
 # Alternative: Use rp-pico but you'll need to handle CYW43 separately
 # rp-pico = "0.9"

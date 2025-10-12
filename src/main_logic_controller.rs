@@ -1,6 +1,4 @@
-use core::error;
 use core::str::FromStr;
-use cortex_m::register::control;
 use defmt::*;
 
 use cyw43::NetDriver;
@@ -16,17 +14,18 @@ use embassy_rp::clocks::RoscRng;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::Duration;
 use embassy_time::Timer;
-use embassy_time::WithTimeout;
 use heapless::Vec;
+use leasehund::DHCPServerBuffers;
+use leasehund::DHCPServerSocket;
+use leasehund::LeasingEvent;
 use static_cell::StaticCell;
 
 use crate::flash_storage::*;
-use crate::settings::{Error as SettingsError, Settings};
+use crate::settings::Settings;
 use crate::ui::*;
 use crate::units::TimeExt as _;
 use crate::vcp_sensors::*;
 use crate::wifi::*;
-use common::any_string::AnyString;
 
 // TODO: Move to separate module
 // DHCP server
@@ -40,7 +39,6 @@ const DEFAULT_AP_SSID: &str = "LeadBarry";
 const DEFAULT_AP_CHANNEL: u8 = 6;
 
 static NETWORK_RESOURCES: StaticCell<StackResources<NETWORK_RESOURCES_SIZE>> = StaticCell::new();
-static NET_STACK: StaticCell<Stack<'static>> = StaticCell::new();
 
 pub type VcpControlType<'a> = VcpControl<'a, VCP_SENSORS_EVENT_QUEUE_SIZE>;
 pub type UiControlType<'a> = UiControl<'a, ScCollection>;
@@ -212,6 +210,8 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
     ui_control: &'static UiControlType<'_>,
     stack: Stack<'static>,
 ) -> WiFiController<'a> {
+    //SoftAP provisioning mode.
+
     // Shortcut for switching screens convenience
     let set_screen = |new_screen: ScCollection| async { ui_control.switch(new_screen).await };
 
@@ -241,10 +241,6 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
         gateway: None,
     }));
 
-    // let wifi_ap_data = ScWifiApData::LinkUp;
-    // set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
-    // stack.wait_link_up().await;
-
     let wifi_ap_data = ScWifiApData::ConfigUp;
     set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
     stack.wait_config_up().await;
@@ -257,8 +253,8 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
 
         let adr: Ipv4Cidr = config.address;
         let adr_oct = adr.address().octets();
-        let start = Ipv4Addr::new(adr_oct[0], adr_oct[1], adr_oct[2], adr_oct[3] + 123);
-        let end = Ipv4Addr::new(adr_oct[0], adr_oct[1], adr_oct[2], adr_oct[3] + 100);
+        let start = Ipv4Addr::new(adr_oct[0], adr_oct[1], adr_oct[2], adr_oct[3] + 122);
+        let end = Ipv4Addr::new(adr_oct[0], adr_oct[1], adr_oct[2], 255);
 
         let mut server: DhcpServer<2, 2> = DhcpServer::new(
             adr.address(),             // Server IP
@@ -269,12 +265,16 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
             end,                       // Pool end
         );
 
-        wait_for_dhcp_client(&mut server, stack).await;
-        let client_info = ScvClientInfo {
-            ip: server.config().ip_pool_start,
-            mac: None,
+        let (ip, mac) = loop {
+            let Ok((ip, mac)) = wait_for_dhcp_client(&mut server, stack).await else {
+                Timer::after(1000.ms()).await;
+                continue;
+            };
+
+            break (ip, mac);
         };
 
+        let client_info = ScvClientInfo { ip, mac: Some(mac) };
         let wifi_ap_data = ScWifiApData::Connected(client_info);
         set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
     }
@@ -303,23 +303,31 @@ fn generate_random_password() -> heapless::String<64> {
     pwd
 }
 
-async fn wait_for_dhcp_client(server: &mut DhcpServer<2, 2>, stack: Stack<'static>) {
+async fn wait_for_dhcp_client(
+    server: &mut DhcpServer<2, 2>,
+    stack: Stack<'static>,
+) -> Result<(Ipv4Addr, [u8; 6]), ()> {
+    let mut buffers = DHCPServerBuffers::new();
+    let mut socket = DHCPServerSocket::new(stack, &mut buffers);
     loop {
-        if (server
-            .run(stack)
-            .with_timeout(Duration::from_millis(40))
-            .await)
-            .is_err()
-            && (server.lease_count() > 0)
-        {
-            info!(
-                "DHCP Server running, active leases: {}",
-                server.lease_count()
-            );
-            return;
+        if server.is_pool_full() {
+            error!("No free ip-addresses for leasing");
+            return Err(());
         }
-        // Poll the network stack to handle incoming packets
-        Timer::after(Duration::from_millis(100)).await;
+
+        match server.run_once(&socket).await {
+            Ok(LeasingEvent::Leased(ip, mac)) => {
+                info!("Leased IP: {} for MAC: {}", ip, mac);
+                // Wait a bit before returning to let the stack send the ACK packet
+                socket.flush().await;
+                return Ok((ip, mac));
+            }
+            Err(e) => {
+                error!("DHCP server error: {:?}", e);
+                return Err(());
+            }
+            _ => { /* Unsupported events, continue waiting */ }
+        }
     }
 }
 
