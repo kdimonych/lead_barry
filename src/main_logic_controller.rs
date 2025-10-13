@@ -17,7 +17,7 @@ use embassy_time::Timer;
 use heapless::Vec;
 use leasehund::DHCPServerBuffers;
 use leasehund::DHCPServerSocket;
-use leasehund::LeasingEvent;
+use leasehund::TransactionEvent;
 use static_cell::StaticCell;
 
 use crate::flash_storage::*;
@@ -311,15 +311,16 @@ async fn wait_for_dhcp_client(
     let mut socket = DHCPServerSocket::new(stack, &mut buffers);
     loop {
         if server.is_pool_full() {
+            // In case there is no free IP addresses, we cannot lease any more.
+            // Just stop the process.
             error!("No free ip-addresses for leasing");
             return Err(());
         }
 
-        match server.run_once(&socket).await {
-            Ok(LeasingEvent::Leased(ip, mac)) => {
+        match server.lease_one(&mut socket).await {
+            Ok(TransactionEvent::Leased(ip, mac)) => {
                 info!("Leased IP: {} for MAC: {}", ip, mac);
                 // Wait a bit before returning to let the stack send the ACK packet
-                socket.flush().await;
                 return Ok((ip, mac));
             }
             Err(e) => {
