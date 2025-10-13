@@ -1,3 +1,3 @@
 mod status;
 
-pub use status::{ScStatus, TrStatus};
+pub use status::{DetailString, ScStatus, StatusString, TitleString, TrStatus};

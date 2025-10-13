@@ -11,10 +11,21 @@ use embedded_graphics::{
 
 use crate::ui::Screen;
 
+const TITLE_LENGTH: usize = 15;
+const STATUS_LENGTH: usize = 17;
+const DETAIL_LENGTH: usize = STATUS_LENGTH;
+
+/// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
+pub type TitleString = AnyString<'static, TITLE_LENGTH>;
+/// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
+pub type StatusString = AnyString<'static, STATUS_LENGTH>;
+/// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
+pub type DetailString = AnyString<'static, DETAIL_LENGTH>;
+
 pub trait TrStatus {
-    fn title<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE>;
-    fn status<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE>;
-    fn detail<const SIZE: usize>(&'_ self) -> Option<AnyString<'_, SIZE>>;
+    fn title(&'_ self) -> TitleString;
+    fn status(&'_ self) -> StatusString;
+    fn detail(&'_ self) -> Option<DetailString>;
 }
 
 pub struct ScStatus<StatusT> {
@@ -42,7 +53,7 @@ where
         draw_target.clear(BinaryColor::Off).ok();
         draw_main_screen_layout(draw_target);
 
-        let title = self.status.title::<64>();
+        let title = self.status.title();
         Text::with_text_style(
             title.as_str(),
             TITLE_TEXT_POSITION,
@@ -52,7 +63,7 @@ where
         .draw(draw_target)
         .ok();
 
-        let status_str = self.status.status::<64>();
+        let status_str = self.status.status();
         let mut status_text = Text::with_text_style(
             status_str.as_str(),
             STATUS_TEXT_POSITION,
@@ -63,7 +74,7 @@ where
         let status_box = status_text.bounding_box();
         let mut text_box = status_box;
 
-        if let Some(detail_str) = self.status.detail::<64>() {
+        if let Some(detail_str) = self.status.detail() {
             let mut detail_text = Text::with_text_style(
                 detail_str.as_str(),
                 STATUS_TEXT_POSITION,

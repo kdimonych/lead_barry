@@ -1,6 +1,7 @@
 use common::any_string::AnyString;
+use embassy_rp::pac::xip_ctrl::regs::Stat;
 
-use super::common::{ScStatus, TrStatus};
+use super::common::{DetailString, ScStatus, StatusString, TitleString, TrStatus};
 
 pub enum ScvState {
     Disconnected,
@@ -27,21 +28,22 @@ impl ScWifiStatsData {
 }
 
 impl TrStatus for ScWifiStatsData {
-    fn title<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE> {
-        "WiFi Status".into()
+    fn title(&'_ self) -> TitleString {
+        TitleString::from_str("WiFi Status")
     }
-    fn status<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE> {
+
+    fn status(&'_ self) -> StatusString {
         match self.wifi_state {
-            ScvState::Disconnected => "Disconnected".into(),
-            ScvState::Connecting => "Connecting to:".into(),
-            ScvState::Dhcp => "Getting IP...".into(),
-            ScvState::Connected => "Connected to:".into(),
+            ScvState::Disconnected => StatusString::from_str("Disconnected"),
+            ScvState::Connecting => StatusString::from_str("Connecting to:"),
+            ScvState::Dhcp => StatusString::from_str("Getting IP..."),
+            ScvState::Connected => StatusString::from_str("Connected to:"),
         }
     }
-    fn detail<const SIZE: usize>(&'_ self) -> Option<AnyString<'_, SIZE>> {
+    fn detail(&'_ self) -> Option<DetailString> {
         self.wifi_network_name
             .as_ref()
-            .map(|name| name.as_str().into())
+            .map(|name| DetailString::from_str_truncate(name.as_str()))
     }
 }
 

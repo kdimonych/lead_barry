@@ -325,7 +325,7 @@ async fn wait_for_dhcp_client(
             }
             Err(e) => {
                 error!("DHCP server error: {:?}", e);
-                return Err(());
+                Timer::after(1.s()).await;
             }
             _ => { /* Unsupported events, continue waiting */ }
         }

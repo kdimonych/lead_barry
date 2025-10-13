@@ -1,8 +1,9 @@
 use core::any::Any;
 
 use common::any_string::AnyString;
+use embassy_rp::pac::xip_ctrl::regs::Stat;
 
-use super::common::{ScStatus, TrStatus};
+use super::common::{DetailString, ScStatus, StatusString, TitleString, TrStatus};
 
 // struct InternalState
 // {
@@ -33,23 +34,23 @@ struct Internals {
 }
 
 impl TrStatus for ScWifiApData {
-    fn title<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE> {
+    fn title(&'_ self) -> TitleString {
         match self {
-            ScWifiApData::NotReady => "WiFi AP".into(),
-            ScWifiApData::LinkUp => "WiFi AP Init".into(),
-            ScWifiApData::ConfigUp => "WiFi AP Init".into(),
-            ScWifiApData::WaitingForClient(_) => "WiFi AP Ready".into(),
-            ScWifiApData::Connected(_) => "New Client".into(),
+            ScWifiApData::NotReady => TitleString::from_str("WiFi AP"),
+            ScWifiApData::LinkUp => TitleString::from_str("WiFi AP Init"),
+            ScWifiApData::ConfigUp => TitleString::from_str("WiFi AP Init"),
+            ScWifiApData::WaitingForClient(_) => TitleString::from_str("WiFi AP Ready"),
+            ScWifiApData::Connected(_) => TitleString::from_str("New Client"),
         }
     }
 
-    fn status<const SIZE: usize>(&'_ self) -> AnyString<'_, SIZE> {
+    fn status(&'_ self) -> StatusString {
         match self {
-            ScWifiApData::NotReady => "Initializing...".into(),
-            ScWifiApData::LinkUp => "AP Link Up...".into(),
-            ScWifiApData::ConfigUp => "AP Config Up...".into(),
+            ScWifiApData::NotReady => StatusString::from_str("Initializing..."),
+            ScWifiApData::LinkUp => StatusString::from_str("AP Link Up..."),
+            ScWifiApData::ConfigUp => StatusString::from_str("AP Config Up..."),
             ScWifiApData::WaitingForClient(credentials) => {
-                let mut status_str = heapless::String::<SIZE>::new();
+                let mut status_str = StatusString::complimentary_str();
                 core::fmt::write(
                     &mut status_str,
                     format_args!("SSID: {}", credentials.ssid.as_str()),
@@ -58,19 +59,19 @@ impl TrStatus for ScWifiApData {
                 status_str.into()
             }
             ScWifiApData::Connected(client_info) => {
-                let mut status_str = heapless::String::<SIZE>::new();
+                let mut status_str = StatusString::complimentary_str();
                 core::fmt::write(&mut status_str, format_args!("IP: {}", client_info.ip)).ok();
                 status_str.into()
             }
         }
     }
-    fn detail<const SIZE: usize>(&'_ self) -> Option<AnyString<'_, SIZE>> {
+    fn detail(&'_ self) -> Option<DetailString> {
         match self {
             ScWifiApData::NotReady => None,
             ScWifiApData::LinkUp => None,
             ScWifiApData::ConfigUp => None,
             ScWifiApData::WaitingForClient(credentials) => {
-                let mut status_str = heapless::String::<SIZE>::new();
+                let mut status_str = DetailString::complimentary_str();
                 core::fmt::write(
                     &mut status_str,
                     format_args!("Psw: {}", credentials.password.as_str()),
@@ -80,7 +81,7 @@ impl TrStatus for ScWifiApData {
             }
             ScWifiApData::Connected(client_info) => {
                 if let Some(mac) = client_info.mac {
-                    let mut status_str = heapless::String::<SIZE>::new();
+                    let mut status_str = DetailString::complimentary_str();
                     core::fmt::write(
                         &mut status_str,
                         format_args!(
