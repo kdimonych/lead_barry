@@ -16,23 +16,23 @@ const STATUS_LENGTH: usize = 17;
 const DETAIL_LENGTH: usize = STATUS_LENGTH;
 
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type TitleString = AnyString<'static, TITLE_LENGTH>;
+pub type TitleString<'a> = AnyString<'a, TITLE_LENGTH>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type StatusString = AnyString<'static, STATUS_LENGTH>;
+pub type StatusString<'a> = AnyString<'static, STATUS_LENGTH>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type DetailString = AnyString<'static, DETAIL_LENGTH>;
+pub type DetailString<'a> = AnyString<'static, DETAIL_LENGTH>;
 
 pub trait TrStatus {
-    fn title(&'_ self) -> TitleString;
-    fn status(&'_ self) -> StatusString;
+    fn title(&'_ self) -> TitleString<'_>;
+    fn status(&'_ self) -> StatusString<'_>;
     fn detail(&'_ self) -> Option<DetailString>;
 }
 
-pub struct ScStatus<StatusT> {
+pub struct ScStatusImpl<StatusT> {
     status: StatusT,
 }
 
-impl<StatusT> ScStatus<StatusT>
+impl<StatusT> ScStatusImpl<StatusT>
 where
     StatusT: TrStatus,
 {
@@ -41,7 +41,7 @@ where
     }
 }
 
-impl<StatusT> Screen for ScStatus<StatusT>
+impl<StatusT> Screen for ScStatusImpl<StatusT>
 where
     StatusT: TrStatus,
 {
@@ -171,7 +171,7 @@ const TITLE_TEXT_POSITION: Point = Point::new(SCREEN_MIDDLE_X, (TITLE_HEIGHT / 2
 //Status frame layout constants
 const STATUS_FRAME_BORDER: Rectangle = Rectangle::new(
     Point::new(SCREEN_TL.x, SCREEN_TL.y + (TITLE_HEIGHT as i32)),
-    Size::new(SCREEN_WIDTH as u32, SCREEN_HEIGHT - TITLE_HEIGHT),
+    Size::new(SCREEN_WIDTH, SCREEN_HEIGHT - TITLE_HEIGHT),
 );
 const STATUS_FRAME_THICKNESS: u32 = 1;
 const STATUS_TEXT_POSITION: Point = Point::new(

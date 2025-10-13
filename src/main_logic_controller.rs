@@ -90,6 +90,15 @@ pub async fn main_logic_controller(
         )
         .await;
 
+        Timer::after(3.s()).await;
+        info!("AP mode done");
+
+        let msg = ScMessageData {
+            title: MsgTitleString::from_str("Config. mode"),
+            message: MessageString::from_str("The device is currently in configuration mode."),
+        };
+        ui_control.switch(ScMessage::new(msg).into()).await;
+
         // Here we ready to start web server for configuration
         // TODO: Implement web server
     }
@@ -179,14 +188,18 @@ async fn join_wifi_network<'a>(
     Timer::after(1.s()).await;
 
     //Init DHCP client and wait for network ready
-    set_screen(ScvIpStatus::new(Ipv4Address::UNSPECIFIED, ScvIpState::GettingIp, 0).into()).await;
+    let ip_status_data = ScIpData {
+        state: ScvIpState::GettingIp,
+        ip: Ipv4Address::UNSPECIFIED,
+        mac: None,
+    };
+    set_screen(ScIpStatus::new(ip_status_data).into()).await;
 
     stack.set_config_v4(ConfigV4::Dhcp(DhcpConfig::default()));
     stack.wait_link_up().await;
     stack.wait_config_up().await;
     wait_for_network_ready(&stack).await;
 
-    set_screen(ScvIpStatus::new(Ipv4Address::UNSPECIFIED, ScvIpState::GettingIp, 0).into()).await;
     let ip = stack.config_v4().map_or_else(
         || {
             error!("No IPv4 address acquired");
@@ -197,7 +210,12 @@ async fn join_wifi_network<'a>(
             c.address.address()
         },
     );
-    set_screen(ScvIpStatus::new(ip, ScvIpState::GettingIp, 0).into()).await;
+    let ip_status_data = ScIpData {
+        state: ScvIpState::IpAssigned,
+        ip,
+        mac: None,
+    };
+    set_screen(ScIpStatus::new(ip_status_data).into()).await;
     Timer::after(3.s()).await;
 
     state

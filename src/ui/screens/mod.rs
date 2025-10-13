@@ -1,11 +1,13 @@
 mod common;
 mod ip_satus;
+mod message;
 mod vcp;
 mod welcome;
 mod wifi_ap;
 mod wifi_status;
 
-pub use ip_satus::{ScvIpState, ScvIpStatus};
+pub use ip_satus::{IpTitleString, ScIpData, ScIpStatus, ScvIpState};
+pub use message::{MessageString, MsgTitleString, ScMessage, ScMessageData};
 pub use vcp::{ScVcp, ScvBaseUnits};
 pub use welcome::ScWelcome;
 pub use wifi_ap::{ScWifiAp, ScWifiApData, ScvClientInfo, ScvCredentials};
@@ -37,7 +39,8 @@ pub enum ScCollection {
     Vcp(ScVcp),
     WiFiStatus(ScWifiStats),
     WiFiAp(ScWifiAp),
-    IpStatus(ScvIpStatus),
+    IpStatus(ScIpStatus),
+    Message(ScMessage),
     Empty,
 }
 
@@ -65,9 +68,15 @@ impl From<ScWifiAp> for ScCollection {
     }
 }
 
-impl From<ScvIpStatus> for ScCollection {
-    fn from(value: ScvIpStatus) -> Self {
+impl From<ScIpStatus> for ScCollection {
+    fn from(value: ScIpStatus) -> Self {
         ScCollection::IpStatus(value)
+    }
+}
+
+impl From<ScMessage> for ScCollection {
+    fn from(value: ScMessage) -> Self {
+        ScCollection::Message(value)
     }
 }
 
@@ -82,6 +91,7 @@ impl Screen for ScCollection {
             ScCollection::WiFiStatus(screen) => screen.enter(draw_target),
             ScCollection::WiFiAp(screen) => screen.enter(draw_target),
             ScCollection::IpStatus(screen) => screen.enter(draw_target),
+            ScCollection::Message(screen) => screen.enter(draw_target),
             ScCollection::Empty => (),
         }
     }
@@ -96,6 +106,7 @@ impl Screen for ScCollection {
             ScCollection::WiFiStatus(screen) => screen.redraw(draw_target),
             ScCollection::WiFiAp(screen) => screen.redraw(draw_target),
             ScCollection::IpStatus(screen) => screen.redraw(draw_target),
+            ScCollection::Message(screen) => screen.redraw(draw_target),
             ScCollection::Empty => (),
         }
     }
@@ -110,6 +121,7 @@ impl Screen for ScCollection {
             ScCollection::WiFiStatus(screen) => screen.exit(draw_target),
             ScCollection::WiFiAp(screen) => screen.exit(draw_target),
             ScCollection::IpStatus(screen) => screen.exit(draw_target),
+            ScCollection::Message(screen) => screen.exit(draw_target),
             ScCollection::Empty => (),
         }
     }

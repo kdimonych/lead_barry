@@ -1,14 +1,4 @@
-use core::any::Any;
-
-use common::any_string::AnyString;
-use embassy_rp::pac::xip_ctrl::regs::Stat;
-
-use super::common::{DetailString, ScStatus, StatusString, TitleString, TrStatus};
-
-// struct InternalState
-// {
-//     heapless::String<64>
-// }
+use super::common::{DetailString, ScStatusImpl, StatusString, TitleString, TrStatus};
 
 pub struct ScvCredentials {
     pub ssid: heapless::String<32>,
@@ -26,11 +16,6 @@ pub enum ScWifiApData {
     ConfigUp,
     WaitingForClient(ScvCredentials),
     Connected(ScvClientInfo),
-}
-
-struct Internals {
-    status_str: heapless::String<64>,
-    detail_str: heapless::String<64>,
 }
 
 impl TrStatus for ScWifiApData {
@@ -99,4 +84,4 @@ impl TrStatus for ScWifiApData {
     }
 }
 
-pub type ScWifiAp = ScStatus<ScWifiApData>;
+pub type ScWifiAp = ScStatusImpl<ScWifiApData>;

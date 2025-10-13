@@ -1,7 +1,4 @@
-use common::any_string::AnyString;
-use embassy_rp::pac::xip_ctrl::regs::Stat;
-
-use super::common::{DetailString, ScStatus, StatusString, TitleString, TrStatus};
+use super::common::{DetailString, ScStatusImpl, StatusString, TitleString, TrStatus};
 
 pub enum ScvState {
     Disconnected,
@@ -47,4 +44,4 @@ impl TrStatus for ScWifiStatsData {
     }
 }
 
-pub type ScWifiStats = ScStatus<ScWifiStatsData>;
+pub type ScWifiStats = ScStatusImpl<ScWifiStatsData>;

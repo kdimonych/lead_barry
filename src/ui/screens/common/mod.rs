@@ -1,3 +1,5 @@
+mod message;
 mod status;
 
-pub use status::{DetailString, ScStatus, StatusString, TitleString, TrStatus};
+pub use message::{MessageString, MsgTitleString, ScMessageImpl, TrMessage};
+pub use status::{DetailString, ScStatusImpl, StatusString, TitleString, TrStatus};
