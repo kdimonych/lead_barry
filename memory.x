@@ -6,7 +6,7 @@ MEMORY {
     /* User data storage area - last 4KB of flash */
     USER_FLASH : ORIGIN = 0x101FF000, LENGTH = 4K
 
-    RAM   : ORIGIN = 0x20000000, LENGTH = 256K
+    RAM   : ORIGIN = 0x20000000, LENGTH = 264K
 }
 
 _user_flash_start = ORIGIN(USER_FLASH);

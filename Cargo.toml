@@ -15,7 +15,7 @@ categories = ["embedded", "no-std", "no-std::no-alloc"]
 
 [dependencies]
 cortex-m = "0.7"
-cortex-m-rt = "0.7"
+cortex-m-rt = { version = "0.7", features = ["set-sp"] }
 embedded-hal-async = "1.0"
 # Embedded graphics support
 embedded-graphics = "0.8"

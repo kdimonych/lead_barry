@@ -45,7 +45,7 @@ use wifi::*;
 use {defmt_rtt as _, panic_probe as _};
 
 // Constants
-const CORE1_STACK_SIZE: usize = 4096;
+const CORE1_STACK_SIZE: usize = 4096 * 2;
 const VCP_SENSORS_EVENT_QUEUE_SIZE: usize = 8;
 
 // Global types
@@ -112,6 +112,8 @@ struct ResourcesCore0 {
 struct ResourcesCore1 {
     // Owned resources
     ui_runner: Option<UiRunnerType<'static>>,
+    core1_stack_base: usize,
+    core1_stack_end: usize,
 
     // Shared resources
     shared_resources: &'static SharedResources,
@@ -135,9 +137,50 @@ fn log_system_frequencies() {
     info!("================================");
 }
 
+fn debug_memory_layout() {
+    unsafe extern "C" {
+        unsafe static _ram_start: u32;
+        unsafe static _ram_end: u32;
+        unsafe static _stack_start: u32;
+        unsafe static _stack_end: u32;
+    }
+
+    let ram_start = { &raw const _ram_start as usize };
+    let ram_end = { &raw const _ram_end as usize };
+    let stack_start = { &raw const _stack_start as usize };
+    let stack_end = { &raw const _stack_end as usize };
+    let current_sp = cortex_m::register::msp::read() as usize;
+
+    info!("=== Memory Layout ===");
+    info!("RAM Start:    0x{:08x}", ram_start);
+    info!("RAM End:      0x{:08x}", ram_end);
+    info!("Stack Start:  0x{:08x}", stack_start);
+    info!("Stack End:    0x{:08x}", stack_end);
+    info!("Current MSP:  0x{:08x}", current_sp);
+    info!("Expected MSP: 0x{:08x}", stack_start);
+
+    // Check if they match
+    if current_sp == stack_start {
+        info!("✅ MSP correctly set to stack_start");
+    } else {
+        info!(
+            "❌ MSP mismatch! Difference: {} bytes",
+            if current_sp > stack_start {
+                current_sp - stack_start
+            } else {
+                stack_start - current_sp
+            }
+        );
+    }
+}
+
 #[cortex_m_rt::entry]
 fn main() -> ! {
+    debug_memory_layout();
+
     let p = embassy_rp::init(Default::default());
+
+    debug_memory_layout();
 
     log_system_frequencies();
 
@@ -154,7 +197,9 @@ fn main() -> ! {
         I2C_BUS.init(Mutex::new(i2c));
 
     // Initialize the stack
-    let stack = CORE1_STACK.init(Stack::new());
+    let core1_stack = CORE1_STACK.init(Stack::new());
+    let core1_stack_base = core1_stack.mem.as_ptr() as usize;
+    let core1_stack_end = core1_stack_base + core1_stack.mem.len();
 
     // Initialize global data models
     let voltage_reading: &'static VoltageReading = VOLTAGE_READING_MODEL.init(DataModel::new(0.0));
@@ -206,7 +251,7 @@ fn main() -> ! {
     });
 
     // Spawn core threads
-    embassy_rp::multicore::spawn_core1(p.CORE1, stack, move || {
+    embassy_rp::multicore::spawn_core1(p.CORE1, core1_stack, move || {
         let executor1 = EXECUTOR1.init(Executor::new());
         debug!("Starting executor on core 1");
         executor1.run(|spawner| {
@@ -215,6 +260,8 @@ fn main() -> ! {
                     spawner,
                     ResourcesCore1 {
                         ui_runner: Some(ui_runner),
+                        core1_stack_base,
+                        core1_stack_end,
                         shared_resources,
                     },
                 ))
@@ -297,6 +344,9 @@ async fn led_task(led: &'static mut Output<'static>) -> ! {
 
 #[embassy_executor::task]
 async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
+    // Spawn stack monitor task
+    spawner.spawn(core_0_stack_monitor_task()).unwrap();
+
     // Spawn the LED blink task on Core 0
     debug!("Spawn LED task on core 0");
     // For regular GPIO LED (if you connect an external LED to a GPIO pin)
@@ -334,6 +384,15 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
 
 #[embassy_executor::task]
 async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
+    // Spawn stack monitor task
+    spawner
+        .spawn(core_1_stack_monitor_task(
+            resources.core1_stack_base,
+            resources.core1_stack_end,
+        ))
+        .unwrap();
+
+    // Spawn the UI task on Core 1
     if let Some(ui_runner) = resources.ui_runner {
         // Spawn the display task on Core 1
         debug!("Spawn display task on core 1");
@@ -359,6 +418,63 @@ async fn cyw43_task(
 ) -> ! {
     debug!("Starting CYW43 driver task...");
     runner.run().await
+}
+
+fn get_core_0_stack_usage() -> (usize, usize) {
+    unsafe extern "C" {
+        static mut _stack_start: u32;
+        static mut _stack_end: u32;
+    }
+
+    let stack_start = { &raw const _stack_start as *const _ as usize };
+
+    let current_sp = cortex_m::register::msp::read() as usize;
+
+    (stack_start - current_sp, 0x2000)
+}
+
+#[embassy_executor::task]
+async fn core_0_stack_monitor_task() -> ! {
+    loop {
+        let (stack_used, stack_size) = get_core_0_stack_usage();
+        if stack_used > (stack_size as f32 * 0.8) as usize {
+            defmt::warn!(
+                "❗ [ATTENTION!] High stack usage at core 0: {} bytes of {} bytes",
+                stack_used,
+                stack_size
+            );
+        }
+
+        // Your task work here
+        embassy_time::Timer::after(Duration::from_millis(3000)).await;
+    }
+}
+
+fn get_core_1_stack_usage(core1_stack_base: usize, core1_stack_end: usize) -> (usize, usize) {
+    let current_sp = cortex_m::register::msp::read() as usize;
+    defmt::debug_assert!(core1_stack_end > core1_stack_base);
+
+    (
+        core1_stack_end - current_sp,
+        core1_stack_end - core1_stack_base,
+    )
+}
+
+#[embassy_executor::task]
+async fn core_1_stack_monitor_task(core1_stack_base: usize, core1_stack_end: usize) -> ! {
+    loop {
+        let (stack_used, stack_size) = get_core_1_stack_usage(core1_stack_base, core1_stack_end);
+        if stack_used > (stack_size as f32 * 0.8) as usize {
+            defmt::warn!(
+                "❗ [ATTENTION!] High stack usage at core 1: {} bytes of {} bytes",
+                stack_used,
+                stack_size
+            );
+        }
+
+        // Your task work here
+        embassy_time::Timer::after(Duration::from_millis(3000)).await;
+    }
 }
 
 #[embassy_executor::task]
