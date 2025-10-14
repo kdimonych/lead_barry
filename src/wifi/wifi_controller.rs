@@ -207,7 +207,7 @@ impl<'a> IdleState<'a> {
         self.control.gpio_set(0, gpio_en).await;
     }
 
-    pub async fn gpio_set(&mut self) -> [u8; 6] {
+    pub async fn address(&mut self) -> [u8; 6] {
         self.control.address().await
     }
 
@@ -243,7 +243,7 @@ impl<'a> JoinedState<'a> {
         self.control.gpio_set(0, gpio_en).await;
     }
 
-    pub async fn gpio_set(&mut self) -> [u8; 6] {
+    pub async fn address(&mut self) -> [u8; 6] {
         self.control.address().await
     }
 
@@ -279,7 +279,7 @@ impl<'a> ApState<'a> {
         self.control.gpio_set(0, gpio_en).await;
     }
 
-    pub async fn gpio_set(&mut self) -> [u8; 6] {
+    pub async fn address(&mut self) -> [u8; 6] {
         self.control.address().await
     }
 

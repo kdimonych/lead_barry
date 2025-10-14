@@ -81,7 +81,7 @@ pub async fn main_logic_controller(
         let WiFiController::Idle(controller) = state else {
             defmt::panic!("Unexpected state");
         };
-        state = init_wifi_ap_network_and_wait_for_client(
+        let mut controller = init_wifi_ap_network_and_wait_for_client(
             spawner,
             controller,
             &mut settings,
@@ -90,6 +90,7 @@ pub async fn main_logic_controller(
         )
         .await;
 
+        controller.led(true).await;
         Timer::after(3.s()).await;
 
         let msg = ScMessageData {
@@ -217,6 +218,11 @@ async fn join_wifi_network<'a>(
         mac: None,
     };
     set_screen(ScIpStatus::new(ip_status_data).into()).await;
+
+    if let WiFiController::Joined(controller) = &mut state {
+        controller.led(true).await;
+    }
+
     Timer::after(3.s()).await;
 
     state
@@ -228,7 +234,7 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
     settings: &mut Settings,
     ui_control: &'static UiControlType<'_>,
     stack: Stack<'static>,
-) -> WiFiController<'a> {
+) -> ApState<'a> {
     //SoftAP provisioning mode.
 
     // Shortcut for switching screens convenience
@@ -300,7 +306,7 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
 
     // We have done
 
-    WiFiController::Ap(wifi_controller)
+    wifi_controller
 }
 
 /* Helper Functions */
