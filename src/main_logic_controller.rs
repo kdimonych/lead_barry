@@ -91,13 +91,14 @@ pub async fn main_logic_controller(
         .await;
 
         Timer::after(3.s()).await;
-        info!("AP mode done");
 
         let msg = ScMessageData {
             title: MsgTitleString::from_str("Config. mode"),
-            message: MessageString::from_str("The device is currently in configuration mode."),
+            message: MessageString::from_str("The device is in configuration mode."),
         };
         ui_control.switch(ScMessage::new(msg).into()).await;
+
+        info!("AP mode done");
 
         // Here we ready to start web server for configuration
         // TODO: Implement web server

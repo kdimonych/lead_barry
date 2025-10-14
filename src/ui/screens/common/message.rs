@@ -1,24 +1,31 @@
 use common::any_string::AnyString;
 use core::str::SplitWhitespace;
+use defmt::info;
+use nalgebra::constraint;
 
 use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::*},
     pixelcolor::BinaryColor,
     prelude::*,
-    primitives::{Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment},
-    text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
+    primitives::{
+        Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment, line,
+    },
+    text::{self, Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
 use crate::ui::Screen;
 
 const TITLE_LENGTH: usize = 15;
+const TITLE_SIZE: usize = TITLE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 const MESSAGE_LINE_LENGTH: usize = 18;
+const MESSAGE_LINE_SIZE: usize = MESSAGE_LINE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 const MESSAGE_LENGTH: usize = MESSAGE_LINE_LENGTH * 3; // Support for three lines of message
+const MESSAGE_SIZE: usize = MESSAGE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type MsgTitleString<'a> = AnyString<'a, TITLE_LENGTH>;
+pub type MsgTitleString<'a> = AnyString<'a, TITLE_SIZE>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type MessageString<'a> = AnyString<'a, MESSAGE_LENGTH>;
+pub type MessageString<'a> = AnyString<'a, MESSAGE_SIZE>;
 
 pub trait TrMessage {
     fn title(&'_ self) -> MsgTitleString<'_>;
@@ -61,13 +68,7 @@ where
         .ok();
 
         let message_str = self.status.message();
-        let lines = split_message_into_lines(message_str.as_str()).unwrap_or_else(|_| {
-            let mut err_str = heapless::String::<MESSAGE_LINE_LENGTH>::new();
-            err_str.push_str("Message too long").ok();
-            let mut vec = heapless::Vec::<heapless::String<MESSAGE_LINE_LENGTH>, 3>::new();
-            vec.push(err_str).ok();
-            vec
-        });
+        let lines = split_message_into_lines(message_str.as_str());
 
         let mut lines_texts: heapless::Vec<Text<'_, MonoTextStyle<'static, BinaryColor>>, 3> =
             heapless::Vec::new();
@@ -84,10 +85,16 @@ where
 
         let mut text_box = align_text_center_vertically(&mut lines_texts);
 
+        //Draw the text
+        for text_line in &lines_texts {
+            text_line.draw(draw_target).ok();
+        }
+
         text_box = text_box.offset(2);
-        if text_box.size.le(&MESSAGE_FRAME_BORDER
-            .offset(-(MESSAGE_FRAME_THICKNESS as i32) - 3)
-            .size)
+        let constraint = MESSAGE_FRAME_BORDER.offset(-(MESSAGE_FRAME_THICKNESS as i32) - 3);
+
+        if text_box.size.width <= constraint.size.width
+            && text_box.size.height <= constraint.size.height
         {
             // TODO: Move this to a function to avoid code duplication
             let frame_y_mid = text_box.top_left.y + (text_box.size.height as i32) / 2;
@@ -170,49 +177,116 @@ fn align_text_center_vertically(
     bounding_box
 }
 
-// TODO: Cover with tests
-fn split_message_into_lines(
-    message: &str,
-) -> Result<heapless::Vec<heapless::String<MESSAGE_LINE_LENGTH>, 3>, &'static str> {
-    let mut lines: heapless::Vec<heapless::String<MESSAGE_LINE_LENGTH>, 3> = heapless::Vec::new();
-    let mut current_line = heapless::String::<MESSAGE_LINE_LENGTH>::new();
-
-    let push_line = |lines: &mut heapless::Vec<heapless::String<_>, 3>,
-                     current_line: &mut heapless::String<_>| {
-        lines.push(current_line.clone()).ok();
-        current_line.clear();
-    };
-
-    for line in message.split('\n') {
-        if lines.is_full() {
-            return Err("Too long message");
-        }
-        if current_line.len() + line.len() <= MESSAGE_LINE_LENGTH {
-            current_line.push_str(line);
-        } else {
-            for word in line.split_whitespace() {
-                loop {
-                    if lines.is_full() {
-                        return Err("Too long message");
-                    }
-                    if current_line.len() + word.len() <= MESSAGE_LINE_LENGTH {
-                        if !current_line.is_empty() {
-                            current_line.push(' ');
-                        }
-                        current_line.push_str(word);
-                        break;
-                    } else if word.len() > MESSAGE_LINE_LENGTH {
-                        return Err("Too long word");
-                    }
-
-                    push_line(&mut lines, &mut current_line);
-                }
-            }
-        }
-        push_line(&mut lines, &mut current_line);
+fn try_split_at_utf8(word: &str, step: usize) -> (usize, &str, &str) {
+    let mut i: usize = 0;
+    while word.chars().next().is_some() && i < step {
+        i += 1;
     }
 
-    Ok(lines)
+    (i, &word[0..i], &word[i..])
+}
+
+fn len_in_chars(word: &str) -> usize {
+    word.chars().count()
+}
+
+fn split_whitespace_once(text: &str) -> (&str, &str) {
+    if let Some((first, rest)) = text.split_once(char::is_whitespace) {
+        (first, rest.trim_start())
+    } else {
+        (text, &text[text.len()..])
+    }
+}
+
+fn split_line_once(text: &str) -> (&str, &str) {
+    if let Some((first, rest)) = text.split_once(['\n', '\r']) {
+        (first, rest.trim_start())
+    } else {
+        (text, &text[text.len()..])
+    }
+}
+
+/// Fill the line with words from the message until it reaches the maximum length or runs out of words.
+/// Returns the length of the line and the remaining part of the message.
+/// If a word is too long to fit in an empty line, it will be truncated and "..." will be added.
+/// If a word is too long to fit in a non-empty line, it will be left for the next line.
+fn fill_with_words<'a>(
+    line: &mut heapless::String<MESSAGE_SIZE>,
+    msg: &'a str,
+) -> (usize, &'a str) {
+    let mut rest = msg;
+    let mut old_rest = msg;
+    let mut line_len = len_in_chars(line.as_ref());
+
+    while line.len() <= MESSAGE_LINE_LENGTH {
+        let (word, rest_msg) = split_whitespace_once(rest);
+        rest = rest_msg;
+        if word.is_empty() {
+            break;
+        }
+        let word_len = len_in_chars(word);
+        let space_len = if line_len > 0 { 1 } else { 0 };
+        if line_len + word_len + space_len <= MESSAGE_LINE_LENGTH {
+            if space_len > 0 {
+                // Add space before the word if it's not the first word in the line
+                line.push(' ').ok();
+            }
+            line.push_str(word).ok();
+            line_len += space_len + word_len;
+        } else if line.is_empty() {
+            // In case this is new line and the word is too long, we need to split it
+            let (part_len, part, _) = try_split_at_utf8(word, MESSAGE_LINE_LENGTH - space_len - 3);
+            if space_len > 0 {
+                // Add space before the word if it's not the first word in the line
+                line.push(' ').ok();
+            }
+            line.push_str(part).ok();
+            line.push_str("...").ok();
+            line_len += space_len + part_len + 3;
+            break;
+        } else {
+            // In case the line is not empty and the word is too long, we need a new line, so just return the old rest
+            rest = old_rest;
+            break;
+        }
+
+        old_rest = rest;
+    }
+    (line_len, rest)
+}
+
+// TODO: Cover with tests
+fn split_message_into_lines(message: &str) -> heapless::Vec<heapless::String<MESSAGE_SIZE>, 3> {
+    let mut lines: heapless::Vec<heapless::String<MESSAGE_SIZE>, 3> = heapless::Vec::new();
+    for _ in 0..lines.capacity() {
+        lines.push(heapless::String::new()).ok();
+    }
+
+    let mut target_lines = lines.iter_mut();
+    let mut rest = message;
+
+    while let Some(mut current_line) = target_lines.next() {
+        let (mut msg_line, msg_rest) = split_line_once(rest);
+        rest = msg_rest;
+
+        while !msg_line.is_empty() {
+            let (_, line_rest) = fill_with_words(current_line, msg_line);
+            msg_line = line_rest;
+
+            let Some(new_current_line) = target_lines.next() else {
+                return lines;
+            };
+            current_line = new_current_line;
+        }
+
+        if rest.is_empty() {
+            break;
+        }
+    }
+    // Truncate empty lines at the end
+    lines.truncate(lines.iter().filter(|line| !line.is_empty()).count());
+
+    lines
 }
 
 /* Constants */
