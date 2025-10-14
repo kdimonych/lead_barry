@@ -158,20 +158,6 @@ fn debug_memory_layout() {
     info!("Stack End:    0x{:08x}", stack_end);
     info!("Current MSP:  0x{:08x}", current_sp);
     info!("Expected MSP: 0x{:08x}", stack_start);
-
-    // Check if they match
-    if current_sp == stack_start {
-        info!("✅ MSP correctly set to stack_start");
-    } else {
-        info!(
-            "❌ MSP mismatch! Difference: {} bytes",
-            if current_sp > stack_start {
-                current_sp - stack_start
-            } else {
-                stack_start - current_sp
-            }
-        );
-    }
 }
 
 #[cortex_m_rt::entry]
