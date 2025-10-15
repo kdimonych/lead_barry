@@ -183,7 +183,7 @@ fn main() -> ! {
         I2C_BUS.init(Mutex::new(i2c));
 
     // Initialize the stack
-    let core1_stack = CORE1_STACK.init(Stack::new());
+    let core1_stack = CORE1_STACK.init_with(Stack::new);
     let core1_stack_base = core1_stack.mem.as_ptr() as usize;
     let core1_stack_end = core1_stack_base + core1_stack.mem.len();
 
@@ -202,8 +202,7 @@ fn main() -> ! {
     let ui_control: &'static UiControlType = UI_CONTROL.init(ui_control);
 
     // Initialize the VCP sensors
-    let vcp_sensors_state = VcpSensorsState::new();
-    let vcp_state_ref = VCP_SENSORS_STATE.init(vcp_sensors_state);
+    let vcp_state_ref = VCP_SENSORS_STATE.init_with(VcpSensorsState::new);
     let (vcp_runner, vcp_control) =
         VcpSensorsService::new(I2cDevice::new(i2c_bus), vcp_state_ref, VcpConfig::default());
     let vcp_control: &'static VcpControlType = VCP_SENSORS_CONTROL.init(vcp_control);
