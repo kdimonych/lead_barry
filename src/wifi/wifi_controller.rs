@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use cyw43::{Control, NetDriver};
 use cyw43_firmware::{CYW43_43439A0, CYW43_43439A0_CLM};
 use cyw43_pio::{DEFAULT_CLOCK_DIVIDER, PioSpi};
@@ -22,40 +24,24 @@ use embassy_rp::{
 
 use crate::wifi::config::*;
 
-pub enum WiFiState {
-    Uninitialized,
-    Idle,
-    Joined,
-    Ap,
-}
+pub trait WiFiState {}
 
-// WiFi service states
-pub struct WiFiDriverCreatedState<PIO, DMA>
+pub struct IdleState;
+impl WiFiState for IdleState {}
+
+pub struct JoinedState;
+impl WiFiState for JoinedState {}
+
+pub struct ApState;
+impl WiFiState for ApState {}
+
+pub struct WiFiController<'a, State>
 where
-    DMA: embassy_rp::dma::Channel + 'static,
-    PIO: embassy_rp::pio::Instance + 'static,
+    State: WiFiState,
 {
-    pio_spi: PioSpi<'static, PIO, 0, DMA>,
-    pwr_pin: Peri<'static, PIN_23>, // Power pin, pin 23 (will be used in following states)
-}
-
-pub struct InitializedState<'a> {
     control: Control<'a>,
+    _marker: core::marker::PhantomData<State>,
 }
-
-pub struct IdleState<'a> {
-    control: Control<'a>,
-}
-
-pub struct JoinedState<'a> {
-    control: Control<'a>,
-}
-
-pub struct ApState<'a> {
-    control: Control<'a>,
-    // You can add fields if needed
-}
-
 pub struct WiFiStaticData {
     cyw43_state: cyw43::State,
 }
@@ -74,132 +60,143 @@ impl Default for WiFiStaticData {
     }
 }
 
-pub enum WiFiController<'a> {
-    Idle(IdleState<'a>),
-    Joined(JoinedState<'a>),
-    Ap(ApState<'a>),
+pub enum WiFiControllerState<'a> {
+    Idle(WiFiController<'a, IdleState>),
+    Joined(WiFiController<'a, JoinedState>),
+    Ap(WiFiController<'a, ApState>),
 }
 
-/// Create a new WiFi service instance
-/// 'static lifetime is required for the peripherals and state
-/// PIO and DMA types are generic to allow for different instances
-/// The irq parameter is used to bind the PIO interrupt
-/// You must bind appropriate PIO interrupts in your main.rs, for example for PIO0:
-/// ```rust,ignore
-/// bind_interrupts!(struct Irqs {
-///     PIO0_IRQ_0 => InterruptHandler<PIO0>;
-/// });
-/// ```
-pub fn new_wifi_service<PIO, DMA>(
-    wifi_cfg: WiFiConfig<PIO, DMA>,
-    irq: impl Binding<PIO::Interrupt, InterruptHandler<PIO>>,
-) -> WiFiDriverCreatedState<PIO, DMA>
+pub struct WiFiDriverBuilder<PIO, DMA>
+where
+    DMA: embassy_rp::dma::Channel + 'static,
+    PIO: embassy_rp::pio::Instance + 'static,
+{
+    pio_spi: PioSpi<'static, PIO, 0, DMA>,
+    pwr: Output<'static>,
+}
+
+impl<PIO, DMA> WiFiDriverBuilder<PIO, DMA>
 where
     // Bounds from impl:
     DMA: embassy_rp::dma::Channel + 'static,
     PIO: embassy_rp::pio::Instance + 'static,
 {
-    // let fw = CYW43_43439A0; // Firmware binary included in the cyw43_firmware crate;
-    // let clm = CYW43_43439A0_CLM; // CLM binary included in the cyw43_firmware crate;
+    /// Create a new WiFi service instance
+    /// 'static lifetime is required for the peripherals and state
+    /// PIO and DMA types are generic to allow for different instances
+    /// The irq parameter is used to bind the PIO interrupt
+    /// You must bind appropriate PIO interrupts in your main.rs, for example for PIO0:
+    /// ```rust,ignore
+    /// bind_interrupts!(struct Irqs {
+    ///     PIO0_IRQ_0 => InterruptHandler<PIO0>;
+    /// });
+    /// ```
+    pub fn new(
+        wifi_cfg: WiFiConfig<PIO, DMA>,
+        irq: impl Binding<PIO::Interrupt, InterruptHandler<PIO>>,
+    ) -> WiFiDriverBuilder<PIO, DMA> {
+        // let fw = CYW43_43439A0; // Firmware binary included in the cyw43_firmware crate;
+        // let clm = CYW43_43439A0_CLM; // CLM binary included in the cyw43_firmware crate;
 
-    // To make flashing faster for development, you may want to flash the firmwares independently
-    // at hardcoded addresses, instead of baking them into the program with `include_bytes!`:
-    //     probe-rs download 43439A0.bin --binary-format bin --chip RP2040 --base-address 0x10100000
-    //     probe-rs download 43439A0_clm.bin --binary-format bin --chip RP2040 --base-address 0x10140000
-    // let fw = unsafe { core::slice::from_raw_parts(0x10100000 as *const u8, 230321) };
-    // let clm = unsafe { core::slice::from_raw_parts(0x10140000 as *const u8, 4752) };
+        // To make flashing faster for development, you may want to flash the firmwares independently
+        // at hardcoded addresses, instead of baking them into the program with `include_bytes!`:
+        //     probe-rs download 43439A0.bin --binary-format bin --chip RP2040 --base-address 0x10100000
+        //     probe-rs download 43439A0_clm.bin --binary-format bin --chip RP2040 --base-address 0x10140000
+        // let fw = unsafe { core::slice::from_raw_parts(0x10100000 as *const u8, 230321) };
+        // let clm = unsafe { core::slice::from_raw_parts(0x10140000 as *const u8, 4752) };
 
-    //let pwr = Output::new(wifi_cfg.pwr_pin, Level::Low);
-    let cs = Output::new(wifi_cfg.cs_pin, Level::High);
-    let mut pio = Pio::new(wifi_cfg.pio, irq);
+        //let pwr = Output::new(wifi_cfg.pwr_pin, Level::Low);
+        let cs = Output::new(wifi_cfg.cs_pin, Level::High);
+        let mut pio = Pio::new(wifi_cfg.pio, irq);
+        let pwr: Output<'_> = Output::new(wifi_cfg.pwr_pin, Level::Low);
 
-    let spi: PioSpi<'_, PIO, 0, DMA> = PioSpi::new(
-        &mut pio.common,
-        pio.sm0,
-        DEFAULT_CLOCK_DIVIDER,
-        pio.irq0,
-        cs,
-        wifi_cfg.dio_pin,
-        wifi_cfg.clk_pin,
-        wifi_cfg.dma_ch,
-    );
+        let spi: PioSpi<'_, PIO, 0, DMA> = PioSpi::new(
+            &mut pio.common,
+            pio.sm0,
+            DEFAULT_CLOCK_DIVIDER,
+            pio.irq0,
+            cs,
+            wifi_cfg.dio_pin,
+            wifi_cfg.clk_pin,
+            wifi_cfg.dma_ch,
+        );
 
-    WiFiDriverCreatedState::<PIO, DMA> {
-        pio_spi: spi,
-        pwr_pin: wifi_cfg.pwr_pin,
+        WiFiDriverBuilder::<PIO, DMA> { pio_spi: spi, pwr }
     }
-}
 
-impl<PIO, DMA> WiFiDriverCreatedState<PIO, DMA>
-where
-    DMA: embassy_rp::dma::Channel + 'static,
-    PIO: embassy_rp::pio::Instance + 'static,
-{
     /// Initialize the WiFi hardware and transition to Idle state
-    pub async fn initialize(
+    pub async fn build(
         self,
         wifi_static_state: &'_ mut WiFiStaticData,
     ) -> (
-        InitializedState<'_>,
+        WiFiController<'_, IdleState>,
         cyw43::Runner<'_, Output<'_>, PioSpi<'_, PIO, 0, DMA>>,
         NetDriver<'_>,
     ) {
         let fw = CYW43_43439A0; // Firmware binary included in the cyw43_firmware crate;
 
-        let pwr = Output::new(self.pwr_pin, Level::Low);
-
         let state = &mut wifi_static_state.cyw43_state;
         debug!("Creating WiFi driver...");
-        let (net_device, control, cyw43_runner) = cyw43::new(state, pwr, self.pio_spi, fw).await;
+        let (net_device, mut control, cyw43_runner) =
+            cyw43::new(state, self.pwr, self.pio_spi, fw).await;
 
-        debug!("WiFi driver created.");
-        (InitializedState { control }, cyw43_runner, net_device)
-    }
-}
-
-impl<'a> InitializedState<'a> {
-    /// Initialize the WiFi hardware and transition to Idle state
-    pub async fn initialize_controller(mut self) -> IdleState<'a> {
+        // Initialize the WiFi hardware with CLM data
+        debug!("Initializing WiFi driver...");
         let clm = CYW43_43439A0_CLM; // CLM binary included in the cyw43_firmware crate;
-        self.control.init(clm).await;
-        self.control
+        control.init(clm).await;
+        control
             .set_power_management(cyw43::PowerManagementMode::Performance)
             .await;
-        IdleState {
-            control: self.control,
-        }
+
+        debug!("WiFi driver created.");
+        (
+            WiFiController {
+                control,
+                _marker: PhantomData,
+            },
+            cyw43_runner,
+            net_device,
+        )
     }
 }
 
-impl<'a> IdleState<'a> {
+impl<'a> WiFiController<'a, IdleState> {
     /// Initialize the WiFi hardware and transition to Joined state
     pub async fn join(
         mut self,
         ssid: &str,
         join_options: JoinOptions<'_>,
-    ) -> Result<JoinedState<'a>, (Self, Error)> {
+    ) -> Result<WiFiController<'a, JoinedState>, (Self, Error)> {
         if let Err(error) = self.control.join(ssid, join_options).await {
             Err((self, error))
         } else {
-            Ok(JoinedState {
+            Ok(WiFiController {
                 control: self.control,
+                _marker: PhantomData,
             })
         }
     }
 
     /// Initialize the WiFi hardware and transition to AP state
-    pub async fn start_ap_open(mut self, ssid: &str, channel: u8) -> ApState<'a> {
+    pub async fn start_ap_open(mut self, ssid: &str, channel: u8) -> WiFiController<'a, ApState> {
         self.control.start_ap_open(ssid, channel).await;
-        ApState {
+        WiFiController {
             control: self.control,
+            _marker: PhantomData,
         }
     }
 
     /// Initialize the WiFi hardware and transition to AP state with WPA2
-    pub async fn start_ap_wpa2(mut self, ssid: &str, password: &str, channel: u8) -> ApState<'a> {
+    pub async fn start_ap_wpa2(
+        mut self,
+        ssid: &str,
+        password: &str,
+        channel: u8,
+    ) -> WiFiController<'a, ApState> {
         self.control.start_ap_wpa2(ssid, password, channel).await;
-        ApState {
+        WiFiController {
             control: self.control,
+            _marker: PhantomData,
         }
     }
 
@@ -230,12 +227,19 @@ impl<'a> IdleState<'a> {
     }
 }
 
-impl<'a> JoinedState<'a> {
+impl<'a> From<WiFiController<'a, IdleState>> for WiFiControllerState<'a> {
+    fn from(controller: WiFiController<'a, IdleState>) -> Self {
+        Self::Idle(controller)
+    }
+}
+
+impl<'a> WiFiController<'a, JoinedState> {
     /// Disconnect from the current WiFi network and transition to Idle state
-    pub async fn leave(mut self) -> IdleState<'a> {
+    pub async fn leave(mut self) -> WiFiController<'a, IdleState> {
         self.control.leave().await;
-        IdleState {
+        WiFiController {
             control: self.control,
+            _marker: PhantomData,
         }
     }
 
@@ -266,12 +270,19 @@ impl<'a> JoinedState<'a> {
     }
 }
 
-impl<'a> ApState<'a> {
+impl<'a> From<WiFiController<'a, JoinedState>> for WiFiControllerState<'a> {
+    fn from(controller: WiFiController<'a, JoinedState>) -> Self {
+        Self::Joined(controller)
+    }
+}
+
+impl<'a> WiFiController<'a, ApState> {
     /// Close the access point and transition to Idle state
-    pub async fn close_ap(mut self) -> IdleState<'a> {
+    pub async fn close_ap(mut self) -> WiFiController<'a, IdleState> {
         self.control.close_ap().await;
-        IdleState {
+        WiFiController {
             control: self.control,
+            _marker: PhantomData,
         }
     }
 
@@ -300,5 +311,11 @@ impl<'a> ApState<'a> {
 
     pub async fn scan(&mut self, scan_opts: ScanOptions) -> Scanner<'_> {
         self.control.scan(scan_opts).await
+    }
+}
+
+impl<'a> From<WiFiController<'a, ApState>> for WiFiControllerState<'a> {
+    fn from(controller: WiFiController<'a, ApState>) -> Self {
+        Self::Ap(controller)
     }
 }

@@ -56,7 +56,7 @@ type UiRunnerType<'a> =
 type UiControlType<'a> = UiControl<'a, ScCollection>;
 type VcpSensorsRunnerType<'a> =
     VcpSensorsRunner<'a, I2cDeviceType<'a>, VCP_SENSORS_EVENT_QUEUE_SIZE>;
-type WiFiUninitializedControllerType = WiFiDriverCreatedState<PIO0, DMA_CH0>;
+type WiFiDriverBuilderType = WiFiDriverBuilder<PIO0, DMA_CH0>;
 type SharedStorageType = Mutex<CriticalSectionRawMutex, Storage<'static>>; // 4KB storage
 
 // Interrupt handlers
@@ -103,7 +103,7 @@ struct ResourcesCore0 {
     led_pin: Peri<'static, PIN_22>,
 
     vcp_runner: Option<VcpSensorsRunnerType<'static>>,
-    wifi_controller: WiFiUninitializedControllerType,
+    wifi_builder: WiFiDriverBuilderType,
 
     // Shared resources
     shared_resources: &'static SharedResources,
@@ -157,7 +157,6 @@ fn debug_memory_layout() {
     info!("Stack Start:  0x{:08x}", stack_start);
     info!("Stack End:    0x{:08x}", stack_end);
     info!("Current MSP:  0x{:08x}", current_sp);
-    info!("Expected MSP: 0x{:08x}", stack_start);
 }
 
 #[cortex_m_rt::entry]
@@ -216,8 +215,7 @@ fn main() -> ! {
         dma_ch: p.DMA_CH0, // DMA channel
     };
 
-    let wifi_controller: WiFiDriverCreatedState<PIO0, DMA_CH0> =
-        new_wifi_service(wifi_cfg, Pio0Irqs);
+    let wifi_builder: WiFiDriverBuilder<PIO0, DMA_CH0> = WiFiDriverBuilder::new(wifi_cfg, Pio0Irqs);
 
     // wifi_config
     //     .wifi_network
@@ -264,7 +262,7 @@ fn main() -> ! {
                     vcp_runner: Some(vcp_runner),
                     led_pin: p.PIN_22,
                     voltage_reading,
-                    wifi_controller,
+                    wifi_builder,
                     shared_resources,
                 },
             ))
@@ -349,11 +347,8 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     info!("Create wifi controller");
     let wifi_static_data = WIFI_STATIC_DATA.init(WiFiStaticData::new());
     let (wifi_controller, wifi_runner, wifi_network_driver) =
-        resources.wifi_controller.initialize(wifi_static_data).await;
+        resources.wifi_builder.build(wifi_static_data).await;
     spawner.spawn(cyw43_task(wifi_runner)).unwrap();
-
-    info!("Initialize WiFi controller.");
-    let wifi_controller = wifi_controller.initialize_controller().await;
 
     //Call main logic controller
     main_logic_controller(

@@ -47,7 +47,7 @@ pub async fn main_logic_controller(
     spawner: Spawner,
     vcp_control: &'static VcpControlType<'_>,
     ui_control: &'static UiControlType<'_>,
-    wifi_control: IdleState<'_>,
+    wifi_control: WiFiController<'_, IdleState>,
     wifi_network_driver: NetDriver<'static>,
     shared_storage: &'static Mutex<CriticalSectionRawMutex, Storage<'static>>,
 ) -> ! {
@@ -69,16 +69,19 @@ pub async fn main_logic_controller(
     let (stack, runner) = embassy_net::new(wifi_network_driver, config, stack_resources, seed);
 
     spawner.spawn(net_task(runner)).unwrap();
-    let mut state = WiFiController::Idle(wifi_control);
 
-    if !settings.wifi_ssid.is_empty() {
+    let state: WiFiControllerState<'_> = if !settings.wifi_ssid.is_empty() {
         // There is a wifi ssid configured, try to join
-        state = join_wifi_network(state, &settings, ui_control, stack).await;
-    }
+        join_wifi_network(wifi_control, &settings, ui_control, stack)
+            .await
+            .into()
+    } else {
+        wifi_control.into()
+    };
 
-    if matches!(state, WiFiController::Idle(_)) {
+    if matches!(state, WiFiControllerState::Idle(_)) {
         // Still in idle so, switch to AP mode
-        let WiFiController::Idle(controller) = state else {
+        let WiFiControllerState::Idle(controller) = state else {
             defmt::panic!("Unexpected state");
         };
         let mut controller = init_wifi_ap_network_and_wait_for_client(
@@ -139,19 +142,19 @@ async fn wait_for_network_ready(stack: &Stack<'_>) {
 }
 
 async fn join_wifi_network<'a>(
-    state: WiFiController<'a>,
+    wifi_controller: WiFiController<'a, IdleState>,
     settings: &Settings,
     ui_control: &'static UiControlType<'_>,
     stack: Stack<'a>,
-) -> WiFiController<'a> {
+) -> WiFiController<'a, JoinedState> {
     // Shortcut for switching screens convenience
     let set_screen = |new_screen: ScCollection| async { ui_control.switch(new_screen).await };
 
     info!("Joining WiFi network: {}", settings.wifi_ssid);
-    let mut state = state;
+    let mut state: WiFiControllerState<'_> = wifi_controller.into();
     for _ in 0..5 {
         state = match state {
-            WiFiController::Idle(s) => {
+            WiFiControllerState::Idle(s) => {
                 let wifi_status =
                     ScWifiStatsData::new(ScvState::Connecting, Some(settings.wifi_ssid.clone()));
                 set_screen(ScWifiStats::new(wifi_status).into()).await;
@@ -164,20 +167,17 @@ async fn join_wifi_network<'a>(
                 };
 
                 match s.join(&settings.wifi_ssid, join_options).await {
-                    Ok(s) => WiFiController::Joined(s),
+                    Ok(s) => s.into(),
                     Err((s, e)) => {
                         error!("Join failed with status={}", e.status);
-                        WiFiController::Idle(s)
+                        s.into()
                     }
                 }
             }
 
-            WiFiController::Joined(_) => {
-                break;
-            }
+            WiFiControllerState::Joined(_) => break,
             _ => {
-                error!("Unexpected state");
-                return state;
+                defmt::unreachable!()
             }
         }
     }
@@ -219,22 +219,24 @@ async fn join_wifi_network<'a>(
     };
     set_screen(ScIpStatus::new(ip_status_data).into()).await;
 
-    if let WiFiController::Joined(controller) = &mut state {
-        controller.led(true).await;
-    }
+    let WiFiControllerState::Joined(mut controller) = state else {
+        defmt::panic!("Unexpected state");
+    };
+
+    controller.led(true).await;
 
     Timer::after(3.s()).await;
 
-    state
+    controller
 }
 
 async fn init_wifi_ap_network_and_wait_for_client<'a>(
     spawner: Spawner,
-    wifi_controller: IdleState<'a>,
+    wifi_controller: WiFiController<'a, IdleState>,
     settings: &mut Settings,
     ui_control: &'static UiControlType<'_>,
     stack: Stack<'static>,
-) -> ApState<'a> {
+) -> WiFiController<'a, ApState> {
     //SoftAP provisioning mode.
 
     // Shortcut for switching screens convenience
