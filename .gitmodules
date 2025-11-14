@@ -1,3 +1,6 @@
 [submodule "leasehund"]
 	path = leasehund
 	url = git@github.com:kdimonych/leasehund.git
+[submodule "nanofish"]
+	path = nanofish
+	url = git@github.com:kdimonych/nanofish.git

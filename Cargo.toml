@@ -54,6 +54,10 @@ embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "dhcpv4", "m
 #leasehund = "0.2.0"
 leasehund = { path = "./leasehund", features = ["defmt"] }
 
+# HTTP server/client
+# nanofish = "0.9.1"
+nanofish = { path = "./nanofish" }
+
 # Alternative: Use rp-pico but you'll need to handle CYW43 separately
 # rp-pico = "0.9"
 
