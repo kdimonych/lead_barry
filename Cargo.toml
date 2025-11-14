@@ -45,7 +45,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 embassy-embedded-hal = { version = "0.5.0" , features = ["defmt"] }
 embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt"] }
 embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
-embassy-rp = { version = "0.8", features = ["rp2040", "defmt", "unstable-pac", "time-driver", "critical-section-impl", "intrinsics", "rom-v2-intrinsics"] }
+embassy-rp = { version = "0.8", features = ["rp2040", "defmt", "rt", "unstable-pac", "time-driver", "critical-section-impl", "intrinsics", "rom-v2-intrinsics"] }
 embassy-sync = "0.7"
 embassy-futures = "0.1"
 embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
@@ -53,7 +53,6 @@ embassy-net = { version = "0.7", features = ["defmt", "tcp", "udp", "dhcpv4", "m
 # DHCP server
 #leasehund = "0.2.0"
 leasehund = { path = "./leasehund", features = ["defmt"] }
-
 
 # Alternative: Use rp-pico but you'll need to handle CYW43 separately
 # rp-pico = "0.9"
