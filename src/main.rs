@@ -58,7 +58,6 @@ type UiRunnerType<'a> =
 type UiControlType<'a> = UiControl<'a, ScCollection>;
 type VcpSensorsRunnerType<'a> =
     VcpSensorsRunner<'a, I2cDeviceType<'a>, VCP_SENSORS_EVENT_QUEUE_SIZE>;
-type WiFiDriverBuilderType = WiFiDriverBuilder<PIO0, DMA_CH0>;
 type SharedStorageType = Mutex<CriticalSectionRawMutex, Storage<'static>>; // 4KB storage
 
 // Interrupt handlers
@@ -107,7 +106,7 @@ struct ResourcesCore0 {
     led_pin: Peri<'static, PIN_22>,
 
     vcp_runner: Option<VcpSensorsRunnerType<'static>>,
-    wifi_builder: WiFiDriverBuilderType,
+    wifi_builder: WiFiDriverBuilder<WiFiBuilderCreated<PIO0, DMA_CH0>>,
 
     // Shared resources
     shared_resources: &'static SharedResources,
@@ -224,7 +223,7 @@ fn main() -> ! {
         dma_ch: p.DMA_CH0, // DMA channel
     };
 
-    let wifi_builder: WiFiDriverBuilder<PIO0, DMA_CH0> = WiFiDriverBuilder::new(wifi_cfg, Pio0Irqs);
+    let wifi_builder = WiFiDriverBuilder::new(wifi_cfg, Pio0Irqs);
 
     // wifi_config
     //     .wifi_network
@@ -338,9 +337,10 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     //Initialize wifi controller
     info!("Create wifi controller");
     let wifi_static_data = WIFI_STATIC_DATA.init(WiFiStaticData::new());
-    let (wifi_controller, wifi_runner, wifi_network_driver) =
-        resources.wifi_builder.build(wifi_static_data).await;
-    spawner.spawn(cyw43_task(wifi_runner)).unwrap();
+    let (wifi_controller, wifi_network_driver) = resources
+        .wifi_builder
+        .build(wifi_static_data, spawner, cyw43_task)
+        .await;
 
     // Initialize button controller
     let button_controller_state = BUTTON_CONTROLLER.init(ButtonControllerState::new());
