@@ -6,6 +6,7 @@
 #![allow(async_fn_in_trait)]
 
 mod flash_storage;
+mod input;
 mod main_logic_controller;
 mod matrix_ops;
 mod precise_timing;
@@ -35,6 +36,7 @@ use static_cell::StaticCell;
 
 use crate::units::{FrequencyExt, TimeExt};
 use flash_storage::*;
+use input::*;
 use main_logic_controller::*;
 use micromath::F32Ext;
 use ui::*;
@@ -45,7 +47,7 @@ use wifi::*;
 use {defmt_rtt as _, panic_probe as _};
 
 // Constants
-const CORE1_STACK_SIZE: usize = 4096 * 2;
+const CORE1_STACK_SIZE: usize = 4096 * 3;
 const VCP_SENSORS_EVENT_QUEUE_SIZE: usize = 8;
 
 // Global types
@@ -78,6 +80,7 @@ struct SharedResources {
 }
 
 // Static resources
+static BUTTON_CONTROLLER: StaticCell<ButtonControllerState> = StaticCell::new();
 static CORE1_STACK: StaticCell<Stack<CORE1_STACK_SIZE>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
@@ -99,6 +102,7 @@ static VOLTAGE_READING_MODEL: StaticCell<VoltageReading> = StaticCell::new();
 
 struct ResourcesCore0 {
     // Owned resources
+    button_controller_builder: ButtonControllerBuilder,
     voltage_reading: &'static VoltageReading,
     led_pin: Peri<'static, PIN_22>,
 
@@ -168,6 +172,11 @@ fn main() -> ! {
     debug_memory_layout();
 
     log_system_frequencies();
+
+    // Bind button pins
+    let mut button_controller_builder = ButtonControllerBuilder::new();
+    // button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
+    // button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
 
     //User FLASH storage
     let storage = Storage::new(p.FLASH, p.DMA_CH1);
@@ -259,6 +268,7 @@ fn main() -> ! {
             .spawn(core0_init(
                 spawner,
                 ResourcesCore0 {
+                    button_controller_builder,
                     vcp_runner: Some(vcp_runner),
                     led_pin: p.PIN_22,
                     voltage_reading,
@@ -308,24 +318,6 @@ async fn screen_iterate_task(
 }
 
 #[embassy_executor::task]
-async fn led_task(led: &'static mut Output<'static>) -> ! {
-    let mut ticker = Ticker::every(1500.ms());
-
-    let mut led_state = false;
-
-    loop {
-        if led_state {
-            led.set_low();
-        } else {
-            led.set_high();
-        }
-        led_state = !led_state;
-
-        ticker.next().await;
-    }
-}
-
-#[embassy_executor::task]
 async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     // Spawn stack monitor task
     spawner.spawn(core_0_stack_monitor_task()).unwrap();
@@ -350,6 +342,16 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
         resources.wifi_builder.build(wifi_static_data).await;
     spawner.spawn(cyw43_task(wifi_runner)).unwrap();
 
+    // Initialize button controller
+    let button_controller_state = BUTTON_CONTROLLER.init(ButtonControllerState::new());
+    let (button_controller, button_controller_runner) = resources
+        .button_controller_builder
+        .build(button_controller_state);
+    debug!("Spawn buttons controller task on core 0");
+    spawner
+        .spawn(buttons_controller_task(button_controller_runner))
+        .unwrap();
+
     //Call main logic controller
     main_logic_controller(
         spawner,
@@ -357,9 +359,34 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
         resources.shared_resources.ui_control,
         wifi_controller,
         wifi_network_driver,
+        button_controller,
         resources.shared_resources.shared_storage,
     )
     .await;
+}
+
+#[embassy_executor::task]
+async fn buttons_controller_task(button_controller_runner: ButtonControllerRunner<'static>) -> ! {
+    debug!("Starting buttons controller task...");
+    button_controller_runner.run().await;
+}
+
+#[embassy_executor::task]
+async fn led_task(led: &'static mut Output<'static>) -> ! {
+    let mut ticker = Ticker::every(1500.ms());
+
+    let mut led_state = false;
+
+    loop {
+        if led_state {
+            led.set_low();
+        } else {
+            led.set_high();
+        }
+        led_state = !led_state;
+
+        ticker.next().await;
+    }
 }
 
 #[embassy_executor::task]

@@ -21,6 +21,7 @@ use leasehund::TransactionEvent;
 use static_cell::StaticCell;
 
 use crate::flash_storage::*;
+use crate::input::*;
 use crate::settings::Settings;
 use crate::ui::*;
 use crate::units::TimeExt as _;
@@ -49,6 +50,7 @@ pub async fn main_logic_controller(
     ui_control: &'static UiControlType<'_>,
     wifi_control: WiFiController<'_, IdleState>,
     wifi_network_driver: NetDriver<'static>,
+    button_controller: ButtonController<'_>,
     shared_storage: &'static Mutex<CriticalSectionRawMutex, Storage<'static>>,
 ) -> ! {
     // try load settings from flash
@@ -90,6 +92,7 @@ pub async fn main_logic_controller(
             &mut settings,
             ui_control,
             stack,
+            &button_controller,
         )
         .await;
 
@@ -236,6 +239,7 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
     settings: &mut Settings,
     ui_control: &'static UiControlType<'_>,
     stack: Stack<'static>,
+    button_controller: &ButtonController<'_>,
 ) -> WiFiController<'a, ApState> {
     //SoftAP provisioning mode.
 
@@ -293,12 +297,27 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
         );
 
         let (ip, mac) = loop {
-            let Ok((ip, mac)) = wait_for_dhcp_client(&mut server, stack).await else {
-                Timer::after(1000.ms()).await;
-                continue;
-            };
+            // Wait for a client to connect to the AP or press the button to skip waiting
+            let mut button_fut = button_controller.receive();
 
-            break (ip, mac);
+            let mut select = embassy_futures::select::select(
+                wait_for_dhcp_client(&mut server, stack),
+                button_fut,
+            )
+            .await;
+            match select {
+                embassy_futures::select::Either::First(Ok(client)) => {
+                    let (ip, mac) = client;
+                    break (ip, mac);
+                }
+                embassy_futures::select::Either::First(Err(())) => {
+                    error!("DHCP client wait error, retrying");
+                    Timer::after(500.ms()).await;
+                }
+                embassy_futures::select::Either::Second(event) => {
+                    debug!("Button pressed {:?}", event);
+                }
+            }
         };
 
         let client_info = ScvClientInfo { ip, mac: Some(mac) };
