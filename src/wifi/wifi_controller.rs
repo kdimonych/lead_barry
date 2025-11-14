@@ -14,11 +14,10 @@ pub use cyw43::ScanOptions;
 pub use cyw43::Scanner;
 
 use defmt::debug;
+use embassy_executor::Spawner;
 use embassy_rp::{
-    Peri,
     gpio::{Level, Output},
     interrupt::typelevel::Binding,
-    peripherals::PIN_23,
     pio::{InterruptHandler, Pio},
 };
 
@@ -66,7 +65,8 @@ pub enum WiFiControllerState<'a> {
     Ap(WiFiController<'a, ApState>),
 }
 
-pub struct WiFiDriverBuilder<PIO, DMA>
+pub struct NoWiFiBuilderCreated;
+pub struct WiFiBuilderCreated<PIO, DMA>
 where
     DMA: embassy_rp::dma::Channel + 'static,
     PIO: embassy_rp::pio::Instance + 'static,
@@ -75,12 +75,11 @@ where
     pwr: Output<'static>,
 }
 
-impl<PIO, DMA> WiFiDriverBuilder<PIO, DMA>
-where
-    // Bounds from impl:
-    DMA: embassy_rp::dma::Channel + 'static,
-    PIO: embassy_rp::pio::Instance + 'static,
-{
+pub struct WiFiDriverBuilder<Step = NoWiFiBuilderCreated> {
+    step: Step,
+}
+
+impl WiFiDriverBuilder<NoWiFiBuilderCreated> {
     /// Create a new WiFi service instance
     /// 'static lifetime is required for the peripherals and state
     /// PIO and DMA types are generic to allow for different instances
@@ -91,10 +90,15 @@ where
     ///     PIO0_IRQ_0 => InterruptHandler<PIO0>;
     /// });
     /// ```
-    pub fn new(
+    pub fn new<PIO, DMA>(
         wifi_cfg: WiFiConfig<PIO, DMA>,
         irq: impl Binding<PIO::Interrupt, InterruptHandler<PIO>>,
-    ) -> WiFiDriverBuilder<PIO, DMA> {
+    ) -> WiFiDriverBuilder<WiFiBuilderCreated<PIO, DMA>>
+    where
+        // Bounds from impl:
+        DMA: embassy_rp::dma::Channel + 'static,
+        PIO: embassy_rp::pio::Instance + 'static,
+    {
         // let fw = CYW43_43439A0; // Firmware binary included in the cyw43_firmware crate;
         // let clm = CYW43_43439A0_CLM; // CLM binary included in the cyw43_firmware crate;
 
@@ -121,24 +125,40 @@ where
             wifi_cfg.dma_ch,
         );
 
-        WiFiDriverBuilder::<PIO, DMA> { pio_spi: spi, pwr }
+        WiFiDriverBuilder {
+            step: WiFiBuilderCreated { pio_spi: spi, pwr },
+        }
     }
+}
 
+impl<PIO, DMA> WiFiDriverBuilder<WiFiBuilderCreated<PIO, DMA>>
+where
+    // Bounds from impl:
+    DMA: embassy_rp::dma::Channel + 'static,
+    PIO: embassy_rp::pio::Instance + 'static,
+{
     /// Initialize the WiFi hardware and transition to Idle state
-    pub async fn build(
+    pub async fn build<SpawnTokenBuilder, S>(
         self,
-        wifi_static_state: &'_ mut WiFiStaticData,
-    ) -> (
-        WiFiController<'_, IdleState>,
-        cyw43::Runner<'_, Output<'_>, PioSpi<'_, PIO, 0, DMA>>,
-        NetDriver<'_>,
-    ) {
+        wifi_static_state: &'static mut WiFiStaticData,
+        spawner: Spawner,
+        wifi_runner_task: SpawnTokenBuilder,
+    ) -> (WiFiController<'static, IdleState>, NetDriver<'static>)
+    where
+        SpawnTokenBuilder: Fn(
+            cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO, 0, DMA>>,
+        ) -> ::embassy_executor::SpawnToken<S>,
+    {
         let fw = CYW43_43439A0; // Firmware binary included in the cyw43_firmware crate;
 
         let state = &mut wifi_static_state.cyw43_state;
         debug!("Creating WiFi driver...");
         let (net_device, mut control, cyw43_runner) =
-            cyw43::new(state, self.pwr, self.pio_spi, fw).await;
+            cyw43::new(state, self.step.pwr, self.step.pio_spi, fw).await;
+        debug!("WiFi driver created.");
+
+        // Spawn the CYW43 runner task. Spawning this task here guarantees the WiFi driver operates correctly.
+        spawner.spawn(wifi_runner_task(cyw43_runner)).unwrap();
 
         // Initialize the WiFi hardware with CLM data
         debug!("Initializing WiFi driver...");
@@ -147,14 +167,13 @@ where
         control
             .set_power_management(cyw43::PowerManagementMode::Performance)
             .await;
+        debug!("WiFi driver initialized.");
 
-        debug!("WiFi driver created.");
         (
             WiFiController {
                 control,
                 _marker: PhantomData,
             },
-            cyw43_runner,
             net_device,
         )
     }
