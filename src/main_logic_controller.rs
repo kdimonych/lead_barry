@@ -20,6 +20,7 @@ use leasehund::DHCPServerSocket;
 use leasehund::TransactionEvent;
 use static_cell::StaticCell;
 
+use crate::config_server::HttpConfigServer;
 use crate::flash_storage::*;
 use crate::input::*;
 use crate::settings::Settings;
@@ -109,6 +110,9 @@ pub async fn main_logic_controller(
 
         // Here we ready to start web server for configuration
         // TODO: Implement web server
+
+        let mut http_server = HttpConfigServer::new();
+        http_server.run(spawner, stack).await;
     }
 
     loop {
@@ -249,7 +253,7 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
     info!("Starting WiFi AP network: {}", DEFAULT_AP_SSID);
 
     // Generate random password
-    let password = generate_random_password();
+    let password = heapless::String::<64>::from_str("FW68ETB6").unwrap(); //generate_random_password();
 
     let credentials = ScvCredentials {
         ssid: heapless::String::<32>::from_str(DEFAULT_AP_SSID).unwrap(),

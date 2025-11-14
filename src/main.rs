@@ -5,11 +5,13 @@
 #![no_main]
 #![allow(async_fn_in_trait)]
 
+mod config_server;
 mod flash_storage;
 mod input;
 mod main_logic_controller;
 mod matrix_ops;
 mod precise_timing;
+mod reset;
 mod settings;
 mod ui;
 mod units;
