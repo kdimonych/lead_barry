@@ -174,8 +174,8 @@ fn main() -> ! {
 
     // Bind button pins
     let mut button_controller_builder = ButtonControllerBuilder::new();
-    // button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
-    // button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
+    button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
+    button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
 
     //User FLASH storage
     let storage = Storage::new(p.FLASH, p.DMA_CH1);
