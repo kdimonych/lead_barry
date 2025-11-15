@@ -21,9 +21,9 @@ use leasehund::TransactionEvent;
 use static_cell::StaticCell;
 
 use crate::config_server::HttpConfigServer;
+use crate::configuration::*;
 use crate::flash_storage::*;
 use crate::input::*;
-use crate::settings::Settings;
 use crate::ui::*;
 use crate::units::TimeExt as _;
 use crate::vcp_sensors::*;
@@ -52,11 +52,8 @@ pub async fn main_logic_controller(
     wifi_control: WiFiController<'_, IdleState>,
     wifi_network_driver: NetDriver<'static>,
     button_controller: ButtonController<'_>,
-    shared_storage: &'static Mutex<CriticalSectionRawMutex, Storage<'static>>,
+    configuration_storage: &'static ConfigurationStorage<'static>,
 ) -> ! {
-    // try load settings from flash
-    let mut settings = get_settings(shared_storage).await;
-
     // Generate random seed
     let mut rng = RoscRng;
     let seed = rng.next_u64();
@@ -73,6 +70,7 @@ pub async fn main_logic_controller(
 
     spawner.spawn(net_task(runner)).unwrap();
 
+    let settings = configuration_storage.get_settings().await;
     let state: WiFiControllerState<'_> = if !settings.wifi_ssid.is_empty() {
         // There is a wifi ssid configured, try to join
         join_wifi_network(wifi_control, &settings, ui_control, stack)
@@ -90,7 +88,7 @@ pub async fn main_logic_controller(
         let mut controller = init_wifi_ap_network_and_wait_for_client(
             spawner,
             controller,
-            &mut settings,
+            configuration_storage,
             ui_control,
             stack,
             &button_controller,
@@ -119,20 +117,6 @@ pub async fn main_logic_controller(
         // Main logic goes here
         Timer::after(Duration::from_secs(60)).await;
     }
-}
-
-async fn get_settings(shared_storage: &Mutex<CriticalSectionRawMutex, Storage<'_>>) -> Settings {
-    let mut storage = shared_storage.lock().await;
-    Settings::load_async(&mut storage)
-        .await
-        .unwrap_or_else(|e| {
-            error!("Failed to load settings, using defaults ({:?})", e);
-            let default_settings = Settings::default();
-            if let Err(e) = default_settings.save(&mut storage) {
-                error!("Failed to save default settings ({:?})", e);
-            }
-            default_settings
-        })
 }
 
 async fn wait_for_network_ready(stack: &Stack<'_>) {
@@ -204,7 +188,30 @@ async fn join_wifi_network<'a>(
     };
     set_screen(ScIpStatus::new(ip_status_data).into()).await;
 
-    stack.set_config_v4(ConfigV4::Dhcp(DhcpConfig::default()));
+    if settings.use_static_ip_config {
+        if let Some(static_ip_config) = &settings.static_ip_config {
+            info!("Using static network settings: {}", static_ip_config);
+            stack.set_config_v4(ConfigV4::Static(embassy_net::StaticConfigV4 {
+                address: Ipv4Cidr::new(
+                    Ipv4Addr::from_bits(static_ip_config.ip),
+                    static_ip_config.prefix_len,
+                ),
+                dns_servers: static_ip_config
+                    .dns_servers
+                    .iter()
+                    .map(|dns_ip_bits| Ipv4Addr::from_bits(*dns_ip_bits))
+                    .collect(),
+                gateway: static_ip_config.gateway.map(Ipv4Addr::from_bits),
+            }));
+        } else {
+            error!("Static IP config selected but not configured, falling back to DHCP");
+            stack.set_config_v4(ConfigV4::Dhcp(DhcpConfig::default()));
+        }
+    } else {
+        info!("Use DHCP provided network settings");
+        stack.set_config_v4(ConfigV4::Dhcp(DhcpConfig::default()));
+    }
+
     stack.wait_link_up().await;
     stack.wait_config_up().await;
     wait_for_network_ready(&stack).await;
@@ -240,7 +247,7 @@ async fn join_wifi_network<'a>(
 async fn init_wifi_ap_network_and_wait_for_client<'a>(
     spawner: Spawner,
     wifi_controller: WiFiController<'a, IdleState>,
-    settings: &mut Settings,
+    configuration_storage: &'static ConfigurationStorage<'static>,
     ui_control: &'static UiControlType<'_>,
     stack: Stack<'static>,
     button_controller: &ButtonController<'_>,

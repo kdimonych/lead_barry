@@ -6,13 +6,13 @@
 #![allow(async_fn_in_trait)]
 
 mod config_server;
+mod configuration;
 mod flash_storage;
 mod input;
 mod main_logic_controller;
 mod matrix_ops;
 mod precise_timing;
 mod reset;
-mod settings;
 mod ui;
 mod units;
 mod vcp_sensors;
@@ -36,6 +36,7 @@ use embassy_time::{Duration, Ticker, Timer};
 
 use static_cell::StaticCell;
 
+use crate::configuration::{ConfigurationStorage, ConfigurationStorageBuilder};
 use crate::units::{FrequencyExt, TimeExt};
 use flash_storage::*;
 use input::*;
@@ -60,7 +61,6 @@ type UiRunnerType<'a> =
 type UiControlType<'a> = UiControl<'a, ScCollection>;
 type VcpSensorsRunnerType<'a> =
     VcpSensorsRunner<'a, I2cDeviceType<'a>, VCP_SENSORS_EVENT_QUEUE_SIZE>;
-type SharedStorageType = Mutex<CriticalSectionRawMutex, Storage<'static>>; // 4KB storage
 
 // Interrupt handlers
 bind_interrupts!(struct I2c0Irqs {
@@ -77,7 +77,7 @@ struct SharedResources {
     i2c_bus: &'static I2cBus,
     ui_control: &'static UiControlType<'static>,
     vcp_control: &'static VcpControlType<'static>,
-    shared_storage: &'static SharedStorageType,
+    configuration_storage: &'static ConfigurationStorage<'static>,
 }
 
 // Static resources
@@ -94,7 +94,6 @@ static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
 static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
-static SHARED_STORAGE: StaticCell<SharedStorageType> = StaticCell::new();
 
 // Global data models
 // Voltage reading model
@@ -181,7 +180,8 @@ fn main() -> ! {
 
     //User FLASH storage
     let storage = Storage::new(p.FLASH, p.DMA_CH1);
-    let shared_storage: &'static SharedStorageType = SHARED_STORAGE.init(Mutex::new(storage));
+    let configuration_storage_builder = ConfigurationStorageBuilder::new(storage);
+    let configuration_storage = configuration_storage_builder.build();
 
     // Setup I2C with standard frequency for sensors
     let mut i2c_cfg = i2c::Config::default();
@@ -240,7 +240,7 @@ fn main() -> ! {
         i2c_bus,
         ui_control,
         vcp_control,
-        shared_storage,
+        configuration_storage,
     });
 
     // Spawn core threads
@@ -362,7 +362,7 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
         wifi_controller,
         wifi_network_driver,
         button_controller,
-        resources.shared_resources.shared_storage,
+        resources.shared_resources.configuration_storage,
     )
     .await;
 }
