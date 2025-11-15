@@ -10,27 +10,25 @@ pub enum Error {
     StorageRead(embassy_rp::flash::Error),
     StorageErase(embassy_rp::flash::Error),
     StorageWrite(embassy_rp::flash::Error),
-    StorageCrcWrite(embassy_rp::flash::Error),
     Serialization,
     Deserialization,
-    Crc,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct StaticIpConfig {
+    pub ip: [u8; 4],
+    pub gateway: [u8; 4],
+    pub subnet: [u8; 4],
+    pub dns_servers: Option<[u8; 4]>, // Optional DNS server
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Settings {
     pub wifi_ssid: heapless::String<32>,
     pub wifi_password: heapless::String<64>,
+    pub use_static_ip_config: bool,
+    pub static_ip_config: Option<StaticIpConfig>,
     pub settings_version: u32,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            wifi_ssid: heapless::String::new(),
-            wifi_password: heapless::String::new(),
-            settings_version: 1,
-        }
-    }
 }
 
 impl Settings {
@@ -39,6 +37,8 @@ impl Settings {
             wifi_ssid: heapless::String::new(),
             wifi_password: heapless::String::new(),
             settings_version: 1,
+            use_static_ip_config: false,
+            static_ip_config: None,
         }
     }
 
@@ -86,5 +86,28 @@ impl Settings {
         let crc = Crc::<u32>::new(&CRC_32_ISCSI);
         postcard::from_bytes_crc32::<Self>(&buffer, crc.digest())
             .map_err(|_| Error::Deserialization)
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl StaticIpConfig {
+    pub const fn new() -> Self {
+        Self {
+            ip: [0, 0, 0, 0],
+            gateway: [0, 0, 0, 0],
+            subnet: [0, 0, 0, 0],
+            dns_servers: Some([0, 0, 0, 0]),
+        }
+    }
+}
+
+impl Default for StaticIpConfig {
+    fn default() -> Self {
+        Self::new()
     }
 }
