@@ -111,8 +111,8 @@ pub async fn main_logic_controller(
         // Here we ready to start web server for configuration
         // TODO: Implement web server
 
-        let mut http_server = HttpConfigServer::new();
-        http_server.run(spawner, stack).await;
+        let mut http_server = HttpConfigServer::new(spawner);
+        http_server.run(stack).await;
     }
 
     loop {
