@@ -21,7 +21,7 @@ use embassy_rp::{
     pio::{InterruptHandler, Pio},
 };
 
-use crate::wifi::config::*;
+use super::config::*;
 
 pub trait WiFiState {}
 
