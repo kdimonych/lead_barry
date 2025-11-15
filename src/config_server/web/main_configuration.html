@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Device Config</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        input, button { padding: 10px; margin: 5px; font-size: 16px; }
+        button { background: #4CAF50; color: white; border: none; cursor: pointer; }
+        .result { margin-top: 20px; padding: 10px; background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Device Configuration</h1>
+
+    <label>WiFi SSID:</label><br>
+    <input type="text" id="ssid" placeholder="Enter WiFi SSID"><br>
+
+    <label>Password:</label><br>
+    <input type="password" id="password" placeholder="Enter password"><br>
+
+    <button onclick="sendConfig()">Save Configuration</button>
+
+    <div id="status" class="result" style="display:none;"></div>
+
+    <script>
+        function sendConfig() {
+            const ssid = document.getElementById('ssid').value;
+            const password = document.getElementById('password').value;
+
+            if (!ssid) {
+                alert('Please enter SSID');
+                return;
+            }
+
+            // Send POST request to your Embassy HTTP server
+            fetch('/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ssid: ssid,
+                    password: password
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('status').style.display = 'block';
+                document.getElementById('status').innerHTML = 'Configuration saved: ' + data;
+            })
+            .catch(error => {
+                document.getElementById('status').style.display = 'block';
+                document.getElementById('status').innerHTML = 'Error: ' + error;
+            });
+        }
+    </script>
+</body>
+</html>
