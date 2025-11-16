@@ -345,6 +345,17 @@ async fn init_wifi_ap_network_and_wait_for_client<'a>(
     wifi_controller
 }
 
+//HTTP configuration server task
+#[embassy_executor::task]
+async fn start_http_config_server(
+    spawner: Spawner,
+    configuration_storage: &'static ConfigurationStorage<'static>,
+    stack: Stack<'static>,
+) {
+    let mut http_server = HttpConfigServer::new(spawner, configuration_storage);
+    http_server.run(stack).await;
+}
+
 /* Helper Functions */
 // Generate random password
 fn generate_random_password() -> heapless::String<64> {

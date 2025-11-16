@@ -1,3 +1,5 @@
+use core::str::FromStr;
+
 use embassy_net::{Ipv4Address, Ipv4Cidr};
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
@@ -77,88 +79,68 @@ impl From<StaticIpConfig> for embassy_net::StaticConfigV4 {
     }
 }
 
-// #[cfg(env = "USE_STATIC_IP_CONFIG=true")]
-// fn debug_static_ip_config() -> Option<StaticIpConfig> {
-//     defmt::info!("Use Static IP Config");
-//     defmt::info!("Static IP Address: {}", env!("STATIC_IP_ADDRESS"));
-//     defmt::info!("Static IP Gateway: {}", env!("STATIC_IP_GATEWAY"));
-//     defmt::info!("Static IP Prefix Length: {}", env!("STATIC_IP_PREFIX_LEN"));
-//     defmt::info!("Static IP DNS 1: {}", env!("STATIC_IP_DNS_1"));
-//     defmt::info!("Static IP DNS 2: {}", env!("STATIC_IP_DNS_2"));
-//     defmt::info!("Static IP DNS 3: {}", env!("STATIC_IP_DNS_3"));
+#[cfg(feature_use_static_ip_config)]
+fn debug_static_ip_config() -> Option<StaticIpConfig> {
+    defmt::info!("Use Static IP Config");
+    defmt::info!("Static IP Address: {}", env!("DBG_STATIC_IP_ADDRESS"));
+    defmt::info!("Static IP Gateway: {}", env!("DBG_STATIC_IP_GATEWAY"));
+    defmt::info!(
+        "Static IP Prefix Length: {}",
+        env!("DBG_STATIC_IP_PREFIX_LEN")
+    );
+    defmt::info!("Static IP DNS 1: {}", env!("DBG_STATIC_IP_DNS_1"));
+    defmt::info!("Static IP DNS 2: {}", env!("DBG_STATIC_IP_DNS_2"));
+    defmt::info!("Static IP DNS 3: {}", env!("DBG_STATIC_IP_DNS_3"));
 
-//     Some(StaticIpConfig {
-//         ip: Ipv4Addr::from_str(env!("STATIC_IP_ADDRESS"))
-//             .unwrap()
-//             .to_bits(),
-//         gateway: Some(
-//             Ipv4Addr::from_str(env!("STATIC_IP_GATEWAY"))
-//                 .unwrap()
-//                 .to_bits(),
-//         ),
-//         prefix_len: env!("STATIC_IP_PREFIX_LEN").parse().unwrap_or(24),
-//         dns_servers: {
-//             let mut dns_vec: Vec<u32, 3> = Vec::new();
-//             if let Ok(dns1) = Ipv4Addr::from_str(env!("STATIC_IP_DNS_1")) {
-//                 dns_vec.push(dns1.to_bits()).ok();
-//             }
-//             if let Ok(dns2) = Ipv4Addr::from_str(env!("STATIC_IP_DNS_2")) {
-//                 dns_vec.push(dns2.to_bits()).ok();
-//             }
-//             if let Ok(dns3) = Ipv4Addr::from_str(env!("STATIC_IP_DNS_3")) {
-//                 dns_vec.push(dns3.to_bits()).ok();
-//             }
-//             dns_vec
-//         },
-//     })
-// }
+    Some(StaticIpConfig {
+        ip: Ipv4Address::from_str(env!("DBG_STATIC_IP_ADDRESS"))
+            .unwrap()
+            .to_bits(),
+        gateway: Some(
+            Ipv4Address::from_str(env!("DBG_STATIC_IP_GATEWAY"))
+                .unwrap()
+                .to_bits(),
+        ),
+        prefix_len: env!("DBG_STATIC_IP_PREFIX_LEN").parse().unwrap_or(24),
+        dns_servers: {
+            let mut dns_vec: Vec<u32, 3> = Vec::new();
+            if let Ok(dns1) = Ipv4Address::from_str(env!("DBG_STATIC_IP_DNS_1")) {
+                dns_vec.push(dns1.to_bits()).ok();
+            }
+            if let Ok(dns2) = Ipv4Address::from_str(env!("DBG_STATIC_IP_DNS_2")) {
+                dns_vec.push(dns2.to_bits()).ok();
+            }
+            if let Ok(dns3) = Ipv4Address::from_str(env!("DBG_STATIC_IP_DNS_3")) {
+                dns_vec.push(dns3.to_bits()).ok();
+            }
+            dns_vec
+        },
+    })
+}
 
-// #[cfg(env = "USE_STATIC_IP_CONFIG=false")]
-// fn debug_static_ip_config() -> Option<StaticIpConfig> {
-//     None
-// }
+#[cfg(not(feature_use_static_ip_config))]
+fn debug_static_ip_config() -> Option<StaticIpConfig> {
+    None
+}
 
-// pub fn debug_settings() -> Settings {
-//     defmt::info!("Current Settings:");
-//     defmt::info!("WiFi SSID: {}", env!("WIFI_SSID"));
-//     defmt::info!("WiFi Password: ********");
-//     defmt::info!("Use Static IP Config: {}", env!("USE_STATIC_IP"));
-//     defmt::info!("Static IP Address: {}", env!("STATIC_IP_ADDRESS"));
-//     defmt::info!("Static IP Gateway: {}", env!("STATIC_IP_GATEWAY"));
-//     defmt::info!("Static IP Prefix Length: {}", env!("STATIC_IP_PREFIX_LEN"));
-//     defmt::info!("Static IP DNS 1: {}", env!("STATIC_IP_DNS_1"));
-//     defmt::info!("Static IP DNS 2: {}", env!("STATIC_IP_DNS_2"));
-//     defmt::info!("Static IP DNS 3: {}", env!("STATIC_IP_DNS_3"));
+#[cfg(feature_use_debug_settings)]
+pub fn debug_settings() -> Option<Settings> {
+    defmt::info!("Current Settings:");
+    defmt::info!("WiFi SSID: {}", env!("DBG_WIFI_SSID"));
+    defmt::info!("WiFi Password: ********");
 
-//     Settings {
-//         wifi_ssid: heapless::String::from(env!("WIFI_SSID")),
-//         wifi_password: heapless::String::from(env!("WIFI_PASSWORD")),
+    let static_ip_config = debug_static_ip_config();
 
-//         use_static_ip_config: env!("USE_STATIC_IP") == "true",
-//         static_ip_config: Some(StaticIpConfig {
-//             ip: Ipv4Addr::from_str(env!("STATIC_IP_ADDRESS"))
-//                 .unwrap()
-//                 .to_bits(),
-//             gateway: Some(
-//                 Ipv4Addr::from_str(env!("STATIC_IP_GATEWAY"))
-//                     .unwrap()
-//                     .to_bits(),
-//             ),
-//             prefix_len: env!("STATIC_IP_PREFIX_LEN").parse().unwrap_or(24),
-//             dns_servers: {
-//                 let mut dns_vec: Vec<u32, 3> = Vec::new();
-//                 if let Ok(dns1) = Ipv4Addr::from_str(env!("STATIC_IP_DNS_1")) {
-//                     dns_vec.push(dns1.to_bits()).ok();
-//                 }
-//                 if let Ok(dns2) = Ipv4Addr::from_str(env!("STATIC_IP_DNS_2")) {
-//                     dns_vec.push(dns2.to_bits()).ok();
-//                 }
-//                 if let Ok(dns3) = Ipv4Addr::from_str(env!("STATIC_IP_DNS_3")) {
-//                     dns_vec.push(dns3.to_bits()).ok();
-//                 }
-//                 dns_vec
-//             },
-//         }),
-//         settings_version: 1,
-//     }
-// }
+    Some(Settings {
+        wifi_ssid: heapless::String::from_str(env!("DBG_WIFI_SSID")).unwrap(),
+        wifi_password: heapless::String::from_str(env!("DBG_WIFI_PASSWORD")).unwrap(),
+        use_static_ip_config: static_ip_config.is_some(),
+        static_ip_config,
+        settings_version: 1,
+    })
+}
+
+#[cfg(not(feature_use_debug_settings))]
+pub fn debug_settings() -> Option<Settings> {
+    Some(Settings::new())
+}

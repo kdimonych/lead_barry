@@ -1,11 +1,11 @@
-use super::Settings;
+use super::settings::*;
+#[cfg(feature_use_static_ip_config)]
+use crate::configuration::settings;
 use crate::flash_storage::*;
 use crc::{CRC_32_ISCSI, Crc};
 use defmt::*;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use static_cell::StaticCell;
-
-const CRC_SUM_SIZE: usize = 4; // Size of CRC32 checksum in bytes
 
 static SHARED_STORAGE: StaticCell<ConfigurationStorage<'static>> = StaticCell::new();
 
@@ -28,6 +28,12 @@ impl ConfigurationStorageBuilder {
     }
 
     pub fn build(mut self) -> &'static ConfigurationStorage<'static> {
+        let debug_settings_opt = debug_settings();
+
+        if debug_settings_opt.is_some() {
+            info!("Using debug settings from build configuration");
+        }
+
         let initial_settings = match sync_load(&mut self.flash_storage) {
             Ok(settings) => settings,
 
@@ -36,12 +42,18 @@ impl ConfigurationStorageBuilder {
                     "Can't load settings from storage: {}. Using default settings.",
                     error
                 );
-                let default_settings = Settings::new();
+                let default_settings = debug_settings_opt.unwrap_or_default();
                 if let Err(error) = sync_save(&mut self.flash_storage, &default_settings) {
                     error!("Can't save default settings to storage: {}", error);
                 }
                 default_settings
             }
+        };
+
+        #[cfg(all(feature_use_static_ip_config, feature_use_debug_settings))]
+        let initial_settings = {
+            defmt::info!("Overriding loaded settings with debug static IP config");
+            debug_settings().unwrap_or(initial_settings)
         };
 
         let storage = SHARED_STORAGE.init(ConfigurationStorage::new(
