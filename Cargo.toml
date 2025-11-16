@@ -40,6 +40,7 @@ static_cell = "2.1.1"
 bytemuck = { version = "1.24.0", features = ["derive"] }
 postcard = { version = "1.1", default-features = false, features = ["use-crc"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
+#serde_json = "1.0"
 
 # Embassy
 embassy-embedded-hal = { version = "0.5.0" , features = ["defmt"] }

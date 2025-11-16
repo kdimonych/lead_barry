@@ -100,7 +100,7 @@ pub async fn main_logic_controller(
 
         let msg = ScMessageData {
             title: MsgTitleString::from_str("Config. mode"),
-            message: MessageString::from_str("The device is in configuration mode."),
+            message: MessageString::from_str("Visit http://192.168.1.1 on your device."),
         };
         ui_control.switch(ScMessage::new(msg).into()).await;
 
@@ -109,7 +109,7 @@ pub async fn main_logic_controller(
         // Here we ready to start web server for configuration
         // TODO: Implement web server
 
-        let mut http_server = HttpConfigServer::new(spawner);
+        let mut http_server = HttpConfigServer::new(spawner, configuration_storage);
         http_server.run(stack).await;
     }
 
@@ -176,41 +176,45 @@ async fn join_wifi_network<'a>(
         "WiFi controller is in Joined to {}",
         settings.wifi_ssid.as_str()
     );
+
     let wifi_status = ScWifiStatsData::new(ScvState::Connected, Some(settings.wifi_ssid.clone()));
     set_screen(ScWifiStats::new(wifi_status).into()).await;
     Timer::after(1.s()).await;
 
-    //Init DHCP client and wait for network ready
-    let ip_status_data = ScIpData {
-        state: ScvIpState::GettingIp,
-        ip: Ipv4Address::UNSPECIFIED,
-        mac: None,
-    };
-    set_screen(ScIpStatus::new(ip_status_data).into()).await;
-
-    if settings.use_static_ip_config {
+    //Init DHCP client and wait for network read
+    let ip_config = if settings.use_static_ip_config {
         if let Some(static_ip_config) = &settings.static_ip_config {
             info!("Using static network settings: {}", static_ip_config);
-            stack.set_config_v4(ConfigV4::Static(embassy_net::StaticConfigV4 {
-                address: Ipv4Cidr::new(
-                    Ipv4Addr::from_bits(static_ip_config.ip),
-                    static_ip_config.prefix_len,
-                ),
-                dns_servers: static_ip_config
-                    .dns_servers
-                    .iter()
-                    .map(|dns_ip_bits| Ipv4Addr::from_bits(*dns_ip_bits))
-                    .collect(),
-                gateway: static_ip_config.gateway.map(Ipv4Addr::from_bits),
-            }));
+            ConfigV4::Static(static_ip_config.into())
         } else {
             error!("Static IP config selected but not configured, falling back to DHCP");
-            stack.set_config_v4(ConfigV4::Dhcp(DhcpConfig::default()));
+            ConfigV4::Dhcp(DhcpConfig::default())
         }
     } else {
         info!("Use DHCP provided network settings");
-        stack.set_config_v4(ConfigV4::Dhcp(DhcpConfig::default()));
-    }
+        ConfigV4::Dhcp(DhcpConfig::default())
+    };
+
+    let ip_status_data = match &ip_config {
+        ConfigV4::Dhcp(_) => ScIpData {
+            state: ScvIpState::GettingIp,
+            ip: Ipv4Address::UNSPECIFIED,
+            mac: None,
+        },
+        ConfigV4::Static(cfg) => ScIpData {
+            state: ScvIpState::IpAssigned,
+            ip: cfg.address.address(),
+            mac: None,
+        },
+        ConfigV4::None => ScIpData {
+            state: ScvIpState::GettingIp,
+            ip: Ipv4Address::UNSPECIFIED,
+            mac: None,
+        },
+    };
+
+    set_screen(ScIpStatus::new(ip_status_data).into()).await;
+    stack.set_config_v4(ip_config);
 
     stack.wait_link_up().await;
     stack.wait_config_up().await;

@@ -20,10 +20,18 @@
     <input type="password" id="password" placeholder="Enter password"><br>
 
     <button onclick="sendConfig()">Save Configuration</button>
+    <button onclick="sendConfigAndReboot()">Save Configuration and Reboot</button>
 
     <div id="status" class="result" style="display:none;"></div>
 
     <script>
+        function reboot(){
+
+        }
+        function sendConfigAndReboot(){
+
+        }
+
         function sendConfig() {
             const ssid = document.getElementById('ssid').value;
             const password = document.getElementById('password').value;
@@ -34,7 +42,7 @@
             }
 
             // Send POST request to your Embassy HTTP server
-            fetch('/config', {
+            fetch('/api/save_config', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

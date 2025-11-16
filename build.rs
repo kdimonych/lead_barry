@@ -44,6 +44,38 @@ fn main() {
         println!("cargo:rustc-env=WIFI_PASSWORD={}", wifi_password);
     }
 
+    // if let Ok(use_static_ip_config) = env::var("USE_STATIC_IP_CONFIG") {
+    //     println!(
+    //         "cargo:rustc-env=USE_STATIC_IP_CONFIG={}",
+    //         use_static_ip_config
+    //     );
+    // }
+
+    // if let Ok(static_ip_address) = env::var("STATIC_IP_ADDRESS") {
+    //     println!("cargo:rustc-env=STATIC_IP_ADDRESS={}", static_ip_address);
+    // }
+
+    // if let Ok(static_ip_gateway) = env::var("STATIC_IP_GATEWAY") {
+    //     println!("cargo:rustc-env=STATIC_IP_GATEWAY={}", static_ip_gateway);
+    // }
+
+    // if let Ok(static_ip_prefix_len) = env::var("STATIC_IP_PREFIX_LEN") {
+    //     println!(
+    //         "cargo:rustc-env=STATIC_IP_PREFIX_LEN={}",
+    //         static_ip_prefix_len
+    //     );
+    // }
+
+    // if let Ok(static_ip_dns) = env::var("STATIC_IP_DNS_1") {
+    //     println!("cargo:rustc-env=STATIC_IP_DNS_1={}", static_ip_dns);
+    // }
+    // if let Ok(static_ip_dns) = env::var("STATIC_IP_DNS_2") {
+    //     println!("cargo:rustc-env=STATIC_IP_DNS_2={}", static_ip_dns);
+    // }
+    // if let Ok(static_ip_dns) = env::var("STATIC_IP_DNS_3") {
+    //     println!("cargo:rustc-env=STATIC_IP_DNS_3={}", static_ip_dns);
+    // }
+
     // Rebuild if .env file changes
     println!("cargo:rerun-if-changed=.env");
 }

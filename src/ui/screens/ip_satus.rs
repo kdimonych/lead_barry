@@ -30,7 +30,7 @@ impl TrStatus for ScIpData {
 
     fn status(&'_ self) -> StatusString<'_> {
         match self.state {
-            ScvIpState::GettingIp => return StatusString::from_str("Waiting for IP..."),
+            ScvIpState::GettingIp => return StatusString::from_str("DHCP handshake..."),
             ScvIpState::IpAssigned => {
                 let mut status_str = StatusString::complimentary_str();
                 core::fmt::write(&mut status_str, format_args!("IP: {}", self.ip)).ok();
