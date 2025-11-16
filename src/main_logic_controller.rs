@@ -11,7 +11,6 @@ use embassy_net::Stack;
 use embassy_net::StackResources;
 
 use embassy_rp::clocks::RoscRng;
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::Duration;
 use embassy_time::Timer;
 use heapless::Vec;
@@ -22,7 +21,6 @@ use static_cell::StaticCell;
 
 use crate::config_server::HttpConfigServer;
 use crate::configuration::*;
-use crate::flash_storage::*;
 use crate::input::*;
 use crate::ui::*;
 use crate::units::TimeExt as _;
@@ -85,7 +83,7 @@ pub async fn main_logic_controller(
         let WiFiControllerState::Idle(controller) = state else {
             defmt::panic!("Unexpected state");
         };
-        let mut controller = init_wifi_ap_network_and_wait_for_client(
+        let mut controller = run_wifi_ap(
             spawner,
             controller,
             configuration_storage,
@@ -105,13 +103,18 @@ pub async fn main_logic_controller(
         ui_control.switch(ScMessage::new(msg).into()).await;
 
         info!("AP mode done");
-
-        // Here we ready to start web server for configuration
-        // TODO: Implement web server
-
-        let mut http_server = HttpConfigServer::new(spawner, configuration_storage);
-        http_server.run(stack).await;
     }
+
+    // Here we ready to start web server for configuration
+    // TODO: Implement web server
+
+    spawner
+        .spawn(start_http_config_server(
+            spawner,
+            configuration_storage,
+            stack,
+        ))
+        .unwrap();
 
     loop {
         // Main logic goes here
@@ -136,7 +139,7 @@ async fn join_wifi_network<'a>(
     wifi_controller: WiFiController<'a, IdleState>,
     settings: &Settings,
     ui_control: &'static UiControlType<'_>,
-    stack: Stack<'a>,
+    stack: Stack<'_>,
 ) -> WiFiController<'a, JoinedState> {
     // Shortcut for switching screens convenience
     let set_screen = |new_screen: ScCollection| async { ui_control.switch(new_screen).await };
@@ -243,17 +246,33 @@ async fn join_wifi_network<'a>(
 
     controller.led(true).await;
 
-    Timer::after(3.s()).await;
+    {
+        Timer::after(2.s()).await;
+        let mut msg_str = MessageString::complimentary_str();
+        core::fmt::write(
+            &mut msg_str,
+            format_args!("Visit http://{}/ on your device.", ip),
+        )
+        .ok();
+
+        let msg = ScMessageData {
+            title: MsgTitleString::from_str("Ready"),
+            message: msg_str.into(),
+        };
+        ui_control.switch(ScMessage::new(msg).into()).await;
+    }
+
+    info!("Joined WiFi network done");
 
     controller
 }
 
-async fn init_wifi_ap_network_and_wait_for_client<'a>(
+async fn run_wifi_ap<'a>(
     spawner: Spawner,
     wifi_controller: WiFiController<'a, IdleState>,
     configuration_storage: &'static ConfigurationStorage<'static>,
     ui_control: &'static UiControlType<'_>,
-    stack: Stack<'static>,
+    stack: Stack<'_>,
     button_controller: &ButtonController<'_>,
 ) -> WiFiController<'a, ApState> {
     //SoftAP provisioning mode.
@@ -377,7 +396,7 @@ fn generate_random_password() -> heapless::String<64> {
 
 async fn wait_for_dhcp_client(
     server: &mut DhcpServer<2, 2>,
-    stack: Stack<'static>,
+    stack: Stack<'_>,
 ) -> Result<(Ipv4Addr, [u8; 6]), ()> {
     let mut buffers = DHCPServerBuffers::new();
     let mut socket = DHCPServerSocket::new(stack, &mut buffers);

@@ -50,7 +50,7 @@ impl ConfigurationStorageBuilder {
             }
         };
 
-        #[cfg(all(feature_use_static_ip_config, feature_use_debug_settings))]
+        #[cfg(all(feature_overwrite_with_debug_settings, feature_use_debug_settings))]
         let initial_settings = {
             defmt::info!("Overriding loaded settings with debug static IP config");
             debug_settings().unwrap_or(initial_settings)

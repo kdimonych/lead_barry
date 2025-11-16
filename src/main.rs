@@ -50,7 +50,7 @@ use wifi::*;
 use {defmt_rtt as _, panic_probe as _};
 
 // Constants
-const CORE1_STACK_SIZE: usize = 4096 * 3;
+const CORE1_STACK_SIZE: usize = 4096 * 4;
 const VCP_SENSORS_EVENT_QUEUE_SIZE: usize = 8;
 
 // Global types

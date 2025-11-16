@@ -1,6 +1,7 @@
 // use cyw43::NetDriver;
 use crate::configuration::{ConfigurationStorage, Settings};
 use crate::{reset, units::TimeExt as _};
+use defmt::info;
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use heapless::Vec;
@@ -62,6 +63,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
     ) -> Result<HttpResponse<'_>, nanofish::Error> {
         if request.path == "/" {
             // Show main page
+            info!("Serving main configuration page");
             return Ok(HttpResponse {
                 status_code: StatusCode::Ok,
                 headers: Vec::new(),
