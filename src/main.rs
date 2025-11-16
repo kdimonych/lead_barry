@@ -143,10 +143,11 @@ fn log_system_frequencies() {
 
 fn debug_memory_layout() {
     unsafe extern "C" {
-        unsafe static _ram_start: u32;
+        static _ram_start: u32;
         unsafe static _ram_end: u32;
-        unsafe static _stack_start: u32;
-        unsafe static _stack_end: u32;
+        static _stack_start: u32;
+        static _stack_end: u32;
+        static _stack_size: u32;
     }
 
     let ram_start = { &raw const _ram_start as usize };
@@ -154,6 +155,7 @@ fn debug_memory_layout() {
     let stack_start = { &raw const _stack_start as usize };
     let stack_end = { &raw const _stack_end as usize };
     let current_sp = cortex_m::register::msp::read() as usize;
+    let stack_size = { &raw const _stack_size as usize };
 
     info!("=== Memory Layout ===");
     info!("RAM Start:    0x{:08x}", ram_start);
@@ -161,6 +163,7 @@ fn debug_memory_layout() {
     info!("Stack Start:  0x{:08x}", stack_start);
     info!("Stack End:    0x{:08x}", stack_end);
     info!("Current MSP:  0x{:08x}", current_sp);
+    info!("Stack Size:   {} bytes", stack_size);
 }
 
 #[cortex_m_rt::entry]
@@ -168,8 +171,6 @@ fn main() -> ! {
     debug_memory_layout();
 
     let p = embassy_rp::init(Default::default());
-
-    debug_memory_layout();
 
     log_system_frequencies();
 
@@ -433,13 +434,14 @@ fn get_core_0_stack_usage() -> (usize, usize) {
     unsafe extern "C" {
         static mut _stack_start: u32;
         static mut _stack_end: u32;
+        static _stack_size: u32;
     }
 
     let stack_start = { &raw const _stack_start as *const _ as usize };
 
     let current_sp = cortex_m::register::msp::read() as usize;
 
-    (stack_start - current_sp, 0x2000)
+    (stack_start - current_sp, &raw const _stack_size as usize)
 }
 
 #[embassy_executor::task]

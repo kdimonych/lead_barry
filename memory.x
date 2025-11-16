@@ -9,6 +9,10 @@ MEMORY {
     RAM   : ORIGIN = 0x20000000, LENGTH = 264K
 }
 
+
+/* Set stack size for core 0 */
+_stack_size = 16K;
+
 _user_flash_start = ORIGIN(USER_FLASH);
 _user_flash_size = LENGTH(USER_FLASH);
 
