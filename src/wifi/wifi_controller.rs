@@ -59,10 +59,46 @@ impl Default for WiFiStaticData {
     }
 }
 
-pub enum WiFiControllerState<'a> {
+pub enum WiFiCtrlState<'a> {
+    Uninitialized,
     Idle(WiFiController<'a, IdleState>),
     Joined(WiFiController<'a, JoinedState>),
     Ap(WiFiController<'a, ApState>),
+}
+
+impl<'a> WiFiCtrlState<'a> {
+    pub fn is_idle(&self) -> bool {
+        matches!(self, WiFiCtrlState::Idle(_))
+    }
+
+    pub fn is_joined(&self) -> bool {
+        matches!(self, WiFiCtrlState::Joined(_))
+    }
+
+    pub fn is_ap(&self) -> bool {
+        matches!(self, WiFiCtrlState::Ap(_))
+    }
+    pub fn is_uninitialized(&self) -> bool {
+        matches!(self, WiFiCtrlState::Uninitialized)
+    }
+
+    pub fn change<Modifier>(&mut self, modifier: Modifier)
+    where
+        Modifier: FnOnce(WiFiCtrlState<'a>) -> WiFiCtrlState<'a>,
+    {
+        let old_state = core::mem::replace(self, WiFiCtrlState::Uninitialized);
+        let new_state = modifier(old_state);
+        *self = new_state;
+    }
+
+    pub async fn change_async<Modifier>(&mut self, modifier: Modifier)
+    where
+        Modifier: AsyncFnOnce(WiFiCtrlState<'a>) -> WiFiCtrlState<'a>,
+    {
+        let old_state = core::mem::replace(self, WiFiCtrlState::Uninitialized);
+        let new_state = modifier(old_state).await;
+        *self = new_state;
+    }
 }
 
 pub struct NoWiFiBuilderCreated;
@@ -246,7 +282,7 @@ impl<'a> WiFiController<'a, IdleState> {
     }
 }
 
-impl<'a> From<WiFiController<'a, IdleState>> for WiFiControllerState<'a> {
+impl<'a> From<WiFiController<'a, IdleState>> for WiFiCtrlState<'a> {
     fn from(controller: WiFiController<'a, IdleState>) -> Self {
         Self::Idle(controller)
     }
@@ -289,7 +325,7 @@ impl<'a> WiFiController<'a, JoinedState> {
     }
 }
 
-impl<'a> From<WiFiController<'a, JoinedState>> for WiFiControllerState<'a> {
+impl<'a> From<WiFiController<'a, JoinedState>> for WiFiCtrlState<'a> {
     fn from(controller: WiFiController<'a, JoinedState>) -> Self {
         Self::Joined(controller)
     }
@@ -333,7 +369,7 @@ impl<'a> WiFiController<'a, ApState> {
     }
 }
 
-impl<'a> From<WiFiController<'a, ApState>> for WiFiControllerState<'a> {
+impl<'a> From<WiFiController<'a, ApState>> for WiFiCtrlState<'a> {
     fn from(controller: WiFiController<'a, ApState>) -> Self {
         Self::Ap(controller)
     }

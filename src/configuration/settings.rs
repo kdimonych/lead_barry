@@ -4,6 +4,8 @@ use embassy_net::{Ipv4Address, Ipv4Cidr};
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
+pub const DEFAULT_AP_CHANNEL: u8 = 6;
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, defmt::Format)]
 pub struct StaticIpConfig {
     pub ip: u32,
@@ -13,27 +15,48 @@ pub struct StaticIpConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, defmt::Format)]
-pub struct Settings {
+pub struct NetworkSettings {
     pub wifi_ssid: heapless::String<32>,
     pub wifi_password: heapless::String<64>,
+    pub ap_channel: u8,
     pub use_static_ip_config: bool,
     pub static_ip_config: Option<StaticIpConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, defmt::Format)]
+pub struct Settings {
+    pub network_settings: NetworkSettings,
     pub settings_version: u32,
 }
 
 impl Settings {
     pub const fn new() -> Self {
         Self {
+            network_settings: NetworkSettings::new(),
+            settings_version: 1,
+        }
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NetworkSettings {
+    pub const fn new() -> Self {
+        Self {
             wifi_ssid: heapless::String::new(),
             wifi_password: heapless::String::new(),
-            settings_version: 1,
+            ap_channel: DEFAULT_AP_CHANNEL,
             use_static_ip_config: false,
             static_ip_config: None,
         }
     }
 }
 
-impl Default for Settings {
+impl Default for NetworkSettings {
     fn default() -> Self {
         Self::new()
     }
@@ -132,10 +155,13 @@ pub fn debug_settings() -> Option<Settings> {
     let static_ip_config = debug_static_ip_config();
 
     Some(Settings {
-        wifi_ssid: heapless::String::from_str(env!("DBG_WIFI_SSID")).unwrap(),
-        wifi_password: heapless::String::from_str(env!("DBG_WIFI_PASSWORD")).unwrap(),
-        use_static_ip_config: static_ip_config.is_some(),
-        static_ip_config,
+        network_settings: NetworkSettings {
+            wifi_ssid: heapless::String::from_str(env!("DBG_WIFI_SSID")).unwrap(),
+            wifi_password: heapless::String::from_str(env!("DBG_WIFI_PASSWORD")).unwrap(),
+            ap_channel: env!("DBG_AP_CHANNEL").parse().unwrap_or(DEFAULT_AP_CHANNEL),
+            use_static_ip_config: static_ip_config.is_some(),
+            static_ip_config,
+        },
         settings_version: 1,
     })
 }

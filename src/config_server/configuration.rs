@@ -1,6 +1,6 @@
 use core::u32;
 
-use crate::configuration::{ConfigurationStorage, Settings, StaticIpConfig};
+use crate::configuration::*;
 use embassy_rp::usb::In;
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
@@ -92,10 +92,11 @@ impl From<StaticIpConfig> for HttpStaticIpConfig {
 impl From<&Settings> for HttpConfiguration {
     fn from(settings: &Settings) -> Self {
         Self {
-            ssid: settings.wifi_ssid.clone(),
-            password: settings.wifi_password.clone(),
-            use_static_ip: settings.use_static_ip_config,
+            ssid: settings.network_settings.wifi_ssid.clone(),
+            password: settings.network_settings.wifi_password.clone(),
+            use_static_ip: settings.network_settings.use_static_ip_config,
             static_ip_config: settings
+                .network_settings
                 .static_ip_config
                 .as_ref()
                 .map(HttpStaticIpConfig::from),
@@ -106,10 +107,13 @@ impl From<&Settings> for HttpConfiguration {
 impl From<Settings> for HttpConfiguration {
     fn from(settings: Settings) -> Self {
         Self {
-            ssid: settings.wifi_ssid.clone(),
-            password: settings.wifi_password.clone(),
-            use_static_ip: settings.use_static_ip_config,
-            static_ip_config: settings.static_ip_config.map(HttpStaticIpConfig::from),
+            ssid: settings.network_settings.wifi_ssid.clone(),
+            password: settings.network_settings.wifi_password.clone(),
+            use_static_ip: settings.network_settings.use_static_ip_config,
+            static_ip_config: settings
+                .network_settings
+                .static_ip_config
+                .map(HttpStaticIpConfig::from),
         }
     }
 }
@@ -117,13 +121,16 @@ impl From<Settings> for HttpConfiguration {
 impl From<&HttpConfiguration> for Settings {
     fn from(http_config: &HttpConfiguration) -> Self {
         Self {
-            wifi_ssid: http_config.ssid.clone(),
-            wifi_password: http_config.password.clone(),
-            use_static_ip_config: http_config.use_static_ip,
-            static_ip_config: http_config
-                .static_ip_config
-                .as_ref()
-                .map(StaticIpConfig::from),
+            network_settings: NetworkSettings {
+                wifi_ssid: http_config.ssid.clone(),
+                wifi_password: http_config.password.clone(),
+                use_static_ip_config: http_config.use_static_ip,
+                ap_channel: DEFAULT_AP_CHANNEL,
+                static_ip_config: http_config
+                    .static_ip_config
+                    .as_ref()
+                    .map(StaticIpConfig::from),
+            },
             settings_version: 1,
         }
     }
@@ -132,10 +139,16 @@ impl From<&HttpConfiguration> for Settings {
 impl From<HttpConfiguration> for Settings {
     fn from(http_config: HttpConfiguration) -> Self {
         Self {
-            wifi_ssid: http_config.ssid,
-            wifi_password: http_config.password,
-            use_static_ip_config: http_config.use_static_ip,
-            static_ip_config: http_config.static_ip_config.map(StaticIpConfig::from),
+            network_settings: NetworkSettings {
+                wifi_ssid: http_config.ssid,
+                wifi_password: http_config.password,
+                use_static_ip_config: http_config.use_static_ip,
+                ap_channel: DEFAULT_AP_CHANNEL,
+                static_ip_config: http_config
+                    .static_ip_config
+                    .as_ref()
+                    .map(StaticIpConfig::from),
+            },
             settings_version: 1,
         }
     }

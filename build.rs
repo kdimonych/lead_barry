@@ -55,6 +55,10 @@ fn main() {
         println!("cargo:rustc-env=DBG_WIFI_PASSWORD={}", wifi_password);
     }
 
+    if let Ok(ap_channel) = env::var("DBG_AP_CHANNEL") {
+        println!("cargo:rustc-env=DBG_AP_CHANNEL={}", ap_channel);
+    }
+
     if env::var("DBG_USE_STATIC_IP_CONFIG").is_ok() {
         println!("cargo:rustc-cfg=feature_use_static_ip_config");
     }
