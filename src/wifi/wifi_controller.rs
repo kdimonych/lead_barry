@@ -13,6 +13,7 @@ pub use cyw43::PowerManagementMode;
 pub use cyw43::ScanOptions;
 pub use cyw43::Scanner;
 
+use super::wifi_control_state::WiFiControlState;
 use defmt::debug;
 use embassy_executor::Spawner;
 use embassy_rp::{
@@ -27,12 +28,15 @@ pub trait WiFiState {}
 
 pub struct IdleState;
 impl WiFiState for IdleState {}
+impl WiFiState for &IdleState {}
 
 pub struct JoinedState;
 impl WiFiState for JoinedState {}
+impl WiFiState for &JoinedState {}
 
 pub struct ApState;
 impl WiFiState for ApState {}
+impl WiFiState for &ApState {}
 
 pub struct WiFiController<'a, State>
 where
@@ -41,6 +45,13 @@ where
     control: Control<'a>,
     _marker: core::marker::PhantomData<State>,
 }
+
+pub type WiFiCtrlState<'a> = WiFiControlState<
+    WiFiController<'a, IdleState>,
+    WiFiController<'a, JoinedState>,
+    WiFiController<'a, ApState>,
+>;
+
 pub struct WiFiStaticData {
     cyw43_state: cyw43::State,
 }
@@ -56,48 +67,6 @@ impl WiFiStaticData {
 impl Default for WiFiStaticData {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-pub enum WiFiCtrlState<'a> {
-    Uninitialized,
-    Idle(WiFiController<'a, IdleState>),
-    Joined(WiFiController<'a, JoinedState>),
-    Ap(WiFiController<'a, ApState>),
-}
-
-impl<'a> WiFiCtrlState<'a> {
-    pub fn is_idle(&self) -> bool {
-        matches!(self, WiFiCtrlState::Idle(_))
-    }
-
-    pub fn is_joined(&self) -> bool {
-        matches!(self, WiFiCtrlState::Joined(_))
-    }
-
-    pub fn is_ap(&self) -> bool {
-        matches!(self, WiFiCtrlState::Ap(_))
-    }
-    pub fn is_uninitialized(&self) -> bool {
-        matches!(self, WiFiCtrlState::Uninitialized)
-    }
-
-    pub fn change<Modifier>(&mut self, modifier: Modifier)
-    where
-        Modifier: FnOnce(WiFiCtrlState<'a>) -> WiFiCtrlState<'a>,
-    {
-        let old_state = core::mem::replace(self, WiFiCtrlState::Uninitialized);
-        let new_state = modifier(old_state);
-        *self = new_state;
-    }
-
-    pub async fn change_async<Modifier>(&mut self, modifier: Modifier)
-    where
-        Modifier: AsyncFnOnce(WiFiCtrlState<'a>) -> WiFiCtrlState<'a>,
-    {
-        let old_state = core::mem::replace(self, WiFiCtrlState::Uninitialized);
-        let new_state = modifier(old_state).await;
-        *self = new_state;
     }
 }
 
