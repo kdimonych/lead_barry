@@ -69,7 +69,7 @@ pub async fn main_logic_controller(
     spawner.spawn(net_task(runner)).unwrap();
 
     let settings = configuration_storage.get_settings().await;
-    let state: WiFiCtrlState<'_> = if !settings.network_settings.wifi_ssid.is_empty() {
+    let state: WiFiCtrlState<'_> = if !settings.network_settings.wifi_settings.ssid.is_empty() {
         // There is a wifi ssid configured, try to join
         join_wifi_network(wifi_control, &settings, ui_control, stack)
             .await
@@ -146,7 +146,7 @@ async fn join_wifi_network<'a>(
 
     info!(
         "Joining WiFi network: {}",
-        settings.network_settings.wifi_ssid
+        settings.network_settings.wifi_settings.ssid
     );
     let mut state: WiFiCtrlState<'_> = wifi_controller.into();
     for _ in 0..5 {
@@ -154,20 +154,20 @@ async fn join_wifi_network<'a>(
             WiFiCtrlState::Idle(s) => {
                 let wifi_status = ScWifiStatsData::new(
                     ScvState::Connecting,
-                    Some(settings.network_settings.wifi_ssid.clone()),
+                    Some(settings.network_settings.wifi_settings.ssid.clone()),
                 );
                 set_screen(ScWifiStats::new(wifi_status).into()).await;
 
                 let mut join_options =
-                    JoinOptions::new(settings.network_settings.wifi_password.as_bytes());
-                join_options.auth = if settings.network_settings.wifi_password.is_empty() {
+                    JoinOptions::new(settings.network_settings.wifi_settings.password.as_bytes());
+                join_options.auth = if settings.network_settings.wifi_settings.password.is_empty() {
                     JoinAuth::Open
                 } else {
                     JoinAuth::Wpa2
                 };
 
                 match s
-                    .join(&settings.network_settings.wifi_ssid, join_options)
+                    .join(&settings.network_settings.wifi_settings.ssid, join_options)
                     .await
                 {
                     Ok(s) => s.into(),
@@ -186,12 +186,12 @@ async fn join_wifi_network<'a>(
     }
     info!(
         "WiFi controller is in Joined to {}",
-        settings.network_settings.wifi_ssid.as_str()
+        settings.network_settings.wifi_settings.ssid.as_str()
     );
 
     let wifi_status = ScWifiStatsData::new(
         ScvState::Connected,
-        Some(settings.network_settings.wifi_ssid.clone()),
+        Some(settings.network_settings.wifi_settings.ssid.clone()),
     );
     set_screen(ScWifiStats::new(wifi_status).into()).await;
     Timer::after(1.s()).await;

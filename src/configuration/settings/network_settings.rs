@@ -1,14 +1,15 @@
 use super::static_ip_config::StaticIpConfig;
-use serde::{Deserialize, Serialize};
+use super::wifi_ap_settings::WiFiApSettings;
+use super::wifi_settings::WiFiSettings;
 
-pub const DEFAULT_AP_CHANNEL: u8 = 6;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, defmt::Format)]
 #[non_exhaustive]
 pub struct NetworkSettings {
-    pub wifi_ssid: heapless::String<32>,
-    pub wifi_password: heapless::String<64>,
-    pub ap_channel: u8,
+    pub wifi_settings: WiFiSettings,
+    pub wifi_ap_settings: WiFiApSettings,
+
     pub use_static_ip_config: bool,
     pub static_ip_config: Option<StaticIpConfig>,
 }
@@ -16,9 +17,8 @@ pub struct NetworkSettings {
 impl NetworkSettings {
     pub const fn new() -> Self {
         Self {
-            wifi_ssid: heapless::String::new(),
-            wifi_password: heapless::String::new(),
-            ap_channel: DEFAULT_AP_CHANNEL,
+            wifi_settings: WiFiSettings::new(),
+            wifi_ap_settings: WiFiApSettings::new(),
             use_static_ip_config: false,
             static_ip_config: None,
         }
@@ -27,6 +27,13 @@ impl NetworkSettings {
 
 impl Default for NetworkSettings {
     fn default() -> Self {
-        Self::new()
+        Self {
+            wifi_settings: WiFiSettings::default(),
+            wifi_ap_settings: WiFiApSettings::default(),
+            use_static_ip_config: option_env!("DBG_USE_STATIC_IP_CONFIG")
+                .map(|str| str.parse().unwrap_or(false))
+                .unwrap_or(false),
+            static_ip_config: None,
+        }
     }
 }

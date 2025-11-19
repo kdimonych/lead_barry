@@ -49,16 +49,16 @@ impl HttpConfiguration {
 
 impl From<&HttpStaticIpConfig> for StaticIpConfig {
     fn from(http_static_ip_config: &HttpStaticIpConfig) -> Self {
-        Self {
-            ip: u32::from_be_bytes(http_static_ip_config.ip),
-            gateway: http_static_ip_config.gateway.map(u32::from_be_bytes),
-            prefix_len: http_static_ip_config.prefix_len,
-            dns_servers: http_static_ip_config
-                .dns
-                .iter()
-                .map(|&dns| u32::from_be_bytes(dns))
-                .collect(),
-        }
+        let mut ip_config = StaticIpConfig::default();
+        ip_config.ip = u32::from_be_bytes(http_static_ip_config.ip);
+        ip_config.gateway = http_static_ip_config.gateway.map(u32::from_be_bytes);
+        ip_config.prefix_len = http_static_ip_config.prefix_len;
+        ip_config.dns_servers = http_static_ip_config
+            .dns
+            .iter()
+            .map(|&dns| u32::from_be_bytes(dns))
+            .collect();
+        ip_config
     }
 }
 
@@ -92,8 +92,8 @@ impl From<StaticIpConfig> for HttpStaticIpConfig {
 impl From<&Settings> for HttpConfiguration {
     fn from(settings: &Settings) -> Self {
         Self {
-            ssid: settings.network_settings.wifi_ssid.clone(),
-            password: settings.network_settings.wifi_password.clone(),
+            ssid: settings.network_settings.wifi_settings.ssid.clone(),
+            password: settings.network_settings.wifi_settings.password.clone(),
             use_static_ip: settings.network_settings.use_static_ip_config,
             static_ip_config: settings
                 .network_settings
@@ -107,8 +107,8 @@ impl From<&Settings> for HttpConfiguration {
 impl From<Settings> for HttpConfiguration {
     fn from(settings: Settings) -> Self {
         Self {
-            ssid: settings.network_settings.wifi_ssid.clone(),
-            password: settings.network_settings.wifi_password.clone(),
+            ssid: settings.network_settings.wifi_settings.ssid.clone(),
+            password: settings.network_settings.wifi_settings.password.clone(),
             use_static_ip: settings.network_settings.use_static_ip_config,
             static_ip_config: settings
                 .network_settings
@@ -120,36 +120,31 @@ impl From<Settings> for HttpConfiguration {
 
 impl From<&HttpConfiguration> for Settings {
     fn from(http_config: &HttpConfiguration) -> Self {
-        Self {
-            network_settings: NetworkSettings {
-                wifi_ssid: http_config.ssid.clone(),
-                wifi_password: http_config.password.clone(),
-                use_static_ip_config: http_config.use_static_ip,
-                ap_channel: DEFAULT_AP_CHANNEL,
-                static_ip_config: http_config
-                    .static_ip_config
-                    .as_ref()
-                    .map(StaticIpConfig::from),
-            },
-            settings_version: 1,
-        }
+        let mut network_settings = NetworkSettings::default();
+        network_settings.wifi_settings.ssid = http_config.ssid.clone();
+        network_settings.wifi_settings.password = http_config.password.clone();
+        network_settings.use_static_ip_config = http_config.use_static_ip;
+        network_settings.static_ip_config = http_config
+            .static_ip_config
+            .as_ref()
+            .map(StaticIpConfig::from);
+
+        let mut settings = Settings::default();
+        settings.network_settings = network_settings;
+        settings
     }
 }
 
 impl From<HttpConfiguration> for Settings {
     fn from(http_config: HttpConfiguration) -> Self {
-        Self {
-            network_settings: NetworkSettings {
-                wifi_ssid: http_config.ssid,
-                wifi_password: http_config.password,
-                use_static_ip_config: http_config.use_static_ip,
-                ap_channel: DEFAULT_AP_CHANNEL,
-                static_ip_config: http_config
-                    .static_ip_config
-                    .as_ref()
-                    .map(StaticIpConfig::from),
-            },
-            settings_version: 1,
-        }
+        let mut network_settings = NetworkSettings::default();
+        network_settings.wifi_settings.ssid = http_config.ssid;
+        network_settings.wifi_settings.password = http_config.password;
+        network_settings.use_static_ip_config = http_config.use_static_ip;
+        network_settings.static_ip_config = http_config.static_ip_config.map(StaticIpConfig::from);
+
+        let mut settings = Settings::default();
+        settings.network_settings = network_settings;
+        settings
     }
 }

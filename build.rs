@@ -13,6 +13,31 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
+fn forvard_dbg_var() {
+    let forward_list = [
+        "DBG_WIFI_SSID",
+        "DBG_WIFI_PASSWORD",
+        "DBG_WIFI_AP_SSID",
+        "DBG_WIFI_AP_PASSWORD",
+        "DBG_WIFI_AP_CHANNEL",
+        "DBG_WIFI_AP_IP",
+        "DBG_WIFI_AP_PREFIX_LEN",
+        "DBG_USE_STATIC_IP_CONFIG",
+        "DBG_STATIC_IP_ADDRESS",
+        "DBG_STATIC_IP_GATEWAY",
+        "DBG_STATIC_IP_PREFIX_LEN",
+        "DBG_STATIC_IP_DNS_1",
+        "DBG_STATIC_IP_DNS_2",
+        "DBG_STATIC_IP_DNS_3",
+    ];
+
+    for var_name in forward_list {
+        if let Ok(var_value) = env::var(var_name) {
+            println!("cargo:rustc-env={}={}", var_name, var_value);
+        }
+    }
+}
+
 fn main() {
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
@@ -38,62 +63,12 @@ fn main() {
 
     // Read environment variables and pass them to rustc
 
-    if env::var("USE_DEBUG_SETTINGS").is_ok() {
-        println!("cargo:rustc-cfg=feature_use_debug_settings");
-    }
-    println!("cargo:rustc-check-cfg=cfg(feature_use_debug_settings)");
-
-    if env::var("OVERWRITE_WITH_DEBUG_SETTINGS").is_ok() {
+    if env::var("DBG_OVERWRITE_WITH_DEBUG_SETTINGS").is_ok() {
         println!("cargo:rustc-cfg=feature_overwrite_with_debug_settings");
     }
     println!("cargo:rustc-check-cfg=cfg(feature_overwrite_with_debug_settings)");
 
-    if let Ok(wifi_ssid) = env::var("DBG_WIFI_SSID") {
-        println!("cargo:rustc-env=DBG_WIFI_SSID={}", wifi_ssid);
-    }
-    if let Ok(wifi_password) = env::var("DBG_WIFI_PASSWORD") {
-        println!("cargo:rustc-env=DBG_WIFI_PASSWORD={}", wifi_password);
-    }
-
-    if let Ok(ap_channel) = env::var("DBG_AP_CHANNEL") {
-        println!("cargo:rustc-env=DBG_AP_CHANNEL={}", ap_channel);
-    }
-
-    if env::var("DBG_USE_STATIC_IP_CONFIG").is_ok() {
-        println!("cargo:rustc-cfg=feature_use_static_ip_config");
-    }
-    println!("cargo:rustc-check-cfg=cfg(feature_use_static_ip_config)");
-
-    if let Ok(static_ip_address) = env::var("DBG_STATIC_IP_ADDRESS") {
-        println!(
-            "cargo:rustc-env=DBG_STATIC_IP_ADDRESS={}",
-            static_ip_address
-        );
-    }
-
-    if let Ok(static_ip_gateway) = env::var("DBG_STATIC_IP_GATEWAY") {
-        println!(
-            "cargo:rustc-env=DBG_STATIC_IP_GATEWAY={}",
-            static_ip_gateway
-        );
-    }
-
-    if let Ok(static_ip_prefix_len) = env::var("DBG_STATIC_IP_PREFIX_LEN") {
-        println!(
-            "cargo:rustc-env=DBG_STATIC_IP_PREFIX_LEN={}",
-            static_ip_prefix_len
-        );
-    }
-
-    if let Ok(static_ip_dns) = env::var("DBG_STATIC_IP_DNS_1") {
-        println!("cargo:rustc-env=DBG_STATIC_IP_DNS_1={}", static_ip_dns);
-    }
-    if let Ok(static_ip_dns) = env::var("DBG_STATIC_IP_DNS_2") {
-        println!("cargo:rustc-env=DBG_STATIC_IP_DNS_2={}", static_ip_dns);
-    }
-    if let Ok(static_ip_dns) = env::var("DBG_STATIC_IP_DNS_3") {
-        println!("cargo:rustc-env=DBG_STATIC_IP_DNS_3={}", static_ip_dns);
-    }
+    forvard_dbg_var();
 
     // Rebuild if .env file changes
     println!("cargo:rerun-if-changed=.env");

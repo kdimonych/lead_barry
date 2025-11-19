@@ -28,12 +28,6 @@ impl ConfigurationStorageBuilder {
     }
 
     pub fn build(mut self) -> &'static ConfigurationStorage<'static> {
-        let debug_settings_opt = debug_settings();
-
-        if debug_settings_opt.is_some() {
-            info!("Using debug settings from build configuration");
-        }
-
         let initial_settings = match sync_load(&mut self.flash_storage) {
             Ok(settings) => settings,
 
@@ -42,7 +36,7 @@ impl ConfigurationStorageBuilder {
                     "Can't load settings from storage: {}. Using default settings.",
                     error
                 );
-                let default_settings = debug_settings_opt.unwrap_or_default();
+                let default_settings = Settings::default();
                 if let Err(error) = sync_save(&mut self.flash_storage, &default_settings) {
                     error!("Can't save default settings to storage: {}", error);
                 }
@@ -51,10 +45,7 @@ impl ConfigurationStorageBuilder {
         };
 
         #[cfg(all(feature_overwrite_with_debug_settings, feature_use_debug_settings))]
-        let initial_settings = {
-            defmt::info!("Overriding loaded settings with debug static IP config");
-            debug_settings().unwrap_or(initial_settings)
-        };
+        let initial_settings = Settings::default();
 
         let storage = SHARED_STORAGE.init(ConfigurationStorage::new(
             self.flash_storage,
