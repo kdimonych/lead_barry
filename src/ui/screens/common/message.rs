@@ -1,16 +1,11 @@
 use common::any_string::AnyString;
-use core::str::SplitWhitespace;
-use defmt::info;
-use nalgebra::constraint;
 
 use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::*},
     pixelcolor::BinaryColor,
     prelude::*,
-    primitives::{
-        Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment, line,
-    },
-    text::{self, Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
+    primitives::{Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment},
+    text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
 use crate::ui::Screen;
@@ -18,7 +13,6 @@ use crate::ui::Screen;
 const TITLE_LENGTH: usize = 15;
 const TITLE_SIZE: usize = TITLE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 const MESSAGE_LINE_LENGTH: usize = 18;
-const MESSAGE_LINE_SIZE: usize = MESSAGE_LINE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 const MESSAGE_LENGTH: usize = MESSAGE_LINE_LENGTH * 3; // Support for three lines of message
 const MESSAGE_SIZE: usize = MESSAGE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 

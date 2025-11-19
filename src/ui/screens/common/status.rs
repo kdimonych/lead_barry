@@ -1,5 +1,4 @@
 use common::any_string::AnyString;
-use core::{any::Any, usize};
 
 use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::*},
@@ -25,7 +24,7 @@ pub type DetailString<'a> = AnyString<'static, DETAIL_LENGTH>;
 pub trait TrStatus {
     fn title(&'_ self) -> TitleString<'_>;
     fn status(&'_ self) -> StatusString<'_>;
-    fn detail(&'_ self) -> Option<DetailString>;
+    fn detail(&'_ self) -> Option<DetailString<'_>>;
 }
 
 pub struct ScStatusImpl<StatusT> {
