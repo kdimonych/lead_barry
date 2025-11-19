@@ -1,32 +1,32 @@
-pub enum WiFiControlState<IdleState, JoinedState, ApState> {
+pub enum WiFiControlerState<IdleState, JoinedState, ApState> {
     Uninitialized,
     Idle(IdleState),
     Joined(JoinedState),
     Ap(ApState),
 }
-impl<IdleState, JoinedState, ApState> WiFiControlState<IdleState, JoinedState, ApState> {
+impl<IdleState, JoinedState, ApState> WiFiControlerState<IdleState, JoinedState, ApState> {
     pub fn is_idle(&self) -> bool {
-        matches!(self, WiFiControlState::Idle(_))
+        matches!(self, WiFiControlerState::Idle(_))
     }
 
     pub fn is_joined(&self) -> bool {
-        matches!(self, WiFiControlState::Joined(_))
+        matches!(self, WiFiControlerState::Joined(_))
     }
 
     pub fn is_ap(&self) -> bool {
-        matches!(self, WiFiControlState::Ap(_))
+        matches!(self, WiFiControlerState::Ap(_))
     }
     pub fn is_uninitialized(&self) -> bool {
-        matches!(self, WiFiControlState::Uninitialized)
+        matches!(self, WiFiControlerState::Uninitialized)
     }
 
     pub fn change<Modifier>(&mut self, modifier: Modifier)
     where
         Modifier: FnOnce(
-            WiFiControlState<IdleState, JoinedState, ApState>,
-        ) -> WiFiControlState<IdleState, JoinedState, ApState>,
+            WiFiControlerState<IdleState, JoinedState, ApState>,
+        ) -> WiFiControlerState<IdleState, JoinedState, ApState>,
     {
-        let old_state = core::mem::replace(self, WiFiControlState::Uninitialized);
+        let old_state = core::mem::replace(self, WiFiControlerState::Uninitialized);
         let new_state = modifier(old_state);
         *self = new_state;
     }
@@ -34,29 +34,29 @@ impl<IdleState, JoinedState, ApState> WiFiControlState<IdleState, JoinedState, A
     pub async fn change_async<Modifier>(&mut self, modifier: Modifier)
     where
         Modifier: AsyncFnOnce(
-            WiFiControlState<IdleState, JoinedState, ApState>,
-        ) -> WiFiControlState<IdleState, JoinedState, ApState>,
+            WiFiControlerState<IdleState, JoinedState, ApState>,
+        ) -> WiFiControlerState<IdleState, JoinedState, ApState>,
     {
-        let old_state = core::mem::replace(self, WiFiControlState::Uninitialized);
+        let old_state = core::mem::replace(self, WiFiControlerState::Uninitialized);
         let new_state = modifier(old_state).await;
         *self = new_state;
     }
 
-    pub fn as_ref(&self) -> WiFiControlState<&IdleState, &JoinedState, &ApState> {
+    pub fn as_ref(&self) -> WiFiControlerState<&IdleState, &JoinedState, &ApState> {
         match self {
-            WiFiControlState::Uninitialized => WiFiControlState::Uninitialized,
-            WiFiControlState::Idle(ctrl) => WiFiControlState::Idle(ctrl),
-            WiFiControlState::Joined(ctrl) => WiFiControlState::Joined(ctrl),
-            WiFiControlState::Ap(ctrl) => WiFiControlState::Ap(ctrl),
+            WiFiControlerState::Uninitialized => WiFiControlerState::Uninitialized,
+            WiFiControlerState::Idle(ctrl) => WiFiControlerState::Idle(ctrl),
+            WiFiControlerState::Joined(ctrl) => WiFiControlerState::Joined(ctrl),
+            WiFiControlerState::Ap(ctrl) => WiFiControlerState::Ap(ctrl),
         }
     }
 
-    pub fn as_mut(&mut self) -> WiFiControlState<&mut IdleState, &mut JoinedState, &mut ApState> {
+    pub fn as_mut(&mut self) -> WiFiControlerState<&mut IdleState, &mut JoinedState, &mut ApState> {
         match self {
-            WiFiControlState::Uninitialized => WiFiControlState::Uninitialized,
-            WiFiControlState::Idle(ctrl) => WiFiControlState::Idle(ctrl),
-            WiFiControlState::Joined(ctrl) => WiFiControlState::Joined(ctrl),
-            WiFiControlState::Ap(ctrl) => WiFiControlState::Ap(ctrl),
+            WiFiControlerState::Uninitialized => WiFiControlerState::Uninitialized,
+            WiFiControlerState::Idle(ctrl) => WiFiControlerState::Idle(ctrl),
+            WiFiControlerState::Joined(ctrl) => WiFiControlerState::Joined(ctrl),
+            WiFiControlerState::Ap(ctrl) => WiFiControlerState::Ap(ctrl),
         }
     }
 
@@ -65,62 +65,62 @@ impl<IdleState, JoinedState, ApState> WiFiControlState<IdleState, JoinedState, A
         f_idle: FIdle,
         f_joined: FJoined,
         f_ap: FAp,
-    ) -> WiFiControlState<NewIdleState, NewJoinedState, NewApState>
+    ) -> WiFiControlerState<NewIdleState, NewJoinedState, NewApState>
     where
         FIdle: FnOnce(IdleState) -> NewIdleState,
         FJoined: FnOnce(JoinedState) -> NewJoinedState,
         FAp: FnOnce(ApState) -> NewApState,
     {
         match self {
-            WiFiControlState::Uninitialized => WiFiControlState::Uninitialized,
-            WiFiControlState::Idle(state) => WiFiControlState::Idle(f_idle(state)),
-            WiFiControlState::Joined(state) => WiFiControlState::Joined(f_joined(state)),
-            WiFiControlState::Ap(state) => WiFiControlState::Ap(f_ap(state)),
+            WiFiControlerState::Uninitialized => WiFiControlerState::Uninitialized,
+            WiFiControlerState::Idle(state) => WiFiControlerState::Idle(f_idle(state)),
+            WiFiControlerState::Joined(state) => WiFiControlerState::Joined(f_joined(state)),
+            WiFiControlerState::Ap(state) => WiFiControlerState::Ap(f_ap(state)),
         }
     }
 
     pub fn map_idle<FIdle, NewIdleState>(
         self,
         f_idle: FIdle,
-    ) -> WiFiControlState<NewIdleState, JoinedState, ApState>
+    ) -> WiFiControlerState<NewIdleState, JoinedState, ApState>
     where
         FIdle: FnOnce(IdleState) -> NewIdleState,
     {
         match self {
-            WiFiControlState::Uninitialized => WiFiControlState::Uninitialized,
-            WiFiControlState::Idle(state) => WiFiControlState::Idle(f_idle(state)),
-            WiFiControlState::Joined(state) => WiFiControlState::Joined(state),
-            WiFiControlState::Ap(state) => WiFiControlState::Ap(state),
+            WiFiControlerState::Uninitialized => WiFiControlerState::Uninitialized,
+            WiFiControlerState::Idle(state) => WiFiControlerState::Idle(f_idle(state)),
+            WiFiControlerState::Joined(state) => WiFiControlerState::Joined(state),
+            WiFiControlerState::Ap(state) => WiFiControlerState::Ap(state),
         }
     }
 
     pub fn map_joined<FJoined, NewJoinedState>(
         self,
         f_joined: FJoined,
-    ) -> WiFiControlState<IdleState, NewJoinedState, ApState>
+    ) -> WiFiControlerState<IdleState, NewJoinedState, ApState>
     where
         FJoined: FnOnce(JoinedState) -> NewJoinedState,
     {
         match self {
-            WiFiControlState::Uninitialized => WiFiControlState::Uninitialized,
-            WiFiControlState::Idle(state) => WiFiControlState::Idle(state),
-            WiFiControlState::Joined(state) => WiFiControlState::Joined(f_joined(state)),
-            WiFiControlState::Ap(state) => WiFiControlState::Ap(state),
+            WiFiControlerState::Uninitialized => WiFiControlerState::Uninitialized,
+            WiFiControlerState::Idle(state) => WiFiControlerState::Idle(state),
+            WiFiControlerState::Joined(state) => WiFiControlerState::Joined(f_joined(state)),
+            WiFiControlerState::Ap(state) => WiFiControlerState::Ap(state),
         }
     }
 
     pub fn map_ap<FAp, NewApState>(
         self,
         f_ap: FAp,
-    ) -> WiFiControlState<IdleState, JoinedState, NewApState>
+    ) -> WiFiControlerState<IdleState, JoinedState, NewApState>
     where
         FAp: FnOnce(ApState) -> NewApState,
     {
         match self {
-            WiFiControlState::Uninitialized => WiFiControlState::Uninitialized,
-            WiFiControlState::Idle(state) => WiFiControlState::Idle(state),
-            WiFiControlState::Joined(state) => WiFiControlState::Joined(state),
-            WiFiControlState::Ap(state) => WiFiControlState::Ap(f_ap(state)),
+            WiFiControlerState::Uninitialized => WiFiControlerState::Uninitialized,
+            WiFiControlerState::Idle(state) => WiFiControlerState::Idle(state),
+            WiFiControlerState::Joined(state) => WiFiControlerState::Joined(state),
+            WiFiControlerState::Ap(state) => WiFiControlerState::Ap(f_ap(state)),
         }
     }
 }

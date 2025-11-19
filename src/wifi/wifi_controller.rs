@@ -13,7 +13,7 @@ pub use cyw43::PowerManagementMode;
 pub use cyw43::ScanOptions;
 pub use cyw43::Scanner;
 
-use super::wifi_control_state::WiFiControlState;
+use super::wifi_control_state::WiFiControlerState;
 use defmt::debug;
 use embassy_executor::Spawner;
 use embassy_rp::{
@@ -46,7 +46,7 @@ where
     _marker: core::marker::PhantomData<State>,
 }
 
-pub type WiFiCtrlState<'a> = WiFiControlState<
+pub type WiFiCtrlState<'a> = WiFiControlerState<
     WiFiController<'a, IdleState>,
     WiFiController<'a, JoinedState>,
     WiFiController<'a, ApState>,
