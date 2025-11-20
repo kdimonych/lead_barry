@@ -1,4 +1,4 @@
-use defmt::info;
+use defmt::*;
 use heapless::Vec;
 use nanofish::{HttpRequest, HttpResponse, ResponseBody, StatusCode};
 
@@ -65,9 +65,9 @@ impl TemporalHttpHandler for MainPageHandler {
             ))
             .map_err(|_| nanofish::Error::InvalidStatusCode)?;
 
-        info!(
+        debug!(
             "Send main page. Compressed size: {}",
-            MAIN_CONFIGURATION_HTML_GZ.len()
+            MAIN_CONFIGURATION_HTML_GZ.len(),
         );
 
         Ok(response)

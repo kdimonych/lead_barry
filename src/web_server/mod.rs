@@ -70,7 +70,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
     ) -> Result<HttpResponse<'_>, nanofish::Error> {
         if request.path == "/" {
             // Show main page
-            info!("Serving main configuration page");
+            debug!("Serving main configuration page");
 
             return self
                 .active_handler
@@ -88,7 +88,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
 
         match api {
             "version" => {
-                info!("Serving version info");
+                debug!("Serving version info");
                 Ok(HttpResponse {
                     status_code: StatusCode::Ok,
                     headers: Vec::new(),
@@ -97,6 +97,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
             }
 
             "reset" => {
+                info!("Serving reset request");
                 reset::deferred_system_reset(self.context.spawner(), 1.s());
                 // The reset function does not return, but we provide a response for completeness
                 Ok(HttpResponse {
