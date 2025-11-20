@@ -61,7 +61,7 @@ fn compress(files: &[&str]) {
 }
 
 fn main() {
-    let files_to_compress = ["./src/config_server/web/main_configuration.html"];
+    let files_to_compress = ["./src/web_server/web/main_configuration.html"];
     compress(&files_to_compress);
 
     // Put `memory.x` in our output directory and ensure it's

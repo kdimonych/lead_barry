@@ -5,7 +5,6 @@
 #![no_main]
 #![allow(async_fn_in_trait)]
 
-mod config_server;
 mod configuration;
 mod flash_storage;
 mod input;
@@ -16,6 +15,7 @@ mod reset;
 mod ui;
 mod units;
 mod vcp_sensors;
+mod web_server;
 mod wifi;
 
 use cyw43_pio::PioSpi;

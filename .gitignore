@@ -51,4 +51,4 @@ yarn-debug.log*
 yarn-error.log*
 
 # Generated assets
-src/config_server/web/main_configuration.html.gz
+src/web_server/web/main_configuration.html.gz

@@ -10,8 +10,8 @@ use embassy_net::Stack;
 use heapless::Vec;
 use nanofish::{HttpHandler, HttpRequest, HttpResponse, HttpServer, ResponseBody, StatusCode};
 
-use crate::config_server::http_main_page_handler::MainPageHandler;
 use crate::configuration::ConfigurationStorage;
+use crate::web_server::http_main_page_handler::MainPageHandler;
 use crate::{reset, units::TimeExt as _};
 use http_server_context::HttpServerContext;
 use temporal_handler_storage::TemporalHandlerStorage;

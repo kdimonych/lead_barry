@@ -8,12 +8,12 @@ use embassy_rp::clocks::RoscRng;
 use embassy_time::Duration;
 use embassy_time::Timer;
 
-use crate::config_server::HttpConfigServer;
 use crate::configuration::*;
 use crate::input::*;
 use crate::ui::*;
 use crate::units::TimeExt as _;
 use crate::vcp_sensors::*;
+use crate::web_server::HttpConfigServer;
 use crate::wifi::*;
 
 // TODO: Move to separate module
