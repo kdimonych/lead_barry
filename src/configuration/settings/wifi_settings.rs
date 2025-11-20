@@ -1,6 +1,5 @@
+use super::static_ip_config::StaticIpConfig;
 use core::str::FromStr;
-
-use embassy_net::Ipv4Address;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, defmt::Format)]
@@ -8,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct WiFiSettings {
     pub ssid: heapless::String<32>,
     pub password: heapless::String<64>,
+    pub use_static_ip_config: bool,
+    pub static_ip_config: Option<StaticIpConfig>,
 }
 
 impl WiFiSettings {
@@ -15,6 +16,8 @@ impl WiFiSettings {
         Self {
             ssid: heapless::String::new(),
             password: heapless::String::new(),
+            use_static_ip_config: false,
+            static_ip_config: None,
         }
     }
 }
@@ -25,6 +28,10 @@ impl Default for WiFiSettings {
             ssid: heapless::String::from_str(option_env!("DBG_WIFI_SSID").unwrap_or("")).unwrap(),
             password: heapless::String::from_str(option_env!("DBG_WIFI_PASSWORD").unwrap_or(""))
                 .unwrap(),
+            use_static_ip_config: option_env!("DBG_USE_STATIC_IP_CONFIG")
+                .map(|str| str.parse().unwrap_or(false))
+                .unwrap_or(false),
+            static_ip_config: None,
         }
     }
 }

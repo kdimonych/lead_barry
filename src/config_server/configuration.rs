@@ -1,7 +1,6 @@
 use core::u32;
 
 use crate::configuration::*;
-use embassy_rp::usb::In;
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
@@ -94,9 +93,10 @@ impl From<&Settings> for HttpConfiguration {
         Self {
             ssid: settings.network_settings.wifi_settings.ssid.clone(),
             password: settings.network_settings.wifi_settings.password.clone(),
-            use_static_ip: settings.network_settings.use_static_ip_config,
+            use_static_ip: settings.network_settings.wifi_settings.use_static_ip_config,
             static_ip_config: settings
                 .network_settings
+                .wifi_settings
                 .static_ip_config
                 .as_ref()
                 .map(HttpStaticIpConfig::from),
@@ -109,9 +109,10 @@ impl From<Settings> for HttpConfiguration {
         Self {
             ssid: settings.network_settings.wifi_settings.ssid.clone(),
             password: settings.network_settings.wifi_settings.password.clone(),
-            use_static_ip: settings.network_settings.use_static_ip_config,
+            use_static_ip: settings.network_settings.wifi_settings.use_static_ip_config,
             static_ip_config: settings
                 .network_settings
+                .wifi_settings
                 .static_ip_config
                 .map(HttpStaticIpConfig::from),
         }
@@ -123,8 +124,8 @@ impl From<&HttpConfiguration> for Settings {
         let mut network_settings = NetworkSettings::default();
         network_settings.wifi_settings.ssid = http_config.ssid.clone();
         network_settings.wifi_settings.password = http_config.password.clone();
-        network_settings.use_static_ip_config = http_config.use_static_ip;
-        network_settings.static_ip_config = http_config
+        network_settings.wifi_settings.use_static_ip_config = http_config.use_static_ip;
+        network_settings.wifi_settings.static_ip_config = http_config
             .static_ip_config
             .as_ref()
             .map(StaticIpConfig::from);
@@ -140,8 +141,9 @@ impl From<HttpConfiguration> for Settings {
         let mut network_settings = NetworkSettings::default();
         network_settings.wifi_settings.ssid = http_config.ssid;
         network_settings.wifi_settings.password = http_config.password;
-        network_settings.use_static_ip_config = http_config.use_static_ip;
-        network_settings.static_ip_config = http_config.static_ip_config.map(StaticIpConfig::from);
+        network_settings.wifi_settings.use_static_ip_config = http_config.use_static_ip;
+        network_settings.wifi_settings.static_ip_config =
+            http_config.static_ip_config.map(StaticIpConfig::from);
 
         let mut settings = Settings::default();
         settings.network_settings = network_settings;

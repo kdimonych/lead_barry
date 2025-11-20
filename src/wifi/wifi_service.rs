@@ -1,7 +1,7 @@
 use core::default;
 
 use super::wifi_controller::*;
-use crate::configuration::{NetworkSettings, WiFiApSettings};
+use crate::configuration::{NetworkSettings, WiFiApSettings, WiFiSettings};
 use cyw43::NetDriver;
 use defmt::*;
 use embassy_executor::Spawner;
@@ -150,14 +150,12 @@ impl WifiService {
     }
 
     /// Switch to join mode (connect to WiFi)
-    pub async fn join<H>(&self, network_settings: &NetworkSettings, join_status_handler: H)
+    pub async fn join<H>(&self, wifi_settings: &WiFiSettings, join_status_handler: H)
     where
         H: AsyncFnMut(JoiningStatus) -> (),
     {
         let mut service_impl = self.service_impl.lock().await;
-        service_impl
-            .join(network_settings, join_status_handler)
-            .await;
+        service_impl.join(wifi_settings, join_status_handler).await;
     }
 
     /// Switch to access point mode
@@ -177,7 +175,7 @@ trait WiFiServiceImplementation<'a> {
     fn active_mode(&self) -> ActiveMode;
 
     async fn idle(&mut self);
-    async fn join<H>(&mut self, network_settings: &NetworkSettings, join_status_handler: H)
+    async fn join<H>(&mut self, wifi_settings: &WiFiSettings, join_status_handler: H)
     where
         H: AsyncFnMut(JoiningStatus) -> ();
     async fn start_ap<H>(&mut self, wifi_ap_settings: &WiFiApSettings, wifi_state_handler: H)
@@ -205,7 +203,7 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
             .await;
     }
 
-    async fn join<H>(&mut self, network_settings: &NetworkSettings, mut join_status_handler: H)
+    async fn join<H>(&mut self, wifi_settings: &WiFiSettings, mut join_status_handler: H)
     where
         H: AsyncFnMut(JoiningStatus) -> (),
     {
@@ -216,7 +214,7 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
 
         self.wifi_control
             .change_async(async |state| {
-                Self::join_transition(state, self.net_stack, join_status_handler, network_settings)
+                Self::join_transition(state, self.net_stack, join_status_handler, wifi_settings)
                     .await
             })
             .await;
@@ -350,7 +348,7 @@ impl<'a> WifiServiceImpl<'a> {
         mut controller_state: WiFiCtrlState<'tr>,
         net_stack: Stack<'tr>,
         mut wifi_state_handler: H,
-        network_settings: &NetworkSettings,
+        wifi_settings: &WiFiSettings,
     ) -> WiFiCtrlState<'tr>
     where
         H: AsyncFnMut(JoiningStatus) -> (),
@@ -360,12 +358,9 @@ impl<'a> WifiServiceImpl<'a> {
         // TODO: Not quit sure if we need to go to idle first, but doing it for safety
         controller_state = Self::idle_transition(controller_state, net_stack).await;
 
-        debug!(
-            "Attempting to join SSID: {}",
-            network_settings.wifi_settings.ssid.as_str()
-        );
-        let mut join_options = JoinOptions::new(network_settings.wifi_settings.password.as_bytes());
-        join_options.auth = if network_settings.wifi_settings.password.is_empty() {
+        debug!("Attempting to join SSID: {}", wifi_settings.ssid.as_str());
+        let mut join_options = JoinOptions::new(wifi_settings.password.as_bytes());
+        join_options.auth = if wifi_settings.password.is_empty() {
             debug!("Using open authentication");
             JoinAuth::Open
         } else {
@@ -378,7 +373,7 @@ impl<'a> WifiServiceImpl<'a> {
                 WiFiCtrlState::Idle(controller) => {
                     debug!("Attempt {}", i + 1);
                     controller_state = controller
-                        .join(&network_settings.wifi_settings.ssid, join_options.clone())
+                        .join(&wifi_settings.ssid, join_options.clone())
                         .await
                         .map_or_else(
                             |(idle, e)| {
@@ -394,8 +389,8 @@ impl<'a> WifiServiceImpl<'a> {
                     wifi_state_handler(JoiningStatus::ObtainingIP).await;
 
                     //Init DHCP client and wait for network read
-                    let ip_config = if network_settings.use_static_ip_config {
-                        if let Some(static_ip_config) = &network_settings.static_ip_config {
+                    let ip_config = if wifi_settings.use_static_ip_config {
+                        if let Some(static_ip_config) = &wifi_settings.static_ip_config {
                             info!("Using static network settings: {}", static_ip_config);
                             ConfigV4::Static(static_ip_config.into())
                         } else {

@@ -41,7 +41,7 @@ pub async fn main_logic_controller(
     let mut network_ready = false;
     if !settings.network_settings.wifi_settings.ssid.is_empty() {
         wifi_service
-            .join(&settings.network_settings, async |status| {
+            .join(&settings.network_settings.wifi_settings, async |status| {
                 // Handle join status updates here
                 info!("Join Status: {:?}", status);
 
