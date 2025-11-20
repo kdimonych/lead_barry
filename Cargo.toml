@@ -83,6 +83,7 @@ ssd1306 = { version = "0.10", features = ["async"] }
 ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "main", features = ["async"] }
 crc = "3.3.0"
 
+# Internal workspace crates
 common = { path = "./common" }
 
 # cargo build/run
@@ -139,3 +140,4 @@ opt-level = 3
 
 [build-dependencies]
 dotenvy = "0.15"
+flate2 = "1.1.5"

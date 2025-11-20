@@ -75,6 +75,9 @@ impl WiFiServiceBuilder {
             stack_resources,
             seed,
         );
+
+        // Spawn network driver task
+        info!("Spawn network driver task");
         spawner.spawn(net_driver_task(runner)).unwrap();
 
         // Run service routine
@@ -90,6 +93,39 @@ impl WiFiServiceBuilder {
 /// WiFi Service
 /// - Manages WiFi connection and access point modes
 /// - Provides network stack access
+/// - Handles DHCP server in access point mode
+/// - Allows switching between idle, join, and access point modes
+/// - Not thread-safe, should be used from a single task context
+/// # Example
+/// ```rust,no_run
+/// use embassy_executor::Spawner;
+/// use embassy_net::Stack;
+/// use cyw43::NetDriver;
+/// use crate::wifi::{WiFiServiceBuilder, WiFiController, IdleState,
+///     NetworkSettings, JoiningStatus};
+/// async fn example(spawner: Spawner, wifi_control: WiFiController<'static, IdleState>,
+///     wifi_network_driver: NetDriver<'static>, network_settings: &NetworkSettings) {
+/// let wifi_service = WiFiServiceBuilder::new(wifi_control, wifi_network_driver)
+///     .build(spawner);
+/// let net_stack: Stack<'static> = wifi_service.net_stack().await;
+/// wifi_service.join(network_settings, async |status| {
+///     match status {
+///         JoiningStatus::JoiningAP => {
+///             // Handle joining status
+///         }
+///         JoiningStatus::ObtainingIP => {
+///             // Handle obtaining IP status
+///         }
+///         JoiningStatus::Ready => {
+///             // Handle ready status
+///         }
+///         JoiningStatus::Failed => {
+///             // Handle failed status
+///         }
+///     }
+/// }).await;
+/// # }
+/// ```
 pub struct WifiService {
     service_impl: &'static WiFiServiceImplType,
 }

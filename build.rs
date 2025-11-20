@@ -13,6 +13,11 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 
+use flate2::Compression;
+use flate2::write::GzEncoder;
+use std::io;
+use std::io::prelude::*;
+
 fn forvard_dbg_var() {
     let forward_list = [
         "DBG_WIFI_SSID",
@@ -38,7 +43,27 @@ fn forvard_dbg_var() {
     }
 }
 
+// Compress the files with gzip and include them in the binary
+fn compress(files: &[&str]) {
+    for &file in files {
+        let output_file = format!("{}.gz", file);
+        let input_data = std::fs::read(file).expect("Failed to read input file");
+
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder
+            .write_all(&input_data)
+            .expect("Failed to write data to encoder");
+        let compressed_data = encoder.finish().expect("Failed to finish compression");
+
+        std::fs::write(&output_file, compressed_data).expect("Failed to write compressed file");
+        println!("cargo:warning=Compressed {} to {}", file, output_file);
+    }
+}
+
 fn main() {
+    let files_to_compress = ["./src/config_server/web/main_configuration.html"];
+    compress(&files_to_compress);
+
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
     let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
