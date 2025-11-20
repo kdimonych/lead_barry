@@ -29,7 +29,7 @@ impl TemporalHandlerStorage {
     {
         // Instatntiate the handler and replace self with it
         // This gives the handler and its byproducts a temporal lifetime enough to handle the request
-        *self = core::mem::replace(self, Handler::default().into());
+        let _ = core::mem::replace(self, Handler::default().into());
 
         // Delegate the request handling to the active handler
         match self {
