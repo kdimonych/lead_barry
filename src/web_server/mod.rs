@@ -10,6 +10,9 @@ use embassy_net::Stack;
 use heapless::Vec;
 use nanofish::{HttpHandler, HttpRequest, HttpResponse, HttpServer, ResponseBody, StatusCode};
 
+// Get version from Cargo.toml at compile time
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 use crate::configuration::ConfigurationStorage;
 use crate::web_server::http_main_page_handler::MainPageHandler;
 use crate::{reset, units::TimeExt as _};
@@ -84,11 +87,14 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         };
 
         match api {
-            "status" => Ok(HttpResponse {
-                status_code: StatusCode::Ok,
-                headers: Vec::new(),
-                body: ResponseBody::Text("{\"status\":\"ok\"}"),
-            }),
+            "version" => {
+                info!("Serving version info");
+                Ok(HttpResponse {
+                    status_code: StatusCode::Ok,
+                    headers: Vec::new(),
+                    body: ResponseBody::Text(VERSION),
+                })
+            }
 
             "reset" => {
                 reset::deferred_system_reset(self.context.spawner(), 1.s());

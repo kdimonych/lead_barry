@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Device Config</title>
+    <title>Lead Barry</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
@@ -25,14 +25,40 @@
     <div id="status" class="result" style="display:none;"></div>
 
     <script>
-        function reboot(){
+        window.onload = async function() {
+            // Load version and current configuration
+            await get_version();
+            // await loadCurrentConfig();
+        };
 
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch('/api/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    document.getElementById('ssid').value = config.ssid || '';
+                    // Don't populate password for security
+                }
+            } catch (error) {
+                console.error('Failed to load current config:', error);
+            }
+        }
+
+        async function get_version(){
+            try {
+                const response = await fetch('/api/version');
+                const data = await response.text();
+                document.title = "Lead Barry v" + data;
+            } catch (error) {
+                console.error('Failed to get version:', error);
+                document.title = "Lead Barry";
+            }
         }
         function sendConfigAndReboot(){
 
         }
 
-        function sendConfig() {
+        async function sendConfig() {
             const ssid = document.getElementById('ssid').value;
             const password = document.getElementById('password').value;
 
@@ -41,26 +67,36 @@
                 return;
             }
 
-            // Send POST request to your Embassy HTTP server
-            fetch('/api/save_config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ssid: ssid,
-                    password: password
-                })
-            })
-            .then(response => response.text())
-            .then(data => {
+            try {
+                // Show loading state
                 document.getElementById('status').style.display = 'block';
+                document.getElementById('status').innerHTML = 'Saving configuration...';
+
+                // Wait for the save operation to complete
+                const response = await fetch('/api/save_config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ssid: ssid,
+                        password: password
+                    })
+                });
+
+                // Check if the response was successful
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.text();
                 document.getElementById('status').innerHTML = 'Configuration saved: ' + data;
-            })
-            .catch(error => {
+
+            } catch (error) {
                 document.getElementById('status').style.display = 'block';
-                document.getElementById('status').innerHTML = 'Error: ' + error;
-            });
+                document.getElementById('status').innerHTML = 'Error: ' + error.message;
+                console.error('Save config error:', error);
+            }
         }
     </script>
 </body>
