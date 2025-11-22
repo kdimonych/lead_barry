@@ -22,5 +22,9 @@ rustflags = [
 [build]
 target = "thumbv6m-none-eabi"
 
+# Override target for testing specific packages
+[target.x86_64-apple-darwin]
+rustflags = []
+
 [env]
 DEFMT_LOG = "debug"
