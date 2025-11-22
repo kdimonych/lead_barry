@@ -49,7 +49,7 @@ fn compress(files: &[&str]) {
         let output_file = format!("{}.gz", file);
         let input_data = std::fs::read(file).expect("Failed to read input file");
 
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
         encoder
             .write_all(&input_data)
             .expect("Failed to write data to encoder");

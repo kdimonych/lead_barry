@@ -26,23 +26,9 @@
 
     <script>
         window.onload = async function() {
-            // Load version and current configuration
             await get_version();
-            // await loadCurrentConfig();
+            await get_config();
         };
-
-        async function loadCurrentConfig() {
-            try {
-                const response = await fetch('/api/config');
-                if (response.ok) {
-                    const config = await response.json();
-                    document.getElementById('ssid').value = config.ssid || '';
-                    // Don't populate password for security
-                }
-            } catch (error) {
-                console.error('Failed to load current config:', error);
-            }
-        }
 
         async function get_version(){
             try {
@@ -54,8 +40,24 @@
                 document.title = "Lead Barry";
             }
         }
-        function sendConfigAndReboot(){
 
+        async function get_config()
+        {
+            try {
+                const response = await fetch('/api/wifi_config');
+                const config = await response.json();
+                document.getElementById('ssid').value = config.ssid || '';
+                if (config.password == null)
+                        document.getElementById('password').value = '';
+                else {
+                    if (config.ssid == "")
+                        document.getElementById('password').value = '';
+                    else
+                        document.getElementById('password').value = '********';
+                }
+            } catch (error) {
+                console.error('Failed to load current config:', error);
+            }
         }
 
         async function sendConfig() {

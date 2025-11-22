@@ -1,4 +1,3 @@
-mod configuration;
 mod http_server_context;
 
 use defmt::*;
@@ -9,15 +8,15 @@ use nanofish::{
     HttpServer, StatusCode,
 };
 
+use crate::configuration::{ConfigurationStorage, WiFiSettings};
+use crate::{reset, units::TimeExt as _};
+use http_server_context::HttpServerContext;
+
 // Get version from Cargo.toml at compile time
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 //const MAIN_CONFIGURATION_HTML: &str = include_str!("./web/main_configuration.html");
 const MAIN_CONFIGURATION_HTML_GZ: &[u8] = include_bytes!("./web/main_configuration.html.gz");
-
-use crate::configuration::ConfigurationStorage;
-use crate::{reset, units::TimeExt as _};
-use http_server_context::HttpServerContext;
 
 const RX_SIZE: usize = 2048;
 const TX_SIZE: usize = 2048;
@@ -88,7 +87,6 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body(VERSION)
             }
-
             "reset" => {
                 info!("Serving reset request");
                 reset::deferred_system_reset(self.context.spawner(), 1.s());
@@ -97,11 +95,82 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body("System is resetting...")
             }
+            "wifi_config" => {
+                debug!("Serving configuration request");
+                let mut wifi_settings = self
+                    .context
+                    .configuration_storage()
+                    .get_settings()
+                    .await
+                    .network_settings
+                    .wifi_settings;
+
+                // Clear password before sending
+                if let Some(psw) = wifi_settings.password.as_mut() {
+                    psw.clear()
+                }
+
+                to_response(response_buffer, &wifi_settings)
+            }
+            "set_wifi_config" => {
+                debug!("Serving set configuration request");
+                let mut wifi_settings: WiFiSettings = from_request(request)?;
+                if wifi_settings.password.is_none() {
+                    // Preserve existing password if not provided
+                    let current_settings = self
+                        .context
+                        .configuration_storage()
+                        .get_settings()
+                        .await
+                        .network_settings
+                        .wifi_settings;
+                    wifi_settings.password = current_settings.password;
+                }
+                self.context
+                    .configuration_storage()
+                    .modify_settings(|settings| {
+                        settings.network_settings.wifi_settings = wifi_settings;
+                    })
+                    .await;
+                HttpResponseBuilder::new(response_buffer)
+                    .with_status(StatusCode::Ok)?
+                    .with_plain_text_body("WiFi configuration updated")
+            }
             _ => HttpResponseBuilder::new(response_buffer)
                 .with_status(StatusCode::NotFound)?
                 .with_plain_text_body("Not Found"),
         }
     }
+}
+
+fn to_response<T>(
+    response_buffer: HttpResponseBufferRef<'_>,
+    value: &T,
+) -> Result<HttpResponse, Error>
+where
+    T: serde::Serialize,
+{
+    HttpResponseBuilder::new(response_buffer)
+        .with_status(StatusCode::Ok)?
+        .with_header("Content-Type", "application/json")?
+        .with_body_filler(|buf| {
+            serde_json_core::to_slice(value, buf).map_err(|e| {
+                error!("Serialization error: {}", e);
+                Error::NoResponse
+            })
+        })
+}
+
+fn from_request<'de, T>(request: &HttpRequest<'de>) -> Result<T, nanofish::Error>
+where
+    T: serde::Deserialize<'de>,
+{
+    let (value, _) = serde_json_core::from_slice(request.body).map_err(|e| {
+        error!("Deserialization error: {}", e);
+        nanofish::Error::NoResponse
+    })?;
+
+    Ok(value)
 }
 
 // fn from_http_response(request: &HttpRequest<'de>) -> Result<T, nanofish::Error> {

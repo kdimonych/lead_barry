@@ -359,13 +359,22 @@ impl<'a> WifiServiceImpl<'a> {
         controller_state = Self::idle_transition(controller_state, net_stack).await;
 
         debug!("Attempting to join SSID: {}", wifi_settings.ssid.as_str());
-        let mut join_options = JoinOptions::new(wifi_settings.password.as_bytes());
-        join_options.auth = if wifi_settings.password.is_empty() {
-            debug!("Using open authentication");
-            JoinAuth::Open
+
+        let join_options = if let Some(psw) = &wifi_settings.password {
+            let mut join_options = JoinOptions::new(psw.as_bytes());
+            join_options.auth = if psw.is_empty() {
+                debug!("Using open authentication as password is empty");
+                JoinAuth::Open
+            } else {
+                debug!("Using WPA2/WPA3 authentication");
+                JoinAuth::Wpa2Wpa3
+            };
+            join_options
         } else {
-            debug!("Using WPA2 authentication");
-            JoinAuth::Wpa2
+            debug!("Using open authentication");
+            let mut join_options = JoinOptions::new(b"");
+            join_options.auth = JoinAuth::Open;
+            join_options
         };
 
         for i in 0..JOIN_RETRY_COUNT {
