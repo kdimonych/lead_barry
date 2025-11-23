@@ -159,9 +159,17 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                         settings.network_settings.wifi_settings = wifi_settings;
                     })
                     .await;
-                HttpResponseBuilder::new(response_buffer)
-                    .with_status(StatusCode::Ok)?
-                    .with_plain_text_body("WiFi configuration updated")
+                match self.context.configuration_storage().save().await {
+                    Ok(_) => HttpResponseBuilder::new(response_buffer)
+                        .with_status(StatusCode::Ok)?
+                        .with_plain_text_body("WiFi configuration updated"),
+                    Err(e) => {
+                        error!("Failed to save configuration: {:?}", e);
+                        HttpResponseBuilder::new(response_buffer)
+                            .with_status(StatusCode::InternalServerError)?
+                            .with_plain_text_body("Failed to save WiFi configuration")
+                    }
+                }
             }
             _ => HttpResponseBuilder::new(response_buffer)
                 .with_status(StatusCode::NotFound)?

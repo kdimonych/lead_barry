@@ -32,6 +32,9 @@ pub async fn main_logic_controller(
     button_controller: ButtonController<'_>,
     configuration_storage: &'static ConfigurationStorage<'static>,
 ) -> ! {
+    // Check if factory reset is triggered and perform it if needed
+    factory_reset_if_triggered(button_controller, ui_control, configuration_storage).await;
+
     let set_screen = |new_screen: ScCollection| async { ui_control.switch(new_screen).await };
     let settings = configuration_storage.get_settings().await;
 
@@ -69,13 +72,21 @@ pub async fn main_logic_controller(
                         set_screen(ScWifiStats::new(wifi_status).into()).await;
                     }
                     JoiningStatus::Failed => {
-                        error!("Failed to join WiFi network. Falling back to AP mode.");
+                        error!("Failed to join WiFi network. Falling back to AP mode");
+                        let msg = ScMessageData {
+                            title: MsgTitleString::from_str("ERROR"),
+                            message: MessageString::from_str(
+                                "Failed to join WiFi network. Starting AP...",
+                            ),
+                        };
+                        set_screen(ScMessage::new(msg).into()).await;
                     }
                 }
             })
             .await;
         info!("Joined WiFi network done");
-        Timer::after(3.s()).await;
+
+        Timer::after(5.s()).await;
     }
 
     // If not joined, start AP mode
@@ -209,4 +220,44 @@ fn generate_random_password_uppercase() -> heapless::String<64> {
 #[embassy_executor::task]
 async fn net_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'static>>) -> ! {
     runner.run().await
+}
+
+async fn factory_reset_if_triggered(
+    button_controller: ButtonController<'_>,
+    ui_control: &UiControlType<'_>,
+    configuration_storage: &'static ConfigurationStorage<'static>,
+) {
+    let y_state = button_controller
+        .get_last_state(Buttons::Yellow)
+        .await
+        .unwrap();
+    let b_state = button_controller
+        .get_last_state(Buttons::Blue)
+        .await
+        .unwrap();
+
+    if y_state == ButtonState::Pressed && b_state == ButtonState::Pressed {
+        info!("Factory reset was triggered");
+        let msg = ScMessageData {
+            title: MsgTitleString::from_str("Factory Reset"),
+            message: MessageString::from_str("Performing factory reset..."),
+        };
+        ui_control.switch(ScMessage::new(msg).into()).await;
+        if let Err(e) = configuration_storage.factory_reset().await {
+            error!("Factory reset failed: {:?}", e);
+            let msg = ScMessageData {
+                title: MsgTitleString::from_str("ERROR"),
+                message: MessageString::from_str("Factory reset failed."),
+            };
+            ui_control.switch(ScMessage::new(msg).into()).await;
+        } else {
+            info!("Factory reset completed successfully");
+            let msg = ScMessageData {
+                title: MsgTitleString::from_str("INFO"),
+                message: MessageString::from_str("Factory reset completed successfully."),
+            };
+            ui_control.switch(ScMessage::new(msg).into()).await;
+        }
+        Timer::after(3.s()).await;
+    }
 }

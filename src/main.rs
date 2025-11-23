@@ -162,7 +162,7 @@ fn debug_memory_layout() {
     info!("RAM End:      0x{:08x}", ram_end);
     info!("Stack Start:  0x{:08x}", stack_start);
     info!("Stack End:    0x{:08x}", stack_end);
-    info!("Current MSP:  0x{:08x}", current_sp);
+    info!("Current SP:   0x{:08x}", current_sp);
     info!("Stack Size:   {} bytes", stack_size);
 }
 
@@ -174,15 +174,15 @@ fn main() -> ! {
 
     log_system_frequencies();
 
-    // Bind button pins
-    let mut button_controller_builder = ButtonControllerBuilder::new();
-    button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
-    button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
-
     //User FLASH storage
     let storage = Storage::new(p.FLASH, p.DMA_CH1);
     let configuration_storage_builder = ConfigurationStorageBuilder::new(storage);
     let configuration_storage = configuration_storage_builder.build();
+
+    // Bind button pins
+    let mut button_controller_builder = ButtonControllerBuilder::new();
+    button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
+    button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
 
     // Setup I2C with standard frequency for sensors
     let mut i2c_cfg = i2c::Config::default();

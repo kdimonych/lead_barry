@@ -133,6 +133,12 @@ impl<'a> ConfigurationStorage<'a> {
 
         Ok(())
     }
+
+    pub async fn factory_reset(&self) -> Result<(), Error> {
+        let default_settings = Settings::default();
+        self.set_settings(default_settings).await;
+        self.save().await
+    }
 }
 
 struct StorageImpl<'a> {
