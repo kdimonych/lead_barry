@@ -6,11 +6,13 @@ mod button_controller;
 const BUTTON_EVENT_QUEUE_SIZE: usize = 8;
 const BUTTONS_COUNT: usize = 2;
 
-#[derive(Clone, Copy, Debug, defmt::Format)]
+#[derive(Clone, Copy, Debug, defmt::Format, PartialEq, Eq, Hash)]
 pub enum Buttons {
     Yellow,
     Blue,
 }
+
+pub use button_controller::ButtonState;
 
 pub type ButtonEvent = button_controller::ButtonEvent<Buttons>;
 

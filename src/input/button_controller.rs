@@ -2,11 +2,13 @@ use embassy_rp::gpio::Pin;
 use embassy_rp::{Peri, gpio};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::{Channel, Receiver, Sender};
+use embassy_sync::mutex::Mutex;
 use embassy_time::Ticker;
 use gpio::{Input, Level, Pull};
 
 use crate::units::TimeExt as _;
 
+use defmt::*;
 use {defmt_rtt as _, panic_probe as _};
 
 const POLLING_RATE_MS: u64 = 20;
@@ -17,8 +19,29 @@ const DEBOUNCE_CYCLES: u8 = 3; // Number of cycles to confirm a state change
 /// - Released: Button is released
 #[derive(Clone, Copy, Debug, defmt::Format)]
 pub enum ButtonEvent<AliasType> {
-    Pushed(AliasType),
+    Pressed(AliasType),
     Released(AliasType),
+}
+
+impl<AliasType> ButtonEvent<AliasType> {
+    /// Gets the alias of the button associated with the event
+    pub fn alias(&self) -> AliasType
+    where
+        AliasType: Copy,
+    {
+        match self {
+            ButtonEvent::Pressed(alias) => *alias,
+            ButtonEvent::Released(alias) => *alias,
+        }
+    }
+
+    /// Converts the ButtonEvent to a reference type
+    pub fn as_ref(&self) -> ButtonEvent<&AliasType> {
+        match self {
+            ButtonEvent::Pressed(alias) => ButtonEvent::Pressed(alias),
+            ButtonEvent::Released(alias) => ButtonEvent::Released(alias),
+        }
+    }
 }
 
 type EventChannel<AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize> =
@@ -38,10 +61,28 @@ type EventReceiver<'a, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize> =
 /// **Note**:  The low and high states are referred to button states, not the electrical levels - high,
 ///        button released (input high), low - button pressed (input low), depending on pull-up or
 ///        pull-down configuration. For the pull down configuration, the logic is inverted.
-#[derive(Clone, Copy)]
-enum ButtonState {
+#[derive(Clone, Copy, defmt::Format, PartialEq, Eq)]
+pub enum ButtonState {
     Idle,    // The state when button is not pressed (Actually High)
     Pressed, // The state when button is confirmed pressed
+}
+
+impl<T> From<&ButtonEvent<T>> for ButtonState {
+    fn from(event: &ButtonEvent<T>) -> Self {
+        match event {
+            ButtonEvent::Pressed(_) => ButtonState::Pressed,
+            ButtonEvent::Released(_) => ButtonState::Idle,
+        }
+    }
+}
+
+impl<T> From<ButtonEvent<T>> for ButtonState {
+    fn from(event: ButtonEvent<T>) -> Self {
+        match event {
+            ButtonEvent::Pressed(_) => ButtonState::Pressed,
+            ButtonEvent::Released(_) => ButtonState::Idle,
+        }
+    }
 }
 
 struct Button<AliasType = u8> {
@@ -50,12 +91,61 @@ struct Button<AliasType = u8> {
     pull: Pull,
 }
 
+impl<AliasType> From<&Button<AliasType>> for ButtonState {
+    fn from(button: &Button<AliasType>) -> Self {
+        match (button.pull, button.input.get_level()) {
+            (Pull::Up, Level::High) => ButtonState::Idle,
+            (Pull::Up, Level::Low) => ButtonState::Pressed,
+            (Pull::Down, Level::High) => ButtonState::Pressed,
+            (Pull::Down, Level::Low) => ButtonState::Idle,
+            (Pull::None, Level::High) => ButtonState::Idle,
+            (Pull::None, Level::Low) => ButtonState::Pressed,
+        }
+    }
+}
+
+impl<AliasType: Copy> From<(Edge, &Button<AliasType>)> for ButtonEvent<AliasType> {
+    fn from(pair: (Edge, &Button<AliasType>)) -> Self {
+        let (edge, button) = pair;
+        match (edge, button.pull) {
+            (Edge::Falling, Pull::Up) => ButtonEvent::Pressed(button.alias),
+            (Edge::Falling, Pull::Down) => ButtonEvent::Released(button.alias),
+            (Edge::Rising, Pull::Up) => ButtonEvent::Released(button.alias),
+            (Edge::Rising, Pull::Down) => ButtonEvent::Pressed(button.alias),
+            // Default case (no pull). Assume Pull::None means active low
+            (Edge::Rising, Pull::None) => ButtonEvent::Released(button.alias),
+            (Edge::Falling, Pull::None) => ButtonEvent::Pressed(button.alias),
+        }
+    }
+}
+
+trait ButtonStateProvider<'a, AliasType> {
+    /// Gets the last known state of the button
+    /// - button_id: The alias of the button
+    /// Returns: Poll<Option<ButtonState>> - Ready(Some(state)) if state is available,
+    ///          Ready(None) if button not found, Pending if state is not available yet
+    fn last_state(&'a self, button_id: AliasType) -> core::task::Poll<Option<ButtonState>>;
+
+    /// Sets the state of the button
+    /// - button_id: The alias of the button
+    /// - state: The new state to set
+    /// Returns: Poll<Result<(), ()>> - Ready(Ok(())) if state is set successfully,
+    ///          Ready(Err(())) if button not found, Pending if state cannot be set yet
+    fn update_state(
+        &self,
+        button_id: AliasType,
+        state: ButtonState,
+    ) -> core::task::Poll<Result<(), ()>>;
+}
+
 pub struct ButtonControllerState<
     AliasType,
     const INPUTS: usize,
     const BUTTON_EVENT_QUEUE_SIZE: usize,
 > {
     event_channel: EventChannel<AliasType, BUTTON_EVENT_QUEUE_SIZE>,
+    buttonst_state:
+        Mutex<CriticalSectionRawMutex, heapless::FnvIndexMap<AliasType, ButtonState, INPUTS>>,
 }
 
 impl<const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
@@ -64,6 +154,38 @@ impl<const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
     pub fn new() -> Self {
         Self {
             event_channel: Channel::new(),
+            buttonst_state: Mutex::new(heapless::FnvIndexMap::new()),
+        }
+    }
+}
+
+impl<'a, const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
+    ButtonStateProvider<'a, AliasType>
+    for ButtonControllerState<AliasType, INPUTS, BUTTON_EVENT_QUEUE_SIZE>
+where
+    AliasType: core::cmp::Eq + core::hash::Hash + Copy,
+{
+    fn last_state(&'a self, button_id: AliasType) -> core::task::Poll<Option<ButtonState>> {
+        if let Ok(guard) = self.buttonst_state.try_lock() {
+            core::task::Poll::Ready(guard.get(&button_id).cloned())
+        } else {
+            core::task::Poll::Pending
+        }
+    }
+    fn update_state(
+        &self,
+        button_id: AliasType,
+        state: ButtonState,
+    ) -> core::task::Poll<Result<(), ()>> {
+        if let Ok(mut guard) = self.buttonst_state.try_lock() {
+            if guard.contains_key(&button_id) {
+                guard.insert(button_id, state).ok();
+                core::task::Poll::Ready(Ok(()))
+            } else {
+                core::task::Poll::Ready(Err(()))
+            }
+        } else {
+            core::task::Poll::Pending
         }
     }
 }
@@ -74,6 +196,7 @@ where
     AliasType: 'static,
 {
     receiver: EventReceiver<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>,
+    state: &'a dyn ButtonStateProvider<'a, AliasType>,
 }
 
 impl<'a, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
@@ -84,6 +207,18 @@ where
     /// Asynchronously receives the next button event
     pub async fn receive(&self) -> ButtonEvent<AliasType> {
         self.receiver.receive().await
+    }
+
+    pub async fn get_last_state(&self, button_id: AliasType) -> Option<ButtonState>
+    where
+        AliasType: Copy,
+    {
+        loop {
+            match self.state.last_state(button_id) {
+                core::task::Poll::Ready(state) => return state,
+                core::task::Poll::Pending => embassy_futures::yield_now().await,
+            }
+        }
     }
 }
 
@@ -105,7 +240,7 @@ impl<const INPUTS: usize, AliasType> ButtonControllerBuilder<INPUTS, AliasType> 
     ///   Note: Pull::None assumes active low configuration - button press pulls the line low
     pub fn bind_pin(&mut self, alias: AliasType, pin: Peri<'static, impl Pin>, pull: Pull) {
         if self.buttons.is_full() {
-            panic!("ButtonControllerBuilder: Exceeded maximum number of buttons");
+            defmt::panic!("ButtonControllerBuilder: Exceeded maximum number of buttons");
         }
 
         let mut input = Input::new(pin, pull);
@@ -118,18 +253,32 @@ impl<const INPUTS: usize, AliasType> ButtonControllerBuilder<INPUTS, AliasType> 
     /// Returns: (ButtonController, ButtonControllerRunner)
     pub fn build<'a, const BUTTON_EVENT_QUEUE_SIZE: usize>(
         self,
-        state: &'a ButtonControllerState<AliasType, INPUTS, BUTTON_EVENT_QUEUE_SIZE>,
+        state: &'a mut ButtonControllerState<AliasType, INPUTS, BUTTON_EVENT_QUEUE_SIZE>,
     ) -> (
         ButtonController<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>,
         ButtonControllerRunner<'a, AliasType, INPUTS, BUTTON_EVENT_QUEUE_SIZE>,
-    ) {
+    )
+    where
+        AliasType: core::cmp::Eq + core::hash::Hash + Copy,
+    {
+        // Initialize button state to current levels
+        for button in &self.buttons {
+            state
+                .buttonst_state
+                .get_mut()
+                .insert(button.alias, button.into())
+                .ok();
+        }
+
         (
             ButtonController {
                 receiver: state.event_channel.receiver(),
+                state,
             },
             ButtonControllerRunner {
                 buttons: self.buttons,
                 sender: state.event_channel.sender(),
+                state,
             },
         )
     }
@@ -191,6 +340,7 @@ pub struct ButtonControllerRunner<
 {
     buttons: heapless::Vec<Button<AliasType>, INPUTS>,
     sender: EventSender<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>,
+    state: &'a dyn ButtonStateProvider<'a, AliasType>,
 }
 
 impl<'a, const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
@@ -222,19 +372,30 @@ impl<'a, const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
                 let level = button.input.get_level();
                 // Update edge detector
                 if let Some(edge) = edge_detectors[i].update_level(level) {
-                    let button_alias = button.alias;
-                    let event = match (edge, button.pull) {
-                        (Edge::Falling, Pull::Up) => ButtonEvent::Pushed(button_alias),
-                        (Edge::Falling, Pull::Down) => ButtonEvent::Released(button_alias),
-                        (Edge::Rising, Pull::Up) => ButtonEvent::Released(button_alias),
-                        (Edge::Rising, Pull::Down) => ButtonEvent::Pushed(button_alias),
-                        // Default case (no pull). Assume Pull::None means active low
-                        (Edge::Rising, Pull::None) => ButtonEvent::Released(button_alias),
-                        (Edge::Falling, Pull::None) => ButtonEvent::Pushed(button_alias),
-                    };
+                    let event: ButtonEvent<AliasType> = (edge, button).into();
+                    update_button_states(self.state, event.alias(), event.as_ref().into()).await;
                     self.sender.send(event).await;
                 }
             }
+        }
+    }
+}
+
+async fn update_button_states<AliasType>(
+    state: &dyn ButtonStateProvider<'_, AliasType>,
+    button_id: AliasType,
+    button_state: ButtonState,
+) where
+    AliasType: Copy,
+{
+    loop {
+        match state.update_state(button_id, button_state) {
+            core::task::Poll::Ready(Ok(())) => break,
+            core::task::Poll::Ready(Err(())) => {
+                error!("ButtonControllerRunner: Button alias not found");
+                break;
+            }
+            core::task::Poll::Pending => embassy_futures::yield_now().await,
         }
     }
 }
