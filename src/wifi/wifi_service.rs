@@ -38,7 +38,7 @@ pub enum JoiningStatus {
 pub enum ApStatus {
     StartingAP,
     WaitingForClient,
-    Ready,
+    Ready((Ipv4Address, [u8; 6])),
 }
 
 pub struct WiFiServiceBuilder {
@@ -236,8 +236,8 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
 
         wifi_state_handler(ApStatus::WaitingForClient).await;
         // Wait for a client to connect and get an IP address
-        self.wait_for_dhcp_client().await.ok();
-        wifi_state_handler(ApStatus::Ready).await;
+        let new_client = self.wait_for_dhcp_client().await.unwrap();
+        wifi_state_handler(ApStatus::Ready(new_client)).await;
     }
 
     fn active_mode(&self) -> ActiveMode {
@@ -314,11 +314,13 @@ impl<'a> WifiServiceImpl<'a> {
                 wifi_ap_settings.password.clone().unwrap_or_default();
 
             let mut ap_controller = if password.is_empty() {
+                debug!("Open AP mode...");
                 // Use open AP if password is empty
                 controller
                     .start_ap_open(wifi_ap_settings.ssid.as_str(), wifi_ap_settings.channel)
                     .await
             } else {
+                debug!("WPA2 AP mode...");
                 controller
                     .start_ap_wpa2(
                         wifi_ap_settings.ssid.as_str(),

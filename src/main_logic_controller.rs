@@ -87,42 +87,47 @@ pub async fn main_logic_controller(
             wifi_ap_settings
                 .password
                 .clone()
-                .unwrap_or(generate_random_password()),
+                .unwrap_or(generate_random_password_uppercase()),
         );
 
         wifi_service
-            .start_ap(
-                &settings.network_settings.wifi_ap_settings,
-                async |status| {
-                    // Handle AP status updates here
-                    info!("AP Status: {:?}", status);
+            .start_ap(&wifi_ap_settings, async |status| {
+                // Handle AP status updates here
+                info!("AP Status: {:?}", status);
 
-                    match status {
-                        ApStatus::StartingAP => {
-                            // Set wifi ap screen with not ready state
-                            let wifi_ap_data = ScWifiApData::NotReady;
-                            set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
-                        }
-                        ApStatus::WaitingForClient => {
-                            // Set wifi ap screen with not ready state
-                            let wifi_ap_data = ScWifiApData::WaitingForClient(ScvCredentials {
-                                ssid: wifi_ap_settings.ssid.clone(),
-                                password: wifi_ap_settings.password.clone().unwrap_or_default(),
-                            });
-                            set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
-                        }
-                        ApStatus::Ready => {
-                            //net_stack.
-                            // Set wifi ap screen with not ready state
-                            let wifi_ap_data = ScWifiApData::Connected(ScvClientInfo {
-                                ip: wifi_ap_settings.ip.into(),
-                                mac: None,
-                            });
-                            set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
-                        }
+                match status {
+                    ApStatus::StartingAP => {
+                        // Set wifi ap screen with not ready state
+                        let wifi_ap_data = ScWifiApData::NotReady;
+                        set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
                     }
-                },
-            )
+                    ApStatus::WaitingForClient => {
+                        // Set wifi ap screen with not ready state
+                        debug!("Waiting for client to connect...");
+                        debug!(
+                            "AP SSID: {}, Password: {}",
+                            wifi_ap_settings.ssid,
+                            wifi_ap_settings
+                                .password
+                                .as_ref()
+                                .map(|s| s.as_str())
+                                .unwrap_or("<empty>")
+                        );
+                        let wifi_ap_data = ScWifiApData::WaitingForClient(ScvCredentials {
+                            ssid: wifi_ap_settings.ssid.clone(),
+                            password: wifi_ap_settings.password.clone().unwrap_or_default(),
+                        });
+                        set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
+                    }
+                    ApStatus::Ready((ip, mac)) => {
+                        //net_stack.
+                        // Set wifi ap screen with not ready state
+                        let wifi_ap_data =
+                            ScWifiApData::Connected(ScvClientInfo { ip, mac: Some(mac) });
+                        set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
+                    }
+                }
+            })
             .await;
         info!("AP mode done");
         Timer::after(3.s()).await;
@@ -179,6 +184,21 @@ fn generate_random_password() -> heapless::String<64> {
             (b'a' + idx - 10) as char
         } else {
             (b'A' + idx - 36) as char
+        };
+        pwd.push(c).ok();
+    }
+    pwd
+}
+
+fn generate_random_password_uppercase() -> heapless::String<64> {
+    let mut rng = RoscRng;
+    let mut pwd = heapless::String::<64>::new();
+    for _ in 0..8 {
+        let idx = (rng.next_u32() % 35) as u8;
+        let c = if idx < 9 {
+            (b'1' + idx) as char
+        } else {
+            (b'A' + idx - 9) as char
         };
         pwd.push(c).ok();
     }

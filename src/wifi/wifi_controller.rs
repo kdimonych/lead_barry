@@ -192,6 +192,7 @@ impl<'a> WiFiController<'a, IdleState> {
         join_options: JoinOptions<'_>,
     ) -> Result<WiFiController<'a, JoinedState>, (Self, Error)> {
         if let Err(error) = self.control.join(ssid, join_options).await {
+            self.control.leave().await;
             Err((self, error))
         } else {
             Ok(WiFiController {

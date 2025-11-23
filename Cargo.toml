@@ -71,6 +71,7 @@ nanofish = { path = "./nanofish" }
 # rp-pico = "0.9"
 
 # WiFi/bluetooth driver for the CYW43 chip on the Pico W
+# cyw43 = { version = "0.5", features = ["firmware-logs","defmt"] }
 cyw43 = "0.5"
 cyw43-pio = "0.8"
 # Firmware for CYW43 (Needed to include firmware binary for the CYW43 chip used in raspberry Pi Pico W)
