@@ -4,8 +4,8 @@ use defmt::*;
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
-    Error, HttpHandler, HttpRequest, HttpResponse, HttpResponseBufferRef, HttpResponseBuilder,
-    HttpServer, StatusCode,
+    Error, HttpHandler, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
+    HttpResponseBuilder, HttpServer, StatusCode,
 };
 
 use crate::configuration::{ConfigurationStorage, WiFiSettings};
@@ -58,6 +58,13 @@ impl<'a> HttpConfigHandler<'a> {
     }
 }
 
+fn trace_headers(request: &HttpRequest<'_>) {
+    debug!("Request header");
+    for header in request.headers.iter() {
+        debug!(" - : {}: {}", header.name, header.value);
+    }
+}
+
 impl<'a> HttpHandler for HttpConfigHandler<'a> {
     async fn handle_request(
         &mut self,
@@ -67,10 +74,10 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         if request.path == "/" {
             // Show main page
             debug!("Serving main configuration page");
+            //trace_headers(request);
 
-            // return HttpResponseBuilder::new(response_buffer)
-            //     .with_page(b"<h1>Hello from nanofish HTTP server!</h1>");
             return HttpResponseBuilder::new(response_buffer)
+                .with_status(StatusCode::Ok)?
                 .with_compressed_page(MAIN_CONFIGURATION_HTML_GZ);
         }
 
@@ -80,22 +87,41 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                 .with_plain_text_body("Not Found");
         };
 
-        match api {
-            "version" => {
+        if request.method == HttpMethod::OPTIONS {
+            trace_headers(request);
+        }
+
+        match (request.method, api) {
+            (HttpMethod::OPTIONS, "version") => {
+                //TODO: Implement more strict header checking
+                debug!("Serving version preflight request");
+                HttpResponseBuilder::new(response_buffer).preflight_response()
+            }
+            (HttpMethod::GET, "version") => {
                 debug!("Serving version info");
                 HttpResponseBuilder::new(response_buffer)
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body(VERSION)
             }
-            "reset" => {
-                info!("Serving reset request");
+            (HttpMethod::OPTIONS, "reset") => {
+                //TODO: Implement more strict header checking
+                debug!("Serving reset preflight request");
+                HttpResponseBuilder::new(response_buffer).preflight_response()
+            }
+            (HttpMethod::GET, "reboot") => {
+                info!("Serving reboot request");
                 reset::deferred_system_reset(self.context.spawner(), 1.s());
                 // The reset function does not return, but we provide a response for completeness
                 HttpResponseBuilder::new(response_buffer)
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body("System is resetting...")
             }
-            "wifi_config" => {
+            (HttpMethod::OPTIONS, "wifi_config") => {
+                //TODO: Implement more strict header checking
+                debug!("Serving wifi_config preflight request");
+                HttpResponseBuilder::new(response_buffer).preflight_response()
+            }
+            (HttpMethod::GET, "wifi_config") => {
                 debug!("Serving configuration request");
                 let mut wifi_settings = self
                     .context
@@ -112,8 +138,9 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
 
                 to_response(response_buffer, &wifi_settings)
             }
-            "set_wifi_config" => {
+            (HttpMethod::POST, "set_wifi_config") => {
                 debug!("Serving set configuration request");
+                //TODO: Implement data integrity checks
                 let mut wifi_settings: WiFiSettings = from_request(request)?;
                 if wifi_settings.password.is_none() {
                     // Preserve existing password if not provided

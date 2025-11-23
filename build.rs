@@ -57,6 +57,9 @@ fn compress(files: &[&str]) {
 
         std::fs::write(&output_file, compressed_data).expect("Failed to write compressed file");
         println!("cargo:warning=Compressed {} to {}", file, output_file);
+        // Force rebuild when HTML files change
+        println!("cargo:rerun-if-changed={}", file);
+        println!("cargo:rerun-if-not-exists={}", output_file);
     }
 }
 
