@@ -10,6 +10,7 @@ use embassy_time::Timer;
 
 use crate::configuration::*;
 use crate::input::*;
+use crate::reset::trigger_system_reset;
 use crate::ui::*;
 use crate::units::TimeExt as _;
 use crate::vcp_sensors::*;
@@ -42,7 +43,7 @@ pub async fn main_logic_controller(
     let net_stack = wifi_service.net_stack().await;
 
     let mut network_ready = false;
-    if !settings.network_settings.wifi_settings.ssid.is_empty() {
+    if !(settings.network_settings.wifi_settings.ssid.is_empty() || settings.fallback_ap) {
         wifi_service
             .join(&settings.network_settings.wifi_settings, async |status| {
                 // Handle join status updates here
@@ -80,6 +81,14 @@ pub async fn main_logic_controller(
                             ),
                         };
                         set_screen(ScMessage::new(msg).into()).await;
+                        Timer::after(2.s()).await;
+                        configuration_storage
+                            .modify_settings(|settings| {
+                                settings.fallback_ap = true;
+                            })
+                            .await;
+                        configuration_storage.save().await.ok();
+                        reboot_device(ui_control).await;
                     }
                 }
             })
@@ -91,6 +100,18 @@ pub async fn main_logic_controller(
 
     // If not joined, start AP mode
     if !network_ready {
+        if (settings.fallback_ap) {
+            info!("Starting in fallback AP mode as per settings");
+            configuration_storage
+                .modify_settings(|settings| {
+                    settings.fallback_ap = false;
+                })
+                .await;
+            configuration_storage.save().await.ok();
+        } else {
+            info!("Starting AP mode");
+        }
+
         let mut wifi_ap_settings = settings.network_settings.wifi_ap_settings.clone();
         // Generate_random_password
         // TODO: Maybe it is  possible to eliminate clonong here
@@ -260,4 +281,14 @@ async fn factory_reset_if_triggered(
         }
         Timer::after(3.s()).await;
     }
+}
+
+async fn reboot_device(ui_control: &UiControlType<'_>) -> ! {
+    let msg = ScMessageData {
+        title: MsgTitleString::from_str("Rebooting"),
+        message: MessageString::from_str("The device is rebooting..."),
+    };
+    ui_control.switch(ScMessage::new(msg).into()).await;
+    Timer::after(2.s()).await;
+    trigger_system_reset()
 }

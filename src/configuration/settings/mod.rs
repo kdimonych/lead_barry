@@ -16,6 +16,7 @@ pub use wifi_settings::*;
 pub struct Settings {
     pub network_settings: NetworkSettings,
     pub settings_version: u32,
+    pub fallback_ap: bool,
 }
 
 impl Settings {
@@ -23,6 +24,7 @@ impl Settings {
         Self {
             network_settings: NetworkSettings::new(),
             settings_version: 1,
+            fallback_ap: false,
         }
     }
 }
@@ -32,6 +34,7 @@ impl Default for Settings {
         Self {
             network_settings: NetworkSettings::default(),
             settings_version: 1,
+            fallback_ap: false,
         }
     }
 }
