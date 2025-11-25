@@ -25,6 +25,7 @@ categories = ["embedded", "no-std", "no-std::no-alloc"]
 cortex-m = "0.7"
 cortex-m-rt = { version = "0.7", features = ["set-sp"] }
 embedded-hal-async = "1.0"
+embedded-hal = "1.0"
 # Embedded graphics support
 embedded-graphics = "0.8"
 display-interface = { version = "0.5", features = ["defmt-03"] }
@@ -91,6 +92,13 @@ cyw43-firmware = { version = "0.1.0", features = ["bluetooth", "wifi"] }
 ssd1306 = { version = "0.10", features = ["async"] }
 ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "main", features = ["async"] }
 crc = "3.3.0"
+
+# EEPROM
+eeprom24x = "0.7.2"
+
+# RTC
+# ds323x = "0.7.0"
+ds323x = { path= "./ds323x-rs", features = ["defmt", "sync"] }
 
 # Internal workspace crates
 common = { path = "./common" }
