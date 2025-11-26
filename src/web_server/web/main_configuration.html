@@ -34,7 +34,7 @@
 
         async function get_version(){
             try {
-                const response = await fetch('http://192.168.5.104/api/version', {
+                const response = await fetch('/api/version', {
                     headers: { 'Connection': 'close', 'Cache-Control': 'no-cache' }
                 });
                 const data = await response.text();
@@ -48,7 +48,7 @@
         async function get_config()
         {
             try {
-                const response = await fetch('http://192.168.5.104/api/wifi_config', {
+                const response = await fetch('/api/wifi_config', {
                     headers: { 'Connection': 'close', 'Cache-Control': 'no-cache' }
                 });
                 const config = await response.json();
