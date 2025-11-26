@@ -1,6 +1,6 @@
 use embassy_rp::Peri;
 use embassy_rp::dma::Channel;
-use embassy_rp::peripherals::{DMA_CH0, PIN_23, PIN_24, PIN_25, PIN_29, PIO0};
+use embassy_rp::peripherals::{PIN_23, PIN_24, PIN_25, PIN_29};
 use embassy_rp::pio::Instance;
 
 pub struct WiFiConfig<PIO, DMA>

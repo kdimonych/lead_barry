@@ -88,6 +88,9 @@ pub struct WiFiDriverBuilder<Step = NoWiFiBuilderCreated> {
     step: Step,
 }
 
+pub type WiFiDriverRunner<PIO, DMA> =
+    cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO, 0, DMA>>;
+
 impl WiFiDriverBuilder<NoWiFiBuilderCreated> {
     /// Create a new WiFi service instance
     /// 'static lifetime is required for the peripherals and state
@@ -154,9 +157,7 @@ where
         wifi_runner_task: SpawnTokenBuilder,
     ) -> (WiFiController<'static, IdleState>, NetDriver<'static>)
     where
-        SpawnTokenBuilder: Fn(
-            cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO, 0, DMA>>,
-        ) -> ::embassy_executor::SpawnToken<S>,
+        SpawnTokenBuilder: Fn(WiFiDriverRunner<PIO, DMA>) -> ::embassy_executor::SpawnToken<S>,
     {
         let fw = CYW43_43439A0; // Firmware binary included in the cyw43_firmware crate;
 

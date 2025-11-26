@@ -1,12 +1,16 @@
-use core::default;
-
 use super::wifi_controller::*;
-use crate::configuration::{NetworkSettings, WiFiApSettings, WiFiSettings};
-use cyw43::NetDriver;
+use crate::{
+    configuration::{WiFiApSettings, WiFiSettings},
+    wifi::WiFiConfig,
+};
+
+use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_net::{ConfigV4, DhcpConfig, Ipv4Address, Ipv4Cidr, Stack, StackResources};
-use embassy_rp::clocks::RoscRng;
+use embassy_rp::{
+    clocks::RoscRng, gpio::Output, interrupt::typelevel::Binding, pio::InterruptHandler,
+};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use heapless::Vec;
 use leasehund::{DHCPServerBuffers, DHCPServerSocket, DhcpServer, TransactionEvent};
@@ -19,6 +23,7 @@ type WiFiServiceImplType = Mutex<NoopRawMutex, WifiServiceImpl<'static>>;
 
 static NETWORK_RESOURCES: StaticCell<StackResources<NETWORK_RESOURCES_SIZE>> = StaticCell::new();
 static WIFI_SERVICE_IMPL: StaticCell<WiFiServiceImplType> = StaticCell::new();
+static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
 
 pub enum ActiveMode {
     Idle,
@@ -41,29 +46,55 @@ pub enum ApStatus {
     Ready((Ipv4Address, [u8; 6])),
 }
 
-pub struct WiFiServiceBuilder {
-    wifi_control: WiFiController<'static, IdleState>,
-    wifi_network_driver: NetDriver<'static>,
+pub struct WiFiServiceBuilder<PIO, DMA>
+where
+    // Bounds from impl:
+    DMA: embassy_rp::dma::Channel + 'static,
+    PIO: embassy_rp::pio::Instance + 'static,
+{
+    wifi_driver_builder: WiFiDriverBuilder<WiFiBuilderCreated<PIO, DMA>>,
 }
 
-impl WiFiServiceBuilder {
+impl<PIO, DMA> WiFiServiceBuilder<PIO, DMA>
+where
+    // Bounds from impl:
+    DMA: embassy_rp::dma::Channel + 'static,
+    PIO: embassy_rp::pio::Instance + 'static,
+{
     pub fn new(
-        wifi_control: WiFiController<'static, IdleState>,
-        wifi_network_driver: NetDriver<'static>,
+        wifi_cfg: WiFiConfig<PIO, DMA>,
+        irq: impl Binding<PIO::Interrupt, InterruptHandler<PIO>>,
     ) -> Self {
         Self {
-            wifi_control,
-            wifi_network_driver,
+            wifi_driver_builder: WiFiDriverBuilder::new(wifi_cfg, irq),
         }
     }
 
-    fn take_appart(self) -> (WiFiController<'static, IdleState>, NetDriver<'static>) {
-        (self.wifi_control, self.wifi_network_driver)
+    fn take_appart(self) -> WiFiDriverBuilder<WiFiBuilderCreated<PIO, DMA>> {
+        self.wifi_driver_builder
     }
 
     #[must_use]
-    pub fn build(self, spawner: Spawner) -> WifiService {
-        let (wifi_control, wifi_network_driver) = self.take_appart();
+    pub async fn build<SpawnTokenBuilder, S>(
+        self,
+        spawner: Spawner,
+        wifi_runner_task: SpawnTokenBuilder,
+    ) -> WifiService
+    where
+        SpawnTokenBuilder: Fn(
+            cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO, 0, DMA>>,
+        ) -> ::embassy_executor::SpawnToken<S>,
+    {
+        let wifi_driver_builder = self.take_appart();
+
+        //Initialize wifi controller
+        info!("Create wifi controller");
+        let wifi_static_data = WIFI_STATIC_DATA.init(WiFiStaticData::new());
+        let (wifi_controller, wifi_network_driver) = wifi_driver_builder
+            .build(wifi_static_data, spawner, wifi_runner_task)
+            .await;
+
+        //let (wifi_control, wifi_network_driver) = self.take_appart();
         let mut rng = RoscRng;
         let seed = rng.next_u64();
 
@@ -82,7 +113,7 @@ impl WiFiServiceBuilder {
 
         // Run service routine
         let service_impl = WIFI_SERVICE_IMPL.init(Mutex::new(WifiServiceImpl::new(
-            wifi_control.into(),
+            wifi_controller.into(),
             net_stack,
         )));
 

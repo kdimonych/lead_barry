@@ -78,7 +78,6 @@ static I2C0_BUS: StaticCell<I2c0Bus> = StaticCell::new();
 static I2C1_BUS: StaticCell<I2c1Bus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
-static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
 
 struct ResourcesCore0 {
     // Owned resources
@@ -86,7 +85,7 @@ struct ResourcesCore0 {
     led_pin: Peri<'static, PIN_22>,
 
     vcp_runner: Option<VcpSensorsRunner<'static>>,
-    wifi_builder: WiFiDriverBuilder<WiFiBuilderCreated<PIO0, DMA_CH0>>,
+    wifi_service_builder: WiFiServiceBuilder<PIO0, DMA_CH0>,
 
     // Shared resources
     shared_resources: &'static SharedResources,
@@ -208,7 +207,7 @@ fn main() -> ! {
         dma_ch: p.DMA_CH0, // DMA channel
     };
 
-    let wifi_builder = WiFiDriverBuilder::new(wifi_cfg, Pio0Irqs);
+    let wifi_service_builder = WiFiServiceBuilder::new(wifi_cfg, Pio0Irqs);
 
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
         i2c0_bus,
@@ -246,7 +245,7 @@ fn main() -> ! {
                     button_controller_builder,
                     vcp_runner: Some(vcp_runner),
                     led_pin: p.PIN_22,
-                    wifi_builder,
+                    wifi_service_builder,
                     shared_resources,
                 },
             ))
@@ -260,7 +259,7 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     spawner.spawn(core_0_stack_monitor_task()).unwrap();
 
     // Spawn the LED blink task on Core 0
-    debug!("Spawn LED task on core 0");
+    info!("Spawn LED task on core 0");
     // For regular GPIO LED (if you connect an external LED to a GPIO pin)
     let led = LED_PIN.init(Output::new(resources.led_pin, Level::Low));
     spawner.spawn(led_task(led)).unwrap();
@@ -268,35 +267,32 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     // Spawn the VCP sensors task on Core 0
     if let Some(vcp_runner) = resources.vcp_runner {
         // Spawn the VCP sensors task on core 0
-        debug!("Spawn vcp sensors task on core 0");
+        info!("Spawn vcp sensors task on core 0");
         spawner.spawn(vcp_sensors_runner_task(vcp_runner)).unwrap();
     }
-
-    //Initialize wifi controller
-    info!("Create wifi controller");
-    let wifi_static_data = WIFI_STATIC_DATA.init(WiFiStaticData::new());
-    let (wifi_controller, wifi_network_driver) = resources
-        .wifi_builder
-        .build(wifi_static_data, spawner, cyw43_task)
-        .await;
 
     // Initialize button controller
     let button_controller_state = BUTTON_CONTROLLER.init(ButtonControllerState::new());
     let (button_controller, button_controller_runner) = resources
         .button_controller_builder
         .build(button_controller_state);
-    debug!("Spawn buttons controller task on core 0");
+    info!("Spawn buttons controller task on core 0");
     spawner
         .spawn(buttons_controller_task(button_controller_runner))
         .unwrap();
+
+    info!("Create wifi service");
+    let wifi_service = resources
+        .wifi_service_builder
+        .build(spawner, cyw43_task)
+        .await;
 
     //Call main logic controller
     main_logic_controller(
         spawner,
         resources.shared_resources.vcp_control,
         resources.shared_resources.ui_control,
-        wifi_controller,
-        wifi_network_driver,
+        wifi_service,
         button_controller,
         resources.shared_resources.configuration_storage,
     )
@@ -358,9 +354,7 @@ async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunner<'stati
 }
 
 #[embassy_executor::task]
-async fn cyw43_task(
-    runner: cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO0, 0, DMA_CH0>>,
-) -> ! {
+async fn cyw43_task(runner: WiFiDriverRunner<PIO0, DMA_CH0>) -> ! {
     debug!("Starting CYW43 driver task...");
     runner.run().await
 }

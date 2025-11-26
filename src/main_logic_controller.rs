@@ -22,8 +22,7 @@ pub async fn main_logic_controller(
     spawner: Spawner,
     vcp_control: &'static VcpControl<'_>,
     ui_control: &'static UiControl<'_>,
-    wifi_control: WiFiController<'static, IdleState>,
-    wifi_network_driver: NetDriver<'static>,
+    wifi_service: WifiService,
     button_controller: ButtonController<'_>,
     configuration_storage: &'static ConfigurationStorage<'static>,
 ) -> ! {
@@ -33,7 +32,6 @@ pub async fn main_logic_controller(
     let set_screen = |new_screen: ScCollection| async { ui_control.switch(new_screen).await };
     let settings = configuration_storage.get_settings().await;
 
-    let wifi_service = WiFiServiceBuilder::new(wifi_control, wifi_network_driver).build(spawner);
     let net_stack = wifi_service.net_stack().await;
 
     let mut network_ready = false;
