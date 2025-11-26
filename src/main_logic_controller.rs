@@ -11,23 +11,17 @@ use embassy_time::Timer;
 use crate::configuration::*;
 use crate::input::*;
 use crate::reset::trigger_system_reset;
+use crate::shared_resources::*;
 use crate::ui::*;
 use crate::units::TimeExt as _;
 use crate::vcp_sensors::*;
 use crate::web_server::HttpConfigServer;
 use crate::wifi::*;
 
-// TODO: Move to separate module
-// DHCP server
-pub const VCP_SENSORS_EVENT_QUEUE_SIZE: usize = 8;
-
-pub type VcpControlType<'a> = VcpControl<'a, VCP_SENSORS_EVENT_QUEUE_SIZE>;
-pub type UiControlType<'a> = UiControl<'a, ScCollection>;
-
 pub async fn main_logic_controller(
     spawner: Spawner,
-    vcp_control: &'static VcpControlType<'_>,
-    ui_control: &'static UiControlType<'_>,
+    vcp_control: &'static VcpControl<'_>,
+    ui_control: &'static UiControl<'_>,
     wifi_control: WiFiController<'static, IdleState>,
     wifi_network_driver: NetDriver<'static>,
     button_controller: ButtonController<'_>,
@@ -245,7 +239,7 @@ async fn net_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'sta
 
 async fn factory_reset_if_triggered(
     button_controller: ButtonController<'_>,
-    ui_control: &UiControlType<'_>,
+    ui_control: &UiControl<'_>,
     configuration_storage: &'static ConfigurationStorage<'static>,
 ) {
     let y_state = button_controller
@@ -283,7 +277,7 @@ async fn factory_reset_if_triggered(
     }
 }
 
-async fn reboot_device(ui_control: &UiControlType<'_>) -> ! {
+async fn reboot_device(ui_control: &UiControl<'_>) -> ! {
     let msg = ScMessageData {
         title: MsgTitleString::from_str("Rebooting"),
         message: MessageString::from_str("The device is rebooting..."),

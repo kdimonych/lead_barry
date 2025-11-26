@@ -1,7 +1,7 @@
+use super::flash_storage::*;
 use super::settings::*;
 #[cfg(feature_use_static_ip_config)]
 use crate::configuration::settings;
-use crate::flash_storage::*;
 use crc::{CRC_32_ISCSI, Crc};
 use defmt::*;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};

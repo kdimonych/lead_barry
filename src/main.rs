@@ -6,10 +6,12 @@
 #![allow(async_fn_in_trait)]
 
 mod configuration;
-mod flash_storage;
+mod global_types;
 mod input;
 mod main_logic_controller;
 mod reset;
+mod rtc;
+mod shared_resources;
 mod ui;
 mod units;
 mod vcp_sensors;
@@ -20,7 +22,7 @@ use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
-use embassy_rp::peripherals::{DMA_CH0, PIO0};
+use embassy_rp::peripherals::{DMA_CH0, I2C1, PIO0};
 use embassy_rp::pio::InterruptHandler as PioInterruptHandler;
 use embassy_rp::{
     Peri, bind_interrupts,
@@ -31,14 +33,14 @@ use embassy_rp::{
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
-
 use static_cell::StaticCell;
 
-use crate::configuration::{ConfigurationStorage, ConfigurationStorageBuilder};
+use crate::configuration::{ConfigurationStorageBuilder, Storage};
 use crate::units::{FrequencyExt, TimeExt};
-use flash_storage::*;
+use global_types::*;
 use input::*;
 use main_logic_controller::*;
+use shared_resources::*;
 use ui::*;
 use vcp_sensors::*;
 use wifi::*;
@@ -48,62 +50,42 @@ use {defmt_rtt as _, panic_probe as _};
 
 // Constants
 const CORE1_STACK_SIZE: usize = 4096 * 4;
-const VCP_SENSORS_EVENT_QUEUE_SIZE: usize = 8;
-
-// Global types
-type I2cBus = Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>>;
-type I2cDeviceType<'a> = I2cDevice<'a, CriticalSectionRawMutex, I2c<'a, I2C0, i2c::Async>>;
-type UiRunnerType<'a> =
-    UiRunner<'a, I2cDeviceType<'a>, ssd1306::size::DisplaySize128x64, ScCollection>;
-type UiControlType<'a> = UiControl<'a, ScCollection>;
-type VcpSensorsRunnerType<'a> =
-    VcpSensorsRunner<'a, I2cDeviceType<'a>, VCP_SENSORS_EVENT_QUEUE_SIZE>;
 
 // Interrupt handlers
 bind_interrupts!(struct I2c0Irqs {
     I2C0_IRQ => I2cInterruptHandler<I2C0>;
 });
 
+bind_interrupts!(struct I2c1Irqs {
+    I2C1_IRQ => I2cInterruptHandler<I2C1>;
+});
+
 bind_interrupts!(struct Pio0Irqs {
     PIO0_IRQ_0 => PioInterruptHandler<PIO0>;
 });
-
-// Shared interfaces
-
-struct SharedResources {
-    i2c_bus: &'static I2cBus,
-    ui_control: &'static UiControlType<'static>,
-    vcp_control: &'static VcpControlType<'static>,
-    configuration_storage: &'static ConfigurationStorage<'static>,
-}
 
 // Static resources
 static BUTTON_CONTROLLER: StaticCell<ButtonControllerState> = StaticCell::new();
 static CORE1_STACK: StaticCell<Stack<CORE1_STACK_SIZE>> = StaticCell::new();
 static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
-static UI_SHARED_STATE: StaticCell<UiSharedState<ScCollection>> = StaticCell::new();
-static UI_CONTROL: StaticCell<UiControlType> = StaticCell::new();
+static UI_SHARED_STATE: StaticCell<UiSharedState> = StaticCell::new();
+static UI_CONTROL: StaticCell<UiControl> = StaticCell::new();
 static VCP_SENSORS_STATE: StaticCell<VcpSensorsState<VCP_SENSORS_EVENT_QUEUE_SIZE>> =
     StaticCell::new();
-static VCP_SENSORS_CONTROL: StaticCell<VcpControlType> = StaticCell::new();
-static I2C_BUS: StaticCell<I2cBus> = StaticCell::new();
+static VCP_SENSORS_CONTROL: StaticCell<VcpControl> = StaticCell::new();
+static I2C0_BUS: StaticCell<I2c0Bus> = StaticCell::new();
+static I2C1_BUS: StaticCell<I2c1Bus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
 static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
 
-// Global data models
-// Voltage reading model
-type VoltageReading = DataModel<f32>;
-static VOLTAGE_READING_MODEL: StaticCell<VoltageReading> = StaticCell::new();
-
 struct ResourcesCore0 {
     // Owned resources
     button_controller_builder: ButtonControllerBuilder,
-    voltage_reading: &'static VoltageReading,
     led_pin: Peri<'static, PIN_22>,
 
-    vcp_runner: Option<VcpSensorsRunnerType<'static>>,
+    vcp_runner: Option<VcpSensorsRunner<'static>>,
     wifi_builder: WiFiDriverBuilder<WiFiBuilderCreated<PIO0, DMA_CH0>>,
 
     // Shared resources
@@ -112,12 +94,9 @@ struct ResourcesCore0 {
 
 struct ResourcesCore1 {
     // Owned resources
-    ui_runner: Option<UiRunnerType<'static>>,
+    ui_runner: Option<UiRunner<'static>>,
     core1_stack_base: usize,
     core1_stack_end: usize,
-
-    // Shared resources
-    shared_resources: &'static SharedResources,
 }
 
 fn log_system_frequencies() {
@@ -167,7 +146,7 @@ fn debug_memory_layout() {
 fn main() -> ! {
     debug_memory_layout();
 
-    let p = embassy_rp::init(Default::default());
+    let p: embassy_rp::Peripherals = embassy_rp::init(Default::default());
 
     log_system_frequencies();
 
@@ -181,38 +160,44 @@ fn main() -> ! {
     let configuration_storage_builder = ConfigurationStorageBuilder::new(storage);
     let configuration_storage = configuration_storage_builder.build();
 
-    // Setup I2C with standard frequency for sensors
-    let mut i2c_cfg = i2c::Config::default();
-    i2c_cfg.frequency = 1.mhz(); // Fast I2C for better performance
-    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, I2c0Irqs, i2c_cfg);
+    // Setup I2C0 with standard frequency for sensors
+    let mut i2c0_cfg = i2c::Config::default();
+    i2c0_cfg.frequency = 1.mhz(); // Fast I2C clk for better performance
+    let i2c0 = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, I2c0Irqs, i2c0_cfg);
+    let i2c0_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
+        I2C0_BUS.init(Mutex::new(i2c0));
 
-    let i2c_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
-        I2C_BUS.init(Mutex::new(i2c));
+    // Setup I2C1 with standard frequency for sensors
+    let mut i2c1_cfg = i2c::Config::default();
+    i2c1_cfg.frequency = 400.khz(); // Fast I2C clk for better performance
+    let i2c1 = I2c::new_async(p.I2C1, p.PIN_15, p.PIN_14, I2c1Irqs, i2c1_cfg);
+    let i2c1_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C1, i2c::Async>> =
+        I2C1_BUS.init(Mutex::new(i2c1));
 
     // Initialize the stack
     let core1_stack = CORE1_STACK.init_with(Stack::new);
     let core1_stack_base = core1_stack.mem.as_ptr() as usize;
     let core1_stack_end = core1_stack_base + core1_stack.mem.len();
 
-    // Initialize global data models
-    let voltage_reading: &'static VoltageReading = VOLTAGE_READING_MODEL.init(DataModel::new(0.0));
-
     // Initialize the ui
     let ui_shared_state = UiSharedState::new();
     let state_ref = UI_SHARED_STATE.init(ui_shared_state);
     let (ui_control, ui_runner) = UiInterface::new(
-        I2cDevice::new(i2c_bus),
+        I2cDevice::new(i2c0_bus),
         ssd1306::size::DisplaySize128x64,
         state_ref,
         Some(ScWelcome::new().into()),
     );
-    let ui_control: &'static UiControlType = UI_CONTROL.init(ui_control);
+    let ui_control: &'static UiControl = UI_CONTROL.init(ui_control);
 
     // Initialize the VCP sensors
     let vcp_state_ref = VCP_SENSORS_STATE.init_with(VcpSensorsState::new);
-    let (vcp_runner, vcp_control) =
-        VcpSensorsService::new(I2cDevice::new(i2c_bus), vcp_state_ref, VcpConfig::default());
-    let vcp_control: &'static VcpControlType = VCP_SENSORS_CONTROL.init(vcp_control);
+    let (vcp_runner, vcp_control) = VcpSensorsService::new(
+        I2cDevice::new(i2c0_bus),
+        vcp_state_ref,
+        VcpConfig::default(),
+    );
+    let vcp_control: &'static VcpControl = VCP_SENSORS_CONTROL.init(vcp_control);
 
     let wifi_cfg = WiFiConfig::<PIO0, DMA_CH0> {
         pwr_pin: p.PIN_23, // Power pin, pin 23
@@ -226,7 +211,8 @@ fn main() -> ! {
     let wifi_builder = WiFiDriverBuilder::new(wifi_cfg, Pio0Irqs);
 
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
-        i2c_bus,
+        i2c0_bus,
+        i2c1_bus,
         ui_control,
         vcp_control,
         configuration_storage,
@@ -244,7 +230,6 @@ fn main() -> ! {
                         ui_runner: Some(ui_runner),
                         core1_stack_base,
                         core1_stack_end,
-                        shared_resources,
                     },
                 ))
                 .unwrap();
@@ -261,7 +246,6 @@ fn main() -> ! {
                     button_controller_builder,
                     vcp_runner: Some(vcp_runner),
                     led_pin: p.PIN_22,
-                    voltage_reading,
                     wifi_builder,
                     shared_resources,
                 },
@@ -362,13 +346,13 @@ async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
 }
 
 #[embassy_executor::task]
-async fn display_runner_task(mut ui_runner: UiRunnerType<'static>) -> ! {
+async fn display_runner_task(mut ui_runner: UiRunner<'static>) -> ! {
     debug!("Starting display task...");
     ui_runner.run().await;
 }
 
 #[embassy_executor::task]
-async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunnerType<'static>) -> ! {
+async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunner<'static>) -> ! {
     debug!("Starting VCP sensors task...");
     vcp_sensors_runner.run().await;
 }
@@ -436,56 +420,5 @@ async fn core_1_stack_monitor_task(core1_stack_base: usize, core1_stack_end: usi
 
         // Your task work here
         embassy_time::Timer::after(Duration::from_millis(3000)).await;
-    }
-}
-
-#[embassy_executor::task]
-async fn precise_sensor_task() {
-    use embassy_time::{Duration, Instant, Ticker};
-
-    // Create a precise 100Hz ticker for sensor readings
-    let mut sensor_ticker = Ticker::every(Duration::from_millis(10));
-    let mut counter = 0u32;
-    let mut max_jitter = Duration::from_micros(0);
-    let mut last_time = Instant::now();
-
-    info!("Starting precise sensor task at 100Hz");
-
-    loop {
-        sensor_ticker.next().await;
-
-        let now = Instant::now();
-        let elapsed = now.duration_since(last_time);
-        let expected = Duration::from_millis(10);
-
-        // Measure timing jitter
-        let jitter = if elapsed > expected {
-            elapsed - expected
-        } else {
-            expected - elapsed
-        };
-
-        if jitter > max_jitter {
-            max_jitter = jitter;
-        }
-
-        counter += 1;
-
-        // Simulate precise sensor work
-        let work_start = Instant::now();
-        let work_duration = Instant::now().duration_since(work_start);
-
-        // Log performance every 1000 iterations (10 seconds)
-        if counter.is_multiple_of(1000) {
-            info!(
-                "Sensor task: {} cycles, max jitter: {}μs, last work: {}μs",
-                counter,
-                max_jitter.as_micros(),
-                work_duration.as_micros()
-            );
-            max_jitter = Duration::from_micros(0); // Reset max jitter
-        }
-
-        last_time = now;
     }
 }
