@@ -30,7 +30,7 @@ use embassy_rp::{
     peripherals::{I2C0, PIN_22},
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Ticker};
 
 use static_cell::StaticCell;
 
@@ -39,7 +39,6 @@ use crate::units::{FrequencyExt, TimeExt};
 use flash_storage::*;
 use input::*;
 use main_logic_controller::*;
-use micromath::F32Ext;
 use ui::*;
 use vcp_sensors::*;
 use wifi::*;
