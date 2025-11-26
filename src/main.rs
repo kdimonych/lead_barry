@@ -9,8 +9,6 @@ mod configuration;
 mod flash_storage;
 mod input;
 mod main_logic_controller;
-mod matrix_ops;
-mod precise_timing;
 mod reset;
 mod ui;
 mod units;
@@ -228,15 +226,6 @@ fn main() -> ! {
 
     let wifi_builder = WiFiDriverBuilder::new(wifi_cfg, Pio0Irqs);
 
-    // wifi_config
-    //     .wifi_network
-    //     .push_str(env!("WIFI_SSID"))
-    //     .unwrap();
-    // wifi_config
-    //     .wifi_password
-    //     .push_str(env!("WIFI_PASSWORD"))
-    //     .unwrap();
-
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
         i2c_bus,
         ui_control,
@@ -280,43 +269,6 @@ fn main() -> ! {
             ))
             .unwrap();
     });
-}
-
-#[embassy_executor::task]
-async fn screen_iterate_task(
-    ui_control: &'static UiControlType<'static>,
-    vcp_control: &'static VcpControlType<'static>,
-    voltage_reading: &'static VoltageReading,
-) -> ! {
-    debug!("Starting screen iteration task...");
-    //let mut ticker = Ticker::every(100.ms());
-
-    vcp_control.disable_channel(1).await;
-    vcp_control.disable_channel(2).await;
-
-    ui_control
-        .switch(ScCollection::Vcp(ScVcp::new(
-            voltage_reading,
-            ScvBaseUnits::Volts,
-        )))
-        .await;
-
-    loop {
-        let event: VcpSensorsEvents = vcp_control.receive_event().await;
-        match event {
-            VcpSensorsEvents::Reading(reading) => {
-                trace!("Reading: {}", reading);
-                if reading.channel == 0 {
-                    let mut voltage = voltage_reading.lock().await;
-                    *voltage = reading.voltage.value();
-                }
-            }
-            VcpSensorsEvents::Error(description) => {
-                error!("VCP Event: Error: {}", description);
-            }
-        }
-        //ticker.next().await;
-    }
 }
 
 #[embassy_executor::task]
@@ -371,7 +323,7 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
 #[embassy_executor::task]
 async fn buttons_controller_task(button_controller_runner: ButtonControllerRunner<'static>) -> ! {
     debug!("Starting buttons controller task...");
-    button_controller_runner.run().await;
+    button_controller_runner.run().await
 }
 
 #[embassy_executor::task]
@@ -536,66 +488,5 @@ async fn precise_sensor_task() {
         }
 
         last_time = now;
-    }
-}
-
-#[embassy_executor::task]
-async fn matrix_operations_task() {
-    use matrix_ops::*;
-
-    info!("Starting matrix operations demonstration...");
-
-    // Run the matrix operations demo
-    demo_matrix_operations();
-
-    // Continuous matrix operations for real-time applications
-    let mut angle = 0.0f32;
-    let mut angle_deg = 0i32;
-    let mut filter = KalmanFilter::new(0.0, 1.0, 0.01, 0.1);
-
-    loop {
-        // Rotate a point around origin
-        let rotation_matrix = MatrixOps::rotation_2d(angle);
-        let point = Point2D::new(1.0, 0.0);
-        let rotated = MatrixOps::transform_point_2d(&rotation_matrix, point);
-
-        // Simulate sensor data with noise
-        let simulated_sensor = (angle * 2.0).sin() + 0.1 * (angle * 10.0).sin();
-
-        // Apply Kalman filtering
-        filter.predict();
-        filter.update(simulated_sensor);
-
-        {
-            let rotated_x = (rotated.x * 100.0) as i32; // Convert to fixed point for display
-            let rotated_y = (rotated.y * 100.0) as i32;
-            let sensor_raw = (simulated_sensor * 1000.0) as i32;
-            let sensor_filtered = (filter.estimate() * 1000.0) as i32;
-
-            info!(
-                "Angle: {}°, Rotated point: ({}.{:02}, {}.{:02})",
-                angle_deg,
-                rotated_x / 100,
-                rotated_x.abs() % 100,
-                rotated_y / 100,
-                rotated_y.abs() % 100
-            );
-            info!(
-                "Raw sensor: {}.{:03}, Filtered: {}.{:03}",
-                sensor_raw / 1000,
-                sensor_raw.abs() % 1000,
-                sensor_filtered / 1000,
-                sensor_filtered.abs() % 1000
-            );
-        }
-
-        angle += 0.1;
-        if angle > core::f32::consts::TAU {
-            // 2π
-            angle = 0.0;
-        }
-        angle_deg = (angle * 180.0 / core::f32::consts::PI) as i32;
-
-        Timer::after(Duration::from_millis(500)).await;
     }
 }

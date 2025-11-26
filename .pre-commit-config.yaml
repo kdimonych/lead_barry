@@ -6,7 +6,7 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt
-        entry: cargo fmt --
+        entry: cargo fmt -- --config edition=2024
         language: system
         types: [rust]
       # - id: cargo-clippy

@@ -3,7 +3,8 @@ members = [
     ".",
     "nanofish",
     "leasehund",
-    "common"
+    "common",
+    "ds323x-rs"
 ]
 
 [package]
