@@ -1,4 +1,5 @@
 mod http_server_context;
+use core::fmt::Debug;
 
 use defmt::*;
 use embassy_executor::Spawner;
@@ -9,6 +10,8 @@ use nanofish::{
 };
 
 use crate::configuration::{ConfigurationStorage, WiFiSettings};
+use crate::rtc::*;
+use crate::shared_resources::SharedResources;
 use crate::{reset, units::TimeExt as _};
 use http_server_context::HttpServerContext;
 
@@ -29,13 +32,10 @@ pub struct HttpConfigServer {
 }
 
 impl HttpConfigServer {
-    pub fn new(
-        spawner: Spawner,
-        configuration_storage: &'static ConfigurationStorage<'static>,
-    ) -> Self {
+    pub fn new(spawner: Spawner, shared: &'static SharedResources) -> Self {
         let http_server = HttpServer::new(80);
         Self {
-            context: HttpServerContext::new(spawner, configuration_storage),
+            context: HttpServerContext::new(spawner, shared),
             http_server,
         }
     }
@@ -171,6 +171,32 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                     }
                 }
             }
+
+            (HttpMethod::OPTIONS, "date_time") => {
+                //TODO: Implement more strict header checking
+                debug!("Serving date_time preflight request");
+                HttpResponseBuilder::new(response_buffer).preflight_response()
+            }
+            (HttpMethod::GET, "date_time") => {
+                debug!("Serving date_time request");
+
+                let mut rtc = self.context.rtc().lock().await;
+                let datetime = rtc.datetime().await.map_err(|e| {
+                    error!("RTC datetime read error: {}", e);
+                    Error::NoResponse
+                })?;
+
+                let mut date_time_str = heapless::String::<64>::new();
+
+                //ISO 8601 format could be used as well
+                //"1995-12-17T03:24:00Z"
+                core::fmt::write(&mut date_time_str, format_args!("{}", datetime))
+                    .map_err(|_| Error::NoResponse)?;
+                HttpResponseBuilder::new(response_buffer)
+                    .with_status(StatusCode::Ok)?
+                    .with_plain_text_body(&date_time_str)
+            }
+
             _ => HttpResponseBuilder::new(response_buffer)
                 .with_status(StatusCode::NotFound)?
                 .with_plain_text_body("Not Found"),

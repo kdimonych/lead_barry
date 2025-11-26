@@ -220,6 +220,10 @@ where
             }
         }
     }
+
+    pub fn flush(&self) {
+        while self.receiver.try_receive().is_ok() {}
+    }
 }
 
 pub struct ButtonControllerBuilder<const INPUTS: usize, AliasType = u8> {

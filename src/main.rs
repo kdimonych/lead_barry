@@ -36,6 +36,7 @@ use embassy_time::{Duration, Ticker};
 use static_cell::StaticCell;
 
 use crate::configuration::{ConfigurationStorageBuilder, Storage};
+use crate::rtc::RtcDs3231Ref;
 use crate::units::{FrequencyExt, TimeExt};
 use global_types::*;
 use input::*;
@@ -78,6 +79,7 @@ static I2C0_BUS: StaticCell<I2c0Bus> = StaticCell::new();
 static I2C1_BUS: StaticCell<I2c1Bus> = StaticCell::new();
 static LED_PIN: StaticCell<Output> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
+static RTC_DS3231: StaticCell<RtcDs3231Ref<I2c1Device<'static>>> = StaticCell::new();
 
 struct ResourcesCore0 {
     // Owned resources
@@ -209,9 +211,14 @@ fn main() -> ! {
 
     let wifi_service_builder = WiFiServiceBuilder::new(wifi_cfg, Pio0Irqs);
 
+    // Initialize the RTC DS3231
+    let rtc_ds3231 = rtc::create_rtc_ds3231(I2cDevice::new(i2c1_bus));
+    let rtc_ds3231_ref: &'static RtcDs3231Ref<I2c1Device<'static>> = RTC_DS3231.init(rtc_ds3231);
+
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
         i2c0_bus,
         i2c1_bus,
+        rtc: rtc_ds3231_ref,
         ui_control,
         vcp_control,
         configuration_storage,
@@ -290,11 +297,9 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     //Call main logic controller
     main_logic_controller(
         spawner,
-        resources.shared_resources.vcp_control,
-        resources.shared_resources.ui_control,
+        resources.shared_resources,
         wifi_service,
         button_controller,
-        resources.shared_resources.configuration_storage,
     )
     .await;
 }

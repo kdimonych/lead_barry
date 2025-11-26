@@ -1,21 +1,18 @@
 use embassy_executor::Spawner;
 
-use crate::configuration::ConfigurationStorage;
+use crate::{
+    configuration::ConfigurationStorage, global_types::I2c1Device, rtc::RtcDs3231Ref,
+    shared_resources::SharedResources,
+};
 
 pub struct HttpServerContext {
     spawner: Spawner,
-    configuration_storage: &'static ConfigurationStorage<'static>,
+    shared: &'static SharedResources,
 }
 
 impl HttpServerContext {
-    pub fn new(
-        spawner: Spawner,
-        configuration_storage: &'static ConfigurationStorage<'static>,
-    ) -> Self {
-        Self {
-            spawner,
-            configuration_storage,
-        }
+    pub fn new(spawner: Spawner, shared: &'static SharedResources) -> Self {
+        Self { spawner, shared }
     }
 
     #[inline(always)]
@@ -25,6 +22,10 @@ impl HttpServerContext {
 
     #[inline(always)]
     pub const fn configuration_storage(&self) -> &'static ConfigurationStorage<'static> {
-        self.configuration_storage
+        self.shared.configuration_storage
+    }
+
+    pub const fn rtc(&self) -> &'static RtcDs3231Ref<I2c1Device<'static>> {
+        self.shared.rtc
     }
 }
