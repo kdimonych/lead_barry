@@ -1,4 +1,5 @@
 mod config;
+mod dhcp_server;
 mod wifi_control_state;
 mod wifi_controller;
 mod wifi_service;

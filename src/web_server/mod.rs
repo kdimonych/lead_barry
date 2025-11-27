@@ -1,5 +1,4 @@
 mod http_server_context;
-use core::fmt::Debug;
 
 use defmt::*;
 use embassy_executor::Spawner;

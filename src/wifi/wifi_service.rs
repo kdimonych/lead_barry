@@ -1,9 +1,10 @@
 use super::wifi_controller::*;
 use crate::{
     configuration::{WiFiApSettings, WiFiSettings},
-    wifi::WiFiConfig,
+    wifi::{WiFiConfig, dhcp_server::DhcpEvent},
 };
 
+use super::dhcp_server::{DhcpServer, DhcpServerConfig, DhcpServerState};
 use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_executor::Spawner;
@@ -13,7 +14,6 @@ use embassy_rp::{
 };
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use heapless::Vec;
-use leasehund::{DHCPServerBuffers, DHCPServerSocket, DhcpServer, TransactionEvent};
 use static_cell::StaticCell;
 
 const NETWORK_RESOURCES_SIZE: usize = 20;
@@ -24,6 +24,7 @@ type WiFiServiceImplType = Mutex<NoopRawMutex, WifiServiceImpl<'static>>;
 static NETWORK_RESOURCES: StaticCell<StackResources<NETWORK_RESOURCES_SIZE>> = StaticCell::new();
 static WIFI_SERVICE_IMPL: StaticCell<WiFiServiceImplType> = StaticCell::new();
 static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
+static DHCP_SERVER_STATE: StaticCell<DhcpServerState> = StaticCell::new();
 
 pub enum ActiveMode {
     Idle,
@@ -111,10 +112,16 @@ where
         info!("Spawn network driver task");
         spawner.spawn(net_driver_task(runner)).unwrap();
 
+        // Initialize DHCP server state
+        let dhcp_server_state = DHCP_SERVER_STATE.init(DhcpServerState::new());
+        let dhcp_server = DhcpServer::new(dhcp_server_state).await;
+
         // Run service routine
         let service_impl = WIFI_SERVICE_IMPL.init(Mutex::new(WifiServiceImpl::new(
             wifi_controller.into(),
             net_stack,
+            dhcp_server,
+            spawner,
         )));
 
         WifiService { service_impl }
@@ -216,8 +223,9 @@ trait WiFiServiceImplementation<'a> {
 
 struct WifiServiceImpl<'a> {
     wifi_control: WiFiCtrlState<'a>,
-    net_stack: Stack<'a>,
-    dhcp_server: Option<DhcpServer<2, 2>>,
+    net_stack: Stack<'static>,
+    dhcp_server: DhcpServer,
+    spawner: Spawner,
 }
 
 impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
@@ -227,7 +235,7 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
 
     async fn idle(&mut self) {
         // Disable DHCP server in idle mode
-        self.reset_dhcp_server();
+        self.reset_dhcp_server().await;
 
         self.wifi_control
             .change_async(async |state| Self::idle_transition(state, self.net_stack).await)
@@ -239,7 +247,7 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
         H: AsyncFnMut(JoiningStatus) -> (),
     {
         // No DHCP server in client mode
-        self.reset_dhcp_server();
+        self.reset_dhcp_server().await;
 
         join_status_handler(JoiningStatus::JoiningAP).await;
 
@@ -263,7 +271,7 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
             .await;
 
         // Initialize DHCP server for AP mode
-        self.init_dhcp_server();
+        self.init_dhcp_server().await;
 
         wifi_state_handler(ApStatus::WaitingForClient).await;
         // Wait for a client to connect and get an IP address
@@ -284,11 +292,17 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
 }
 
 impl<'a> WifiServiceImpl<'a> {
-    fn new(wifi_control: WiFiCtrlState<'static>, net_stack: Stack<'a>) -> Self {
+    fn new(
+        wifi_control: WiFiCtrlState<'static>,
+        net_stack: Stack<'static>,
+        dhcp_server: DhcpServer,
+        spawner: Spawner,
+    ) -> Self {
         Self {
             wifi_control,
             net_stack,
-            dhcp_server: None,
+            dhcp_server,
+            spawner,
         }
     }
 
@@ -470,57 +484,38 @@ impl<'a> WifiServiceImpl<'a> {
         controller_state
     }
 
-    fn reset_dhcp_server(&mut self) {
-        self.dhcp_server = None;
+    async fn reset_dhcp_server(&mut self) {
+        self.dhcp_server.stop().await;
     }
 
-    fn init_dhcp_server(&mut self) {
+    async fn init_dhcp_server(&mut self) {
         if let Some(config) = self.net_stack.config_v4() {
-            let adr: Ipv4Cidr = config.address;
-            let adr_oct = adr.address().octets();
+            let adr_oct = config.address.address().octets();
             let start = Ipv4Address::new(adr_oct[0], adr_oct[1], adr_oct[2], adr_oct[3] + 122);
             let end = Ipv4Address::new(adr_oct[0], adr_oct[1], adr_oct[2], 255);
-            let server: DhcpServer<2, 2> = DhcpServer::new(
-                adr.address(),            // Server IP
-                adr.netmask(),            // Subnet mask
-                adr.address(),            // Gateway
-                Ipv4Address::UNSPECIFIED, // DNS server
-                start,                    // Pool start
-                end,                      // Pool end
+
+            let dhcp_config = DhcpServerConfig::new(
+                config.address.address(),
+                config.address.netmask(),
+                config.address.address(),
+                start,
+                end,
             );
-            self.dhcp_server = Some(server);
+            self.dhcp_server
+                .start(self.spawner, self.net_stack, dhcp_config)
+                .await;
         } else {
             error!("Cannot init DHCP server, no valid network config");
-            self.reset_dhcp_server();
+            self.reset_dhcp_server().await;
         }
     }
 
     async fn wait_for_dhcp_client(&mut self) -> Result<(Ipv4Address, [u8; 6]), ()> {
-        let mut buffers = DHCPServerBuffers::new();
-        let mut socket = DHCPServerSocket::new(self.net_stack, &mut buffers);
-
-        let dhcp_server = self.dhcp_server.as_mut().ok_or(())?;
-
         loop {
-            if dhcp_server.is_pool_full() {
-                // In case there is no free IP addresses, we cannot lease any more.
-                // Just stop the process.
-                error!("No free ip-addresses for leasing");
-                // Yeald to other tasks before returning
-                embassy_futures::yield_now().await;
-            }
-
-            match dhcp_server.lease_one(&mut socket).await {
-                Ok(TransactionEvent::Leased(ip, mac)) => {
-                    info!("Leased IP: {} for MAC: {}", ip, mac);
-                    // Wait a bit before returning to let the stack send the ACK packet
-                    return Ok((ip, mac));
-                }
-                Err(e) => {
-                    error!("DHCP server error: {:?}", e);
-                    embassy_futures::yield_now().await;
-                }
-                _ => { /* Unsupported events, continue waiting */ }
+            match self.dhcp_server.wait_event().await {
+                Some(DhcpEvent::Lease(ip, mac)) => return Ok((ip, mac)),
+                Some(DhcpEvent::Release(_, _)) => { /* Ignore release events */ }
+                _ => return Err(()),
             }
         }
     }
