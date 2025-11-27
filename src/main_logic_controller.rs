@@ -50,6 +50,11 @@ pub async fn main_logic_controller(
     // Flush button events to avoid misdetection after long operations
     button_controller.flush();
 
+    debug!(
+        "WiFi Configured: {}, Fallback AP: {}, Force AP: {}, Using AP mode: {}",
+        is_wifi_configured, is_fallback_ap_set, is_force_ap_mode_triggered, use_ap_mode
+    );
+
     if !use_ap_mode {
         wifi_service
             .join(&settings.network_settings.wifi_settings, async |status| {

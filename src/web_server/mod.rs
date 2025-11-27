@@ -1,5 +1,7 @@
 mod http_server_context;
 
+use core::str::FromStr;
+
 use defmt::*;
 use embassy_executor::Spawner;
 use embassy_net::Stack;
@@ -91,9 +93,9 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         }
 
         match (request.method, api) {
-            (HttpMethod::OPTIONS, "version") => {
+            (HttpMethod::OPTIONS, command) => {
                 //TODO: Implement more strict header checking
-                debug!("Serving version preflight request");
+                debug!("Serving {} preflight request", command);
                 HttpResponseBuilder::new(response_buffer).preflight_response()
             }
             (HttpMethod::GET, "version") => {
@@ -102,11 +104,6 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body(VERSION)
             }
-            (HttpMethod::OPTIONS, "reset") => {
-                //TODO: Implement more strict header checking
-                debug!("Serving reset preflight request");
-                HttpResponseBuilder::new(response_buffer).preflight_response()
-            }
             (HttpMethod::GET, "reboot") => {
                 info!("Serving reboot request");
                 reset::deferred_system_reset(self.context.spawner(), 1.s());
@@ -114,11 +111,6 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                 HttpResponseBuilder::new(response_buffer)
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body("System is resetting...")
-            }
-            (HttpMethod::OPTIONS, "wifi_config") => {
-                //TODO: Implement more strict header checking
-                debug!("Serving wifi_config preflight request");
-                HttpResponseBuilder::new(response_buffer).preflight_response()
             }
             (HttpMethod::GET, "wifi_config") => {
                 debug!("Serving configuration request");
@@ -170,12 +162,6 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                     }
                 }
             }
-
-            (HttpMethod::OPTIONS, "date_time") => {
-                //TODO: Implement more strict header checking
-                debug!("Serving date_time preflight request");
-                HttpResponseBuilder::new(response_buffer).preflight_response()
-            }
             (HttpMethod::GET, "date_time") => {
                 debug!("Serving date_time request");
 
@@ -194,6 +180,28 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                 HttpResponseBuilder::new(response_buffer)
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body(&date_time_str)
+            }
+
+            (HttpMethod::POST, "set_date_time") => {
+                debug!("Serving set_date_time request");
+                let date_time_str = core::str::from_utf8(request.body).map_err(|_| {
+                    error!("Invalid UTF-8 in request body");
+                    Error::NoResponse
+                })?;
+                let date_time = NaiveDateTime::from_str(date_time_str).map_err(|_| {
+                    error!("Invalid date time format: {}", date_time_str);
+                    Error::NoResponse
+                })?;
+
+                let mut rtc = self.context.rtc().lock().await;
+                rtc.set_datetime(&date_time).await.map_err(|e| {
+                    error!("RTC datetime set error: {}", e);
+                    Error::NoResponse
+                })?;
+
+                HttpResponseBuilder::new(response_buffer)
+                    .with_status(StatusCode::Ok)?
+                    .with_plain_text_body("Date and time updated")
             }
 
             _ => HttpResponseBuilder::new(response_buffer)

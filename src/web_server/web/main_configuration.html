@@ -6,6 +6,16 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         input, button { padding: 10px; margin: 5px; font-size: 16px; }
+        input[type="datetime-local"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .divider {
+            border-top: 1px solid #ccc;
+            margin: 20px 0;
+        }
         button { background: #4CAF50; color: white; border: none; cursor: pointer; }
         .result { margin-top: 20px; padding: 10px; background: #f0f0f0; }
     </style>
@@ -13,12 +23,19 @@
 <body>
     <h1>Device Configuration</h1>
 
+    <div class="divider"></div>
     <label>WiFi SSID:</label><br>
     <input type="text" id="ssid" placeholder="Enter WiFi SSID"><br>
 
     <label>Password:</label><br>
     <input type="password" id="password" placeholder="Enter password"><br>
 
+    <div class="divider"></div>
+    <label>Date And Time:</label><br>
+
+    <input type="datetime-local" id="date_time">
+
+    <div class="divider"></div>
     <button onclick="sendConfig()">Save Configuration</button>
     <button onclick="sendConfigAndReboot()">Save Configuration and Reboot</button>
 
@@ -26,10 +43,12 @@
 
     <script>
         window.onload = async function() {
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 10));
             await get_version();
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 10));
             await get_config();
+            await new Promise(resolve => setTimeout(resolve, 10));
+            await get_date_time();
         };
 
         async function get_version(){
@@ -104,6 +123,8 @@
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
+                await set_date_time();
+
                 const data = await response.text();
                 document.getElementById('status').innerHTML = 'Configuration saved: ' + data;
 
@@ -113,6 +134,72 @@
                 console.error('Save config error:', error);
             }
         }
+
+        async function get_date_time()
+        {
+            try{
+                const response = await fetch('/api/date_time', {
+                    headers: { 'Connection': 'close', 'Cache-Control': 'no-cache' }
+                });
+                const date_time = await response.text();
+                console.info('date_time:', date_time);
+
+                const date = parseExactDateTime(date_time);
+                const isoString = formatDateTime(date);
+                console.info('isoString:', isoString);
+                document.getElementById('date_time').value = isoString.slice(0, 22);
+            }
+            catch (error) {
+                console.error('Failed to load current config:', error);
+                document.getElementById('date_time').value = new Date().toISOString().slice(0, 22);
+            }
+        }
+
+        function parseExactDateTime(dateTimeString) {
+            // For format: "2025-11-27 14:30:31" or "2025-11-27T14:30:31"
+            const parts = dateTimeString.replace('T', ' ').split(/[- :]/);
+
+            return new Date(
+                parseInt(parts[0]),      // year
+                parseInt(parts[1]) - 1,  // month (0-based!)
+                parseInt(parts[2]),      // day
+                parseInt(parts[3]) || 0, // hours
+                parseInt(parts[4]) || 0, // minutes
+                parseInt(parts[5]) || 0  // seconds
+            );
+        }
+
+        async function set_date_time()
+        {
+            const date_time_str = document.getElementById('date_time').value;
+            console.info('date_time_str:', date_time_str);
+            const date = parseExactDateTime(date_time_str);
+            try {
+                const response = await fetch('/api/set_date_time', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                    body: formatDateTime(date),
+                });
+                const data = await response.text();
+                console.info('Set date time response:', data);
+            } catch (error) {
+                console.error('Set date time error:', error);
+            }
+        }
+
+        function formatDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+
+            return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+        }
+
         function sendConfigAndReboot() {
             try {
                 sendConfig().then(() => {

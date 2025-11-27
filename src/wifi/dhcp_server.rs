@@ -35,15 +35,11 @@ pub struct DhcpServerState {
 
 impl DhcpServerState {
     pub fn new() -> Self {
-        let res = Self {
+        Self {
             command: Signal::new(),
             event: Signal::new(),
             dhcp_server: Mutex::new(None),
-        };
-
-        // Initial state is stopped
-        res.event.signal(DhcpServerEvent::Stopped);
-        res
+        }
     }
 }
 
@@ -96,13 +92,11 @@ pub enum DhcpEvent {
 
 impl DhcpServer {
     pub async fn new(state: &'static DhcpServerState) -> Self {
-        state.command.signal(DhcpServerCmmand::Stop);
-        while state.event.wait().await != DhcpServerEvent::Stopped {}
-        // Destroy existing server, if existing
-        state.dhcp_server.lock().await.take();
-        state.command.reset();
-
-        Self { state }
+        info!("Creating DHCP server instance ...");
+        let res = Self { state };
+        res.stop().await;
+        info!("DHCP server instance created");
+        res
     }
 
     pub async fn wait_event(&self) -> Option<DhcpEvent> {
@@ -122,12 +116,9 @@ impl DhcpServer {
         stack: Stack<'static>,
         dhcp_config: DhcpServerConfig,
     ) {
+        debug!("Starting DHCP server ...");
         // Stop existing server, if existing
-        self.state.command.signal(DhcpServerCmmand::Stop);
-        while self.state.event.wait().await != DhcpServerEvent::Stopped {}
-        // Destroy existing server, if existing
-        self.state.dhcp_server.lock().await.take();
-        self.state.command.reset();
+        self.stop().await;
 
         let server = LhDhcpServer::new(
             dhcp_config.server_ip,     // Server IP
@@ -141,14 +132,37 @@ impl DhcpServer {
         *self.state.dhcp_server.lock().await = Some(server);
 
         //Spawn DHCP server task
-        while spawner.spawn(dhcp_server_task(self.state, stack)).is_err() {}
+        while spawner.spawn(dhcp_server_task(self.state, stack)).is_err() {
+            error!("Failed to spawn DHCP server task, retrying ...");
+            embassy_futures::yield_now().await;
+        }
+        debug!("DHCP server started");
     }
+
     pub async fn stop(&self) {
+        debug!("Stopping DHCP server ...");
+        if !self.is_server_running() {
+            return;
+        }
         self.state.command.signal(DhcpServerCmmand::Stop);
         while self.state.event.wait().await != DhcpServerEvent::Stopped {}
         // Destroy existing server, if existing
         self.state.dhcp_server.lock().await.take();
         self.state.command.reset();
+        self.state.event.reset();
+        debug!("DHCP server stopped");
+    }
+
+    fn is_server_running(&self) -> bool {
+        if let Ok(mut dhcp_server) = self.state.dhcp_server.try_lock() {
+            if dhcp_server.is_none() {
+                return false;
+            }
+            warn!("DHCP server is not running but still initialized, destroying instance");
+            dhcp_server.take();
+            return false;
+        }
+        true
     }
 }
 
@@ -186,7 +200,7 @@ async fn dhcp_server_task(state: &'static DhcpServerState, stack: Stack<'static>
             }
         }
     } else {
-        error!("DHCP server instance not found, stopping DHCP server task");
+        warn!("DHCP server instance not found, stopping DHCP server task");
     }
 
     state.event.signal(DhcpServerEvent::Stopped);
