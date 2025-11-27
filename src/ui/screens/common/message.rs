@@ -4,7 +4,7 @@ use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::*},
     pixelcolor::BinaryColor,
     prelude::*,
-    primitives::{Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment},
+    primitives::{PrimitiveStyle, PrimitiveStyleBuilder, Rectangle},
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
@@ -77,65 +77,22 @@ where
             lines_texts.push(text).ok();
         }
 
-        let mut text_box = align_text_center_vertically(&mut lines_texts);
+        align_text_center_vertically(&mut lines_texts);
 
         //Draw the text
         for text_line in &lines_texts {
             text_line.draw(draw_target).ok();
-        }
-
-        text_box = text_box.offset(2);
-        let constraint = MESSAGE_FRAME_BORDER.offset(-(MESSAGE_FRAME_THICKNESS as i32) - 3);
-
-        if text_box.size.width <= constraint.size.width
-            && text_box.size.height <= constraint.size.height
-        {
-            // TODO: Move this to a function to avoid code duplication
-            let frame_y_mid = text_box.top_left.y + (text_box.size.height as i32) / 2;
-            let text_box_right_side_x = text_box.top_left.x + text_box.size.width as i32 - 1;
-            let text_box_bottom_side_y = text_box.top_left.y + text_box.size.height as i32 - 1;
-            let left_corner = Point::new(text_box.top_left.x - 3, frame_y_mid);
-            let right_corner = Point::new(text_box_right_side_x + 3, frame_y_mid);
-
-            Polyline::new(&[
-                Point::new(
-                    MESSAGE_FRAME_BORDER.top_left.x + (MESSAGE_FRAME_THICKNESS as i32),
-                    frame_y_mid,
-                ),
-                left_corner,
-                Point::new(text_box.top_left.x, text_box.top_left.y),
-                Point::new(text_box_right_side_x, text_box.top_left.y),
-                right_corner,
-                Point::new(
-                    MESSAGE_FRAME_BORDER.top_left.x + (MESSAGE_FRAME_BORDER.size.width as i32)
-                        - 1
-                        - (MESSAGE_FRAME_THICKNESS as i32),
-                    frame_y_mid,
-                ),
-            ])
-            .into_styled(TEXT_FIELD_FRAME_STYLE)
-            .draw(draw_target)
-            .ok();
-
-            Polyline::new(&[
-                left_corner,
-                Point::new(text_box.top_left.x, text_box_bottom_side_y),
-                Point::new(text_box_right_side_x, text_box_bottom_side_y),
-                right_corner,
-            ])
-            .into_styled(TEXT_FIELD_FRAME_STYLE)
-            .draw(draw_target)
-            .ok();
         }
     }
 }
 
 fn align_text_center_vertically(
     text_list: &mut heapless::Vec<Text<'_, MonoTextStyle<'static, BinaryColor>>, 3>,
-) -> Rectangle {
+) {
     const SPACE: u32 = 2;
+
     if text_list.is_empty() {
-        return Rectangle::default();
+        return;
     }
 
     let mut total_height: u32 = text_list
@@ -158,17 +115,6 @@ fn align_text_center_vertically(
         text.position.y += y_offset;
         y_start += text_box_height as i32 + SPACE as i32;
     }
-
-    // Adjust the bounding box to include all texts
-    let mut bounding_box = text_list.first().unwrap().bounding_box();
-    for text in text_list.iter() {
-        let text_box = text.bounding_box();
-        bounding_box.top_left = bounding_box.top_left.component_min(text_box.top_left);
-        bounding_box.size.width = bounding_box.size.width.max(text_box.size.width);
-    }
-    bounding_box.size.height = total_height;
-
-    bounding_box
 }
 
 fn try_split_at_utf8(word: &str, step: usize) -> (usize, &str, &str) {
@@ -307,20 +253,12 @@ const MESSAGE_TEXT_POSITION: Point = Point::new(
     MESSAGE_FRAME_BORDER.top_left.y + (MESSAGE_FRAME_BORDER.size.height as i32 / 2),
 );
 
-// Text frame layout constants
-const TEXT_FRAME_THICKNESS: u32 = 2;
-
 // Styles
 const FRAME_BORDER_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> = PrimitiveStyleBuilder::new()
     .stroke_color(BinaryColor::On)
     .stroke_width(MESSAGE_FRAME_THICKNESS);
 const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = FRAME_BORDER_STYLE_BUILDER.build();
-const TEXT_FIELD_FRAME_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> =
-    FRAME_BORDER_STYLE_BUILDER
-        .fill_color(BinaryColor::Off)
-        .stroke_width(TEXT_FRAME_THICKNESS)
-        .stroke_alignment(StrokeAlignment::Center);
-const TEXT_FIELD_FRAME_STYLE: PrimitiveStyle<BinaryColor> = TEXT_FIELD_FRAME_STYLE_BUILDER.build();
+
 const TITLE_BOX_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::new()
     .stroke_color(BinaryColor::Off)
     .stroke_width(0)
