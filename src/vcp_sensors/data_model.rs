@@ -20,4 +20,14 @@ impl VcpState {
             VcpState::Normal(v) | VcpState::Low(v) | VcpState::High(v) => *v,
         }
     }
+
+    pub fn is_normal(&self) -> bool {
+        matches!(self, VcpState::Normal(_))
+    }
+    pub fn is_low(&self) -> bool {
+        matches!(self, VcpState::Low(_))
+    }
+    pub fn is_high(&self) -> bool {
+        matches!(self, VcpState::High(_))
+    }
 }

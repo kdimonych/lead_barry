@@ -1,18 +1,31 @@
+use core::future::poll_fn;
+use core::task::Poll;
+
 use defmt::*;
 
+use ds323x::DateTimeAccess;
+use ds323x::Timelike;
 use embassy_executor::Spawner;
+use embassy_futures::join;
+use embassy_futures::select::Either;
 use embassy_net::Stack;
 
 use embassy_rp::clocks::RoscRng;
+use embassy_sync::lazy_lock::LazyLock;
 use embassy_time::Duration;
+use embassy_time::Ticker;
 use embassy_time::Timer;
+use ina3221_async::Voltage;
 
 use crate::configuration::*;
+use crate::global_state::*;
 use crate::input::*;
 use crate::reset::trigger_system_reset;
+use crate::rtc::*;
 use crate::shared_resources::*;
 use crate::ui::*;
 use crate::units::TimeExt as _;
+use crate::vcp_sensors::{VcpReading, VcpSensorsEvents};
 use crate::web_server::HttpConfigServer;
 use crate::wifi::*;
 
@@ -69,7 +82,7 @@ pub async fn main_logic_controller(
                         );
                         set_screen(ScWifiStats::new(wifi_status).into()).await;
                     }
-                    JoiningStatus::ObtainingIP => {
+                    JoiningStatus::Dhcp => {
                         let wifi_status: ScWifiStatsData = ScWifiStatsData::new(
                             ScvState::Dhcp,
                             Some(settings.network_settings.wifi_settings.ssid.clone()),
@@ -106,7 +119,11 @@ pub async fn main_logic_controller(
                 }
             })
             .await;
-        info!("Joined WiFi network done");
+
+        if network_ready {
+            info!("Joined WiFi network done");
+            global_state().set_wifi_mode(WiFiMode::Client).await;
+        }
 
         Timer::after(5.s()).await;
     }
@@ -175,6 +192,7 @@ pub async fn main_logic_controller(
                 }
             })
             .await;
+        global_state().set_wifi_mode(WiFiMode::AccessPoint).await;
         info!("AP mode done");
         Timer::after(3.s()).await;
     };
@@ -182,23 +200,186 @@ pub async fn main_logic_controller(
     // Here we ready to start web server for configuration
     if let Some(net_cfg) = net_stack.config_v4() {
         let ip = net_cfg.address.address();
-
-        let mut invitation = MessageString::complimentary_str();
-        core::fmt::write(&mut invitation, format_args!("{} on your device.", ip)).ok();
-
-        let msg = ScMessageData {
-            title: MsgTitleString::from_str("Visit http://"),
-            message: invitation.into(),
-        };
-        shared.ui_control.switch(ScMessage::new(msg).into()).await;
+        global_state().set_device_ip(Some(ip)).await;
 
         spawner
             .spawn(start_http_config_server(spawner, shared, net_stack))
             .unwrap();
+
+        show_visit_screen(shared).await;
     }
+
+    let mut channel: u8 = 0;
+
+    let mut current_screan = screan_iterartor(&button_controller).await;
+
     loop {
-        // Main logic goes here
-        Timer::after(Duration::from_secs(60)).await;
+        match current_screan {
+            ActiveScrean::TimeScreen => {
+                current_screan =
+                    do_until_bt_action(screan_iterartor(&button_controller), || async {
+                        show_time_screen(shared).await;
+                    })
+                    .await;
+            }
+            ActiveScrean::VoltageScreen => {
+                current_screan = on_repeat(
+                    &current_screan,
+                    do_until_bt_action(screan_iterartor(&button_controller), || async {
+                        show_voltage_reading(shared, channel).await;
+                    })
+                    .await,
+                    || async {
+                        channel = (channel + 1) % 3;
+                    },
+                )
+                .await;
+            }
+        }
+    }
+}
+
+fn screan_iterartor(
+    button_controller: &ButtonController,
+) -> impl core::future::Future<Output = ActiveScrean> {
+    poll_fn(|cx| -> Poll<ActiveScrean> {
+        if let Ok(event) = button_controller.try_receive() {
+            match event {
+                ButtonEvent::Pressed(Buttons::Yellow) => Poll::Ready(ActiveScrean::TimeScreen),
+                ButtonEvent::Pressed(Buttons::Blue) => Poll::Ready(ActiveScrean::VoltageScreen),
+                _ => {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            }
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+}
+
+#[derive(PartialEq)]
+enum ActiveScrean {
+    TimeScreen,
+    VoltageScreen,
+}
+
+impl ActiveScrean {
+    fn transition(self, button_event: ButtonEvent) -> Self {
+        match button_event {
+            ButtonEvent::Pressed(Buttons::Yellow) => ActiveScrean::TimeScreen,
+            ButtonEvent::Pressed(Buttons::Blue) => ActiveScrean::VoltageScreen,
+            _ => self,
+        }
+    }
+}
+
+async fn on_repeat<F, Fut>(old: &ActiveScrean, new: ActiveScrean, f: F) -> ActiveScrean
+where
+    F: FnOnce() -> Fut,
+    Fut: core::future::Future<Output = ()>,
+{
+    if *old == new {
+        f().await;
+        new
+    } else {
+        new
+    }
+}
+
+async fn do_until_bt_action<ScreanIterator, F, Fut>(
+    screan_it: ScreanIterator,
+    mut f: F,
+) -> ActiveScrean
+where
+    F: FnMut() -> Fut,
+    Fut: core::future::Future<Output = core::convert::Infallible>,
+    ScreanIterator: core::future::Future<Output = ActiveScrean>,
+{
+    match embassy_futures::select::select(screan_it, f()).await {
+        Either::First(new_screan) => new_screan,
+        Either::Second(_) => defmt::unreachable!(),
+    }
+}
+
+async fn show_time_screen(shared: &'static SharedResources) -> ! {
+    let mut ticker = Ticker::every(1.s());
+
+    let mut time_str = MessageString::complimentary_str();
+    let show_time = async |time_str: &heapless::String<_>| {
+        let msg = ScMessageData {
+            title: MsgTitleString::from_str("Current Time"),
+            message: time_str.clone().into(),
+        };
+        shared.ui_control.switch(ScMessage::new(msg).into()).await;
+    };
+
+    let update_time_str = async |time_str: &mut heapless::String<_>| {
+        let mut rtc = shared.rtc.lock().await;
+        if let Ok(datetime) = rtc.datetime().await {
+            time_str.clear();
+            core::fmt::write(
+                time_str,
+                format_args!(
+                    "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                    datetime.year(),
+                    datetime.month(),
+                    datetime.day(),
+                    datetime.hour(),
+                    datetime.minute(),
+                    datetime.second()
+                ),
+            )
+            .ok();
+        };
+    };
+    loop {
+        update_time_str(&mut time_str).await;
+        show_time(&time_str).await;
+        ticker.next().await;
+    }
+}
+
+async fn show_voltage_reading(shared: &'static SharedResources, channel: u8) -> ! {
+    let mut ticker = Ticker::every(40.ms());
+
+    shared.vcp_control.enable_channel(channel).await;
+    shared.vcp_control.flush_events();
+
+    static VOLTAGE: LazyLock<DataModel<f32>> = LazyLock::new(|| DataModel::new(0f32));
+    let voltage = VOLTAGE.get();
+
+    shared
+        .ui_control
+        .switch(ScVcp::new(voltage, ScvBaseUnits::Volts).into())
+        .await;
+
+    // Voltage update loop
+    loop {
+        if let VcpSensorsEvents::Reading(reading) = shared.vcp_control.receive_event().await
+            && reading.channel == 0
+        {
+            *voltage.lock().await = reading.voltage.value();
+        }
+        ticker.next().await;
+    }
+}
+
+async fn show_visit_screen(shared: &'static SharedResources) {
+    if let Some(ip) = global_state().get_device_ip().await {
+        let mut invitation = MessageString::complimentary_str();
+        core::fmt::write(
+            &mut invitation,
+            format_args!("http:// {} on your device.", ip),
+        )
+        .ok();
+
+        let msg = ScMessageData {
+            title: MsgTitleString::from_str("Visit"),
+            message: invitation.into(),
+        };
+        shared.ui_control.switch(ScMessage::new(msg).into()).await;
     }
 }
 

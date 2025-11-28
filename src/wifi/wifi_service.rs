@@ -35,7 +35,7 @@ pub enum ActiveMode {
 #[derive(Clone, Copy, defmt::Format, Debug)]
 pub enum JoiningStatus {
     JoiningAP,
-    ObtainingIP,
+    Dhcp,
     Ready,
     Failed,
 }
@@ -442,7 +442,6 @@ impl<'a> WifiServiceImpl<'a> {
 
                 WiFiCtrlState::Joined(mut controller) => {
                     debug!("Joined to a network.");
-                    wifi_state_handler(JoiningStatus::ObtainingIP).await;
 
                     //Init DHCP client and wait for network read
                     let ip_config = if wifi_settings.use_static_ip_config {
@@ -459,6 +458,10 @@ impl<'a> WifiServiceImpl<'a> {
                         info!("Use DHCP provided network settings");
                         ConfigV4::Dhcp(DhcpConfig::default())
                     };
+
+                    if let &ConfigV4::Dhcp(_) = &ip_config {
+                        wifi_state_handler(JoiningStatus::Dhcp).await;
+                    }
 
                     net_stack.set_config_v4(ip_config);
 

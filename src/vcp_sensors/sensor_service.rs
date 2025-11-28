@@ -84,6 +84,10 @@ impl<'a, const EVENT_QUEUE_SIZE: usize> VcpControl<'a, EVENT_QUEUE_SIZE> {
         self.event_receiver.receive()
     }
 
+    pub fn flush_events(&self) {
+        while self.event_receiver.try_receive().is_ok() {}
+    }
+
     pub fn enable_channel(&self, channel: ChannelNum) -> VcpCommandSendFuture<'_> {
         self.command_receiver
             .send(VcpCommand::EnableChannel(channel))

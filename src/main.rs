@@ -6,6 +6,7 @@
 #![allow(async_fn_in_trait)]
 
 mod configuration;
+mod global_state;
 mod global_types;
 mod input;
 mod main_logic_controller;

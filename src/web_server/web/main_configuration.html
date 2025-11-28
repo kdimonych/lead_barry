@@ -43,11 +43,8 @@
 
     <script>
         window.onload = async function() {
-            await new Promise(resolve => setTimeout(resolve, 10));
             await get_version();
-            await new Promise(resolve => setTimeout(resolve, 10));
             await get_config();
-            await new Promise(resolve => setTimeout(resolve, 10));
             await get_date_time();
         };
 
