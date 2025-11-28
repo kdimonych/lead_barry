@@ -17,9 +17,9 @@ const DETAIL_LENGTH: usize = STATUS_LENGTH;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
 pub type TitleString<'a> = AnyString<'a, TITLE_LENGTH>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type StatusString<'a> = AnyString<'static, STATUS_LENGTH>;
+pub type StatusString<'a> = AnyString<'a, STATUS_LENGTH>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type DetailString<'a> = AnyString<'static, DETAIL_LENGTH>;
+pub type DetailString<'a> = AnyString<'a, DETAIL_LENGTH>;
 
 pub trait TrStatus {
     fn title(&'_ self) -> TitleString<'_>;

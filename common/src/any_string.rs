@@ -71,7 +71,7 @@ impl<'a, const SIZE: usize> AnyString<'a, SIZE> {
     /// let s: AnyString<20> = AnyString::from_str_truncate("Hi");
     /// assert_eq!(s.as_str(), "Hi");
     /// ```
-    pub fn from_str_truncate<'b>(s: &'b str) -> Self {
+    pub fn from_str_truncate(s: &str) -> Self {
         let mut heapless_str = heapless::String::<SIZE>::new();
         let _ = heapless_str.push_str(&s[..core::cmp::min(s.len(), SIZE)]);
         AnyString::from_heapless(heapless_str)
@@ -95,6 +95,11 @@ impl<'a, const SIZE: usize> AnyString<'a, SIZE> {
             AnyStringInner::Static(s) => s.len(),
             AnyStringInner::Heapless(s) => s.len(),
         }
+    }
+
+    /// Returns true if this `AnyString` is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Returns the capacity of this `AnyString`, which is the maximum number of bytes it can hold.
