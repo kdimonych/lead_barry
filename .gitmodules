@@ -7,3 +7,6 @@
 [submodule "ds323x-rs"]
 	path = ds323x-rs
 	url = git@github.com:kdimonych/ds323x-rs.git
+[submodule "picoserve"]
+	path = picoserve
+	url = git@github.com:sammhicks/picoserve.git
