@@ -17,6 +17,7 @@ use embassy_time::Ticker;
 use embassy_time::Timer;
 use ina3221_async::Voltage;
 
+use crate::async_infinite_stream::AsyncInfiniteStream;
 use crate::configuration::*;
 use crate::global_state::*;
 use crate::input::*;
@@ -211,26 +212,30 @@ pub async fn main_logic_controller(
 
     let mut channel: u8 = 0;
 
-    let mut current_screan = screan_iterartor(&button_controller).await;
+    let mut current_screan = button_controller
+        .map_and_filter(button_event_to_screan)
+        .next()
+        .await;
 
     loop {
         match current_screan {
             ActiveScrean::TimeScreen => {
-                current_screan =
-                    do_until_bt_action(screan_iterartor(&button_controller), || async {
-                        show_time_screen(shared).await;
-                    })
-                    .await;
+                current_screan = do_until_bt_action(&button_controller, || async {
+                    show_time_screen(shared).await;
+                })
+                .await;
             }
             ActiveScrean::VoltageScreen => {
+                debug!("Showing voltage for channel {}", channel);
                 current_screan = on_repeat(
                     &current_screan,
-                    do_until_bt_action(screan_iterartor(&button_controller), || async {
+                    do_until_bt_action(&button_controller, || async {
                         show_voltage_reading(shared, channel).await;
                     })
                     .await,
                     || async {
                         channel = (channel + 1) % 3;
+                        debug!("Switching to voltage channel {}", channel);
                     },
                 )
                 .await;
@@ -239,40 +244,18 @@ pub async fn main_logic_controller(
     }
 }
 
-fn screan_iterartor(
-    button_controller: &ButtonController,
-) -> impl core::future::Future<Output = ActiveScrean> {
-    poll_fn(|cx| -> Poll<ActiveScrean> {
-        if let Ok(event) = button_controller.try_receive() {
-            match event {
-                ButtonEvent::Pressed(Buttons::Yellow) => Poll::Ready(ActiveScrean::TimeScreen),
-                ButtonEvent::Pressed(Buttons::Blue) => Poll::Ready(ActiveScrean::VoltageScreen),
-                _ => {
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                }
-            }
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
+fn button_event_to_screan(event: &ButtonEvent) -> Option<ActiveScrean> {
+    match event {
+        ButtonEvent::Pressed(Buttons::Yellow) => Some(ActiveScrean::TimeScreen),
+        ButtonEvent::Pressed(Buttons::Blue) => Some(ActiveScrean::VoltageScreen),
+        _ => None,
+    }
 }
 
 #[derive(PartialEq)]
 enum ActiveScrean {
     TimeScreen,
     VoltageScreen,
-}
-
-impl ActiveScrean {
-    fn transition(self, button_event: ButtonEvent) -> Self {
-        match button_event {
-            ButtonEvent::Pressed(Buttons::Yellow) => ActiveScrean::TimeScreen,
-            ButtonEvent::Pressed(Buttons::Blue) => ActiveScrean::VoltageScreen,
-            _ => self,
-        }
-    }
 }
 
 async fn on_repeat<F, Fut>(old: &ActiveScrean, new: ActiveScrean, f: F) -> ActiveScrean
@@ -288,16 +271,22 @@ where
     }
 }
 
-async fn do_until_bt_action<ScreanIterator, F, Fut>(
-    screan_it: ScreanIterator,
+async fn do_until_bt_action<F, Fut>(
+    button_controller: &ButtonController<'_>,
     mut f: F,
 ) -> ActiveScrean
 where
     F: FnMut() -> Fut,
     Fut: core::future::Future<Output = core::convert::Infallible>,
-    ScreanIterator: core::future::Future<Output = ActiveScrean>,
 {
-    match embassy_futures::select::select(screan_it, f()).await {
+    let res = embassy_futures::select::select(
+        button_controller
+            .map_and_filter(button_event_to_screan)
+            .next(),
+        f(),
+    )
+    .await;
+    match res {
         Either::First(new_screan) => new_screan,
         Either::Second(_) => defmt::unreachable!(),
     }
@@ -344,6 +333,8 @@ async fn show_time_screen(shared: &'static SharedResources) -> ! {
 async fn show_voltage_reading(shared: &'static SharedResources, channel: u8) -> ! {
     let mut ticker = Ticker::every(40.ms());
 
+    // Pick a channel to monitor
+    shared.vcp_control.disable_all_channels().await;
     shared.vcp_control.enable_channel(channel).await;
     shared.vcp_control.flush_events();
 
@@ -358,7 +349,7 @@ async fn show_voltage_reading(shared: &'static SharedResources, channel: u8) -> 
     // Voltage update loop
     loop {
         if let VcpSensorsEvents::Reading(reading) = shared.vcp_control.receive_event().await
-            && reading.channel == 0
+            && reading.channel == channel
         {
             *voltage.lock().await = reading.voltage.value();
         }

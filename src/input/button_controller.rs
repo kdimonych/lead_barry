@@ -1,3 +1,6 @@
+use core::future::poll_fn;
+use core::task::Poll;
+
 use embassy_rp::gpio::Pin;
 use embassy_rp::{Peri, gpio};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
@@ -6,6 +9,7 @@ use embassy_sync::mutex::Mutex;
 use embassy_time::Ticker;
 use gpio::{Input, Level, Pull};
 
+use crate::async_infinite_stream::*;
 use crate::units::TimeExt as _;
 
 use defmt::*;
@@ -122,15 +126,15 @@ impl<AliasType: Copy> From<(Edge, &Button<AliasType>)> for ButtonEvent<AliasType
 trait ButtonStateProvider<'a, AliasType> {
     /// Gets the last known state of the button
     /// - button_id: The alias of the button
-    /// Returns: Poll<Option<ButtonState>> - Ready(Some(state)) if state is available,
-    ///          Ready(None) if button not found, Pending if state is not available yet
+    ///   Returns: Poll<Option<ButtonState>> - Ready(Some(state)) if state is available,
+    ///   Ready(None) if button not found, Pending if state is not available yet
     fn last_state(&'a self, button_id: AliasType) -> core::task::Poll<Option<ButtonState>>;
 
     /// Sets the state of the button
     /// - button_id: The alias of the button
     /// - state: The new state to set
-    /// Returns: Poll<Result<(), ()>> - Ready(Ok(())) if state is set successfully,
-    ///          Ready(Err(())) if button not found, Pending if state cannot be set yet
+    ///   Returns: Poll<Result<(), ()>> - Ready(Ok(())) if state is set successfully,
+    ///   Ready(Err(())) if button not found, Pending if state cannot be set yet
     fn update_state(
         &self,
         button_id: AliasType,
@@ -193,16 +197,16 @@ where
 #[derive(Clone, Copy)]
 pub struct ButtonController<'a, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
 where
-    AliasType: 'static,
+    AliasType: 'a,
 {
-    receiver: EventReceiver<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>,
+    pub(self) receiver: EventReceiver<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>,
     state: &'a dyn ButtonStateProvider<'a, AliasType>,
 }
 
 impl<'a, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
     ButtonController<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>
 where
-    AliasType: 'static,
+    AliasType: 'a,
 {
     /// Asynchronously receives the next button event
     pub async fn receive(&self) -> ButtonEvent<AliasType> {
@@ -229,6 +233,26 @@ where
 
     pub fn flush(&self) {
         while self.receiver.try_receive().is_ok() {}
+    }
+}
+
+impl<'a, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize> AsyncInfiniteStream
+    for ButtonController<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>
+where
+    AliasType: 'a,
+{
+    type Item = ButtonEvent<AliasType>;
+
+    fn poll_next(
+        self: core::pin::Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> Poll<Self::Item> {
+        // SAFETY: We are not moving out of the pinned field.
+        let this = unsafe { self.get_unchecked_mut() };
+        // SAFETY: We are not moving out of the pinned field. The receiver itself is pinned because its parent is pinned.
+        let receiver = unsafe { core::pin::Pin::new_unchecked(&mut this.receiver) };
+
+        receiver.poll_receive(cx)
     }
 }
 
@@ -260,7 +284,7 @@ impl<const INPUTS: usize, AliasType> ButtonControllerBuilder<INPUTS, AliasType> 
 
     /// Builds the ButtonController and ButtonControllerRunner
     /// - state: The shared ButtonControllerState
-    /// Returns: (ButtonController, ButtonControllerRunner)
+    ///   Returns: (ButtonController, ButtonControllerRunner)
     pub fn build<'a, const BUTTON_EVENT_QUEUE_SIZE: usize>(
         self,
         state: &'a mut ButtonControllerState<AliasType, INPUTS, BUTTON_EVENT_QUEUE_SIZE>,

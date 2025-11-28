@@ -5,6 +5,8 @@
 #![no_main]
 #![allow(async_fn_in_trait)]
 
+mod async_infinite_stream;
+mod async_stream;
 mod configuration;
 mod global_state;
 mod global_types;
