@@ -6,12 +6,12 @@ use embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
+use super::common::base_screan_layout::*;
 use crate::ui::DataModel;
 use crate::ui::Screen;
 
 // Layout constants
-const FRAME_BORDER: Rectangle = Rectangle::new(Point::new(4, 4), Size::new(119, 55));
-const VALUE_TEXT_POSITION: Point = Point::new(64, 32);
+const VALUE_TEXT_POSITION: Point = Point::new(64, 40);
 
 // Styles
 const TEXT_FIELD_FRAME_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::new()
@@ -28,10 +28,8 @@ const VALUE_TEXT_STYLE: TextStyle = TextStyleBuilder::new()
     .baseline(Baseline::Middle)
     .alignment(Alignment::Center)
     .build();
-const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::new()
-    .stroke_color(BinaryColor::On)
-    .stroke_width(1)
-    .build();
+
+pub type VcpTitleString<'a> = TitleString<'a>;
 
 #[derive(PartialEq)]
 pub enum ScvBaseUnits {
@@ -46,6 +44,7 @@ pub struct ScVcp {
     voltage_cache: f32,
     base_unit: ScvBaseUnits,
     unit_prefix: &'static str,
+    title: VcpTitleString<'static>,
 }
 
 const fn unit(base_unit: &ScvBaseUnits) -> &'static str {
@@ -75,7 +74,11 @@ fn prefix(value: f32) -> (&'static str, f32) {
 }
 
 impl ScVcp {
-    pub fn new(voltage: &'static DataModel<f32>, base_unit: ScvBaseUnits) -> Self {
+    pub fn new(
+        voltage: &'static DataModel<f32>,
+        base_unit: ScvBaseUnits,
+        title: VcpTitleString<'static>,
+    ) -> Self {
         let (unit_prefix, _) = prefix(0.0);
 
         Self {
@@ -83,6 +86,7 @@ impl ScVcp {
             voltage_cache: 0.0,
             base_unit,
             unit_prefix,
+            title,
         }
     }
     pub fn update_voltage(&mut self) {
@@ -146,6 +150,10 @@ impl Screen for ScVcp {
 
         // Clear the display
         draw_target.clear(BinaryColor::Off).ok();
+        draw_base_screen_layout(draw_target);
+
+        let title = self.title.as_str();
+        draw_title_text(draw_target, title);
 
         // Draw voltage
         let mut buffer = heapless::String::<32>::new();
@@ -173,13 +181,13 @@ impl Screen for ScVcp {
         let right_corner = Point::new(text_box_right_side_x + 3, frame_y_mid);
 
         Polyline::new(&[
-            Point::new(FRAME_BORDER.top_left.x, frame_y_mid),
+            Point::new(MESSAGE_FRAME_BORDER.top_left.x, frame_y_mid),
             left_corner,
             Point::new(text_box.top_left.x, text_box.top_left.y),
             Point::new(text_box_right_side_x, text_box.top_left.y),
             right_corner,
             Point::new(
-                FRAME_BORDER.top_left.x + FRAME_BORDER.size.width as i32,
+                MESSAGE_FRAME_BORDER.top_left.x + MESSAGE_FRAME_BORDER.size.width as i32,
                 frame_y_mid,
             ),
         ])
@@ -198,10 +206,5 @@ impl Screen for ScVcp {
         .ok();
 
         value_text.draw(draw_target).ok();
-        // Draw a frame border
-        FRAME_BORDER
-            .into_styled(FRAME_BORDER_STYLE)
-            .draw(draw_target)
-            .ok();
     }
 }

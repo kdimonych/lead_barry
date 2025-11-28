@@ -341,9 +341,12 @@ async fn show_voltage_reading(shared: &'static SharedResources, channel: u8) -> 
     static VOLTAGE: LazyLock<DataModel<f32>> = LazyLock::new(|| DataModel::new(0f32));
     let voltage = VOLTAGE.get();
 
+    let mut title = VcpTitleString::complimentary_str();
+    core::fmt::write(&mut title, format_args!("Channel {}", channel + 1)).ok();
+
     shared
         .ui_control
-        .switch(ScVcp::new(voltage, ScvBaseUnits::Volts).into())
+        .switch(ScVcp::new(voltage, ScvBaseUnits::Volts, title.into()).into())
         .await;
 
     // Voltage update loop

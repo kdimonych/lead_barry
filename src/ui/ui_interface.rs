@@ -46,7 +46,7 @@ impl<'a, ScreenSet> UiControl<'a, ScreenSet> {
         &self,
         new_screen: ScreenSet,
     ) -> SendFuture<'a, CriticalSectionRawMutex, ScreenSet, 1> {
-        debug!("Send switching to new screen ...");
+        trace!("Send switching to new screen ...");
         self.screen_sender.send(new_screen)
     }
 }
@@ -132,7 +132,7 @@ where
 
         loop {
             if let Ok(mut new_screen) = self.screen_receiver.try_receive() {
-                debug!("Switching to new screen ...");
+                trace!("Switching to new screen ...");
                 if let Some(old_screen) = self.active_screen {
                     old_screen.exit(&mut display);
                 }
@@ -140,7 +140,7 @@ where
                 new_screen.enter(&mut display);
                 self.active_screen.replace(new_screen);
 
-                debug!("Switching to new screen complete");
+                trace!("Switching to new screen complete");
             } else if let Some(active_screen) = self.active_screen {
                 active_screen.redraw(&mut display);
             }

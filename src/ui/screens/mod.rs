@@ -8,7 +8,7 @@ mod wifi_status;
 
 pub use ip_satus::{IpTitleString, ScIpData, ScIpStatus, ScvIpState};
 pub use message::{MessageString, MsgTitleString, ScMessage, ScMessageData};
-pub use vcp::{ScVcp, ScvBaseUnits};
+pub use vcp::{ScVcp, ScvBaseUnits, VcpTitleString};
 pub use welcome::ScWelcome;
 pub use wifi_ap::{ScWifiAp, ScWifiApData, ScvClientInfo, ScvCredentials};
 pub use wifi_status::{ScWifiStats, ScWifiStatsData, ScvState};

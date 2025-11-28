@@ -8,16 +8,16 @@ use embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
-use crate::ui::Screen;
+use super::base_screan_layout::*;
+use super::screan_constants::*;
+use crate::ui::{Screen, screens::common::base_screan_layout};
 
-const TITLE_LENGTH: usize = 15;
-const TITLE_SIZE: usize = TITLE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 const MESSAGE_LINE_LENGTH: usize = 18;
 const MESSAGE_LENGTH: usize = MESSAGE_LINE_LENGTH * 3; // Support for three lines of message
 const MESSAGE_SIZE: usize = MESSAGE_LENGTH * 4; // UTF-8 can be up to 4 bytes per char
 
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type MsgTitleString<'a> = AnyString<'a, TITLE_SIZE>;
+pub type MsgTitleString<'a> = base_screan_layout::TitleString<'a>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
 pub type MessageString<'a> = AnyString<'a, MESSAGE_SIZE>;
 
@@ -49,17 +49,10 @@ where
     {
         // Clear the display
         draw_target.clear(BinaryColor::Off).ok();
-        draw_main_screen_layout(draw_target);
+        draw_base_screen_layout(draw_target);
 
         let title = self.status.title();
-        Text::with_text_style(
-            title.as_str(),
-            TITLE_TEXT_POSITION,
-            TITLE_CHARACTER_STYLE,
-            TITLE_TEXT_STYLE,
-        )
-        .draw(draw_target)
-        .ok();
+        draw_title_text(draw_target, title.as_str());
 
         let message_str = self.status.message();
         let lines = split_message_into_lines(message_str.as_str());
@@ -230,73 +223,27 @@ fn split_message_into_lines(message: &str) -> heapless::Vec<heapless::String<MES
 }
 
 /* Constants */
-// Screen constants
-const SCREEN_TL: Point = Point::new(0, 0);
-const SCREEN_BR: Point = Point::new(127, 63);
-const SCREEN_WIDTH: u32 = (SCREEN_BR.x - SCREEN_TL.x + 1) as u32;
-const SCREEN_HEIGHT: u32 = (SCREEN_BR.y - SCREEN_TL.y + 1) as u32;
-const SCREEN_MIDDLE_X: i32 = SCREEN_TL.x + (SCREEN_WIDTH / 2) as i32;
-
-// Title layout constants
-const TITLE_HEIGHT: u32 = 16;
-const TITLE_BOX: Rectangle = Rectangle::new(SCREEN_TL, Size::new(SCREEN_WIDTH, TITLE_HEIGHT));
-const TITLE_TEXT_POSITION: Point = Point::new(SCREEN_MIDDLE_X, (TITLE_HEIGHT / 2) as i32);
 
 //Message frame layout constants
 const MESSAGE_FRAME_BORDER: Rectangle = Rectangle::new(
     Point::new(SCREEN_TL.x, SCREEN_TL.y + (TITLE_HEIGHT as i32)),
     Size::new(SCREEN_WIDTH, SCREEN_HEIGHT - TITLE_HEIGHT),
 );
-const MESSAGE_FRAME_THICKNESS: u32 = 1;
 const MESSAGE_TEXT_POSITION: Point = Point::new(
     MESSAGE_FRAME_BORDER.top_left.x + (MESSAGE_FRAME_BORDER.size.width as i32 / 2),
     MESSAGE_FRAME_BORDER.top_left.y + (MESSAGE_FRAME_BORDER.size.height as i32 / 2),
 );
 
 // Styles
-const FRAME_BORDER_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> = PrimitiveStyleBuilder::new()
-    .stroke_color(BinaryColor::On)
-    .stroke_width(MESSAGE_FRAME_THICKNESS);
-const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = FRAME_BORDER_STYLE_BUILDER.build();
-
-const TITLE_BOX_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::new()
-    .stroke_color(BinaryColor::Off)
-    .stroke_width(0)
-    .fill_color(BinaryColor::On)
-    .build();
-
 const MESSAGE_TEXT_STYLE_BUILDER: TextStyleBuilder = TextStyleBuilder::new()
     .baseline(Baseline::Middle)
     .alignment(Alignment::Center);
 const MESSAGE_TEXT_STYLE: TextStyle = MESSAGE_TEXT_STYLE_BUILDER.build();
-const TITLE_TEXT_STYLE_BUILDER: TextStyleBuilder = MESSAGE_TEXT_STYLE_BUILDER;
-const TITLE_TEXT_STYLE: TextStyle = TITLE_TEXT_STYLE_BUILDER.build();
 
 // Fonts
-const TITLE_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> = MonoTextStyleBuilder::new()
-    .font(&FONT_8X13_BOLD)
-    .text_color(BinaryColor::Off)
-    .build();
 const MESSAGE_CHARACTER_STYLE_BUILDER: MonoTextStyleBuilder<'static, BinaryColor> =
     MonoTextStyleBuilder::new()
         .font(&FONT_7X14_BOLD)
         .text_color(BinaryColor::On);
 const MESSAGE_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> =
     MESSAGE_CHARACTER_STYLE_BUILDER.build();
-
-fn draw_main_screen_layout<D>(draw_target: &mut D)
-where
-    D: DrawTarget<Color = BinaryColor>,
-{
-    // Draw title box
-    TITLE_BOX
-        .into_styled(TITLE_BOX_STYLE)
-        .draw(draw_target)
-        .ok();
-
-    // Draw a frame border
-    MESSAGE_FRAME_BORDER
-        .into_styled(FRAME_BORDER_STYLE)
-        .draw(draw_target)
-        .ok();
-}
