@@ -1,4 +1,3 @@
-use core::future::poll_fn;
 use core::task::Poll;
 
 use defmt::*;
@@ -6,18 +5,14 @@ use defmt::*;
 use ds323x::DateTimeAccess;
 use ds323x::Timelike;
 use embassy_executor::Spawner;
-use embassy_futures::join;
 use embassy_futures::select::Either;
 use embassy_net::Stack;
 
 use embassy_rp::clocks::RoscRng;
 use embassy_sync::lazy_lock::LazyLock;
-use embassy_time::Duration;
 use embassy_time::Ticker;
 use embassy_time::Timer;
-use ina3221_async::Voltage;
 
-use crate::async_infinite_stream::AsyncInfiniteStream;
 use crate::configuration::*;
 use crate::global_state::*;
 use crate::input::*;
@@ -26,7 +21,7 @@ use crate::rtc::*;
 use crate::shared_resources::*;
 use crate::ui::*;
 use crate::units::TimeExt as _;
-use crate::vcp_sensors::{VcpReading, VcpSensorsEvents};
+use crate::vcp_sensors::VcpSensorsEvents;
 use crate::web_server::HttpConfigServer;
 use crate::wifi::*;
 

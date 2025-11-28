@@ -68,8 +68,6 @@ leasehund = { path = "./leasehund", features = ["defmt"] }
 # HTTP server/client
 # nanofish = "0.9.1"
 nanofish = { path = "./nanofish" }
-# picoserve = { version = "0.17.1", features = ["defmt", "embassy", "ws",  "json"] }
-picoserve = { path = "./picoserve/picoserve", features = ["defmt", "embassy", "ws",  "json"] }
 
 # Alternative: Use rp-pico but you'll need to handle CYW43 separately
 # rp-pico = "0.9"

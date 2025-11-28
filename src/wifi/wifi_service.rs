@@ -26,12 +26,6 @@ static WIFI_SERVICE_IMPL: StaticCell<WiFiServiceImplType> = StaticCell::new();
 static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
 static DHCP_SERVER_STATE: StaticCell<DhcpServerState> = StaticCell::new();
 
-pub enum ActiveMode {
-    Idle,
-    Join,
-    Ap,
-}
-
 #[derive(Clone, Copy, defmt::Format, Debug)]
 pub enum JoiningStatus {
     JoiningAP,
@@ -175,12 +169,6 @@ impl WifiService {
         service_impl.net_stack()
     }
 
-    /// Get the current active mode
-    pub async fn active_mode(&self) -> ActiveMode {
-        let service_impl = self.service_impl.lock().await;
-        service_impl.active_mode()
-    }
-
     /// Switch to idle mode
     pub async fn idle(&self) {
         let mut service_impl = self.service_impl.lock().await;
@@ -210,7 +198,6 @@ impl WifiService {
 
 trait WiFiServiceImplementation<'a> {
     fn net_stack(&self) -> Stack<'a>;
-    fn active_mode(&self) -> ActiveMode;
 
     async fn idle(&mut self);
     async fn join<H>(&mut self, wifi_settings: &WiFiSettings, join_status_handler: H)
@@ -277,17 +264,6 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
         // Wait for a client to connect and get an IP address
         let new_client = self.wait_for_dhcp_client().await.unwrap();
         wifi_state_handler(ApStatus::Ready(new_client)).await;
-    }
-
-    fn active_mode(&self) -> ActiveMode {
-        match &self.wifi_control {
-            WiFiCtrlState::Idle(_) => ActiveMode::Idle,
-            WiFiCtrlState::Joined(_) => ActiveMode::Join,
-            WiFiCtrlState::Ap(_) => ActiveMode::Ap,
-            WiFiCtrlState::Uninitialized => {
-                defmt::unreachable!()
-            }
-        }
     }
 }
 

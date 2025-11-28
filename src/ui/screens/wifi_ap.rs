@@ -12,28 +12,22 @@ pub struct ScvClientInfo {
 
 pub enum ScWifiApData {
     NotReady,
-    LinkUp,
-    ConfigUp,
     WaitingForClient(ScvCredentials),
     Connected(ScvClientInfo),
 }
 
 impl TrStatus for ScWifiApData {
-    fn title(&'_ self) -> TitleString {
+    fn title(&self) -> TitleString<'_> {
         match self {
             ScWifiApData::NotReady => TitleString::from_str("WiFi AP"),
-            ScWifiApData::LinkUp => TitleString::from_str("WiFi AP Init"),
-            ScWifiApData::ConfigUp => TitleString::from_str("WiFi AP Init"),
             ScWifiApData::WaitingForClient(_) => TitleString::from_str("WiFi AP Ready"),
             ScWifiApData::Connected(_) => TitleString::from_str("New Client"),
         }
     }
 
-    fn status(&'_ self) -> StatusString {
+    fn status(&self) -> StatusString<'_> {
         match self {
             ScWifiApData::NotReady => StatusString::from_str("Initializing..."),
-            ScWifiApData::LinkUp => StatusString::from_str("AP Link Up..."),
-            ScWifiApData::ConfigUp => StatusString::from_str("AP Config Up..."),
             ScWifiApData::WaitingForClient(credentials) => {
                 let mut status_str = StatusString::complimentary_str();
                 core::fmt::write(
@@ -50,11 +44,9 @@ impl TrStatus for ScWifiApData {
             }
         }
     }
-    fn detail(&'_ self) -> Option<DetailString> {
+    fn detail(&self) -> Option<DetailString<'_>> {
         match self {
             ScWifiApData::NotReady => None,
-            ScWifiApData::LinkUp => None,
-            ScWifiApData::ConfigUp => None,
             ScWifiApData::WaitingForClient(credentials) => {
                 let mut status_str = DetailString::complimentary_str();
                 core::fmt::write(
