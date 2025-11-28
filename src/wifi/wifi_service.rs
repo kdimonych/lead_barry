@@ -170,6 +170,7 @@ impl WifiService {
     }
 
     /// Switch to idle mode
+    #[allow(dead_code)]
     pub async fn idle(&self) {
         let mut service_impl = self.service_impl.lock().await;
         service_impl.idle().await;
@@ -196,6 +197,7 @@ impl WifiService {
     }
 }
 
+#[allow(dead_code)]
 trait WiFiServiceImplementation<'a> {
     fn net_stack(&self) -> Stack<'a>;
 

@@ -189,6 +189,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 impl<'a> WiFiController<'a, IdleState> {
     /// Initialize the WiFi hardware and transition to Joined state
     pub async fn join(
@@ -263,6 +264,7 @@ impl<'a> From<WiFiController<'a, IdleState>> for WiFiCtrlState<'a> {
     }
 }
 
+#[allow(dead_code)]
 impl<'a> WiFiController<'a, JoinedState> {
     /// Disconnect from the current WiFi network and transition to Idle state
     pub async fn leave(mut self) -> WiFiController<'a, IdleState> {
@@ -306,6 +308,7 @@ impl<'a> From<WiFiController<'a, JoinedState>> for WiFiCtrlState<'a> {
     }
 }
 
+#[allow(dead_code)]
 impl<'a> WiFiController<'a, ApState> {
     /// Close the access point and transition to Idle state
     pub async fn close_ap(mut self) -> WiFiController<'a, IdleState> {

@@ -85,6 +85,7 @@ impl Default for DhcpServerConfig {
     }
 }
 
+#[allow(dead_code)]
 pub enum DhcpEvent {
     Lease(Ipv4Address, [u8; 6]),
     Release(Ipv4Address, [u8; 6]),

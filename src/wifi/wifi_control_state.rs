@@ -4,6 +4,8 @@ pub enum WiFiControlerState<IdleState, JoinedState, ApState> {
     Joined(JoinedState),
     Ap(ApState),
 }
+
+#[allow(dead_code)]
 impl<IdleState, JoinedState, ApState> WiFiControlerState<IdleState, JoinedState, ApState> {
     pub fn is_idle(&self) -> bool {
         matches!(self, WiFiControlerState::Idle(_))
