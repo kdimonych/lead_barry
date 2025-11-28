@@ -9,7 +9,7 @@ use embassy_sync::{
     },
 };
 
-use embassy_time::Ticker;
+use embassy_time::{Ticker, with_timeout};
 use ina3221_async::*;
 
 use crate::{
@@ -17,9 +17,15 @@ use crate::{
     vcp_sensors::events::*,
 };
 
+const POLL_TIMEOUT_MS: u64 = 40;
+const HARDWARE_RESPONSE_TIMEOUT_MS: u64 = 100;
+
+#[derive(defmt::Format)]
 pub enum VcpCommand {
     EnableChannel(ChannelNum),
     DisableChannel(ChannelNum),
+    EnableAllChannels,
+    DisableAllChannels,
 }
 
 type VcpEventChannel<const EVENT_QUEUE_SIZE: usize> = PriorityChannel<
@@ -96,6 +102,12 @@ impl<'a, const EVENT_QUEUE_SIZE: usize> VcpControl<'a, EVENT_QUEUE_SIZE> {
     pub fn disable_channel(&self, channel: ChannelNum) -> VcpCommandSendFuture<'_> {
         self.command_receiver
             .send(VcpCommand::DisableChannel(channel))
+    }
+    pub fn enable_all_channels(&self) -> impl Future<Output = ()> + '_ {
+        self.command_receiver.send(VcpCommand::EnableAllChannels)
+    }
+    pub fn disable_all_channels(&self) -> impl Future<Output = ()> + '_ {
+        self.command_receiver.send(VcpCommand::DisableAllChannels)
     }
 }
 
@@ -232,6 +244,28 @@ where
                     warn!("Invalid channel number: {}", channel);
                 }
             }
+            VcpCommand::EnableAllChannels => {
+                for ch in 0u8..3u8 {
+                    self.config.enabled_channels[ch as usize] = true;
+                }
+                info!("Enabled all channels");
+            }
+            VcpCommand::DisableAllChannels => {
+                for ch in 0u8..3u8 {
+                    self.config.enabled_channels[ch as usize] = false;
+                }
+                info!("Disabled all channels");
+            }
+        }
+    }
+
+    fn push_event(&mut self, event: VcpSensorsEvents) {
+        if self.event_sender.is_full() {
+            // If data queue is full, clear it to make space for new readings
+            self.event_sender.clear();
+        }
+        if self.event_sender.try_send(event).is_err() {
+            error!("Failed to send VCP event");
         }
     }
 
@@ -250,11 +284,13 @@ where
                 .await;
         }
 
-        let mut ticker = Ticker::every(40.ms());
+        let mut ticker = Ticker::every(POLL_TIMEOUT_MS.ms());
+
         loop {
             match select::select(self.command_sender.receive(), ticker.next()).await {
                 select::Either::First(command) => {
                     // Handle incoming command
+                    debug!("Handled VCP command: {}", command);
                     self.handle_command(&mut ina, command);
                 }
                 select::Either::Second(_) => {}
@@ -264,22 +300,25 @@ where
                 if !self.config.enabled_channels[ch as usize] {
                     continue;
                 }
-                let reading = self.read_channel(&ina, ch).await;
+                let reading = with_timeout(
+                    HARDWARE_RESPONSE_TIMEOUT_MS.ms(),
+                    self.read_channel(&ina, ch),
+                )
+                .await;
                 match reading {
-                    Err(e) => {
-                        error!("Error reading channel {}: {:?}", ch, e);
-                        self.event_sender
-                            .send(VcpSensorsEvents::Error(
-                                e.error_description().unwrap_or("Unknown error"),
-                            ))
-                            .await;
+                    Err(_) => {
+                        error!("Timeout reading channel {}", ch);
+                        self.push_event(VcpSensorsEvents::Error("Timeout reading VCP channel"));
                         continue;
                     }
-                    Ok(reading) => {
-                        self.event_sender
-                            .send(VcpSensorsEvents::Reading(reading))
-                            .await;
+                    Ok(Err(e)) => {
+                        error!("Error reading channel {}: {:?}", ch, e);
+                        self.push_event(VcpSensorsEvents::Error(
+                            e.error_description().unwrap_or("Unknown error"),
+                        ));
+                        continue;
                     }
+                    Ok(Ok(reading)) => self.push_event(VcpSensorsEvents::Reading(reading)),
                 };
             }
         }
