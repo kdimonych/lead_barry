@@ -141,7 +141,7 @@ pub async fn main_logic_controller(
 
         let mut wifi_ap_settings = settings.network_settings.wifi_ap_settings.clone();
         // Generate_random_password
-        // TODO: Maybe it is  possible to eliminate clonong here
+        // TODO: Maybe it is possible to eliminate cloning here
         wifi_ap_settings.password = Some(
             wifi_ap_settings
                 .password
@@ -181,6 +181,8 @@ pub async fn main_logic_controller(
                     ApStatus::Ready((ip, mac)) => {
                         //net_stack.
                         // Set wifi ap screen with not ready state
+                        trace!("Ap ready. Client connected.");
+                        network_ready = true;
                         let wifi_ap_data =
                             ScWifiApData::Connected(ScvClientInfo { ip, mac: Some(mac) });
                         set_screen(ScWifiAp::new(wifi_ap_data).into()).await;

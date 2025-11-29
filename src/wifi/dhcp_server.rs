@@ -20,16 +20,18 @@ enum DhcpServerCmmand {
 enum DhcpServerEvent {
     Stopped,
     Started,
-    /// Indicates a new lease assignment
-    Leased(Ipv4Address, [u8; 6]),
-    /// Indicates a release the IP by a client
-    Released(Ipv4Address, [u8; 6]),
 }
-//    const MAX_CLIENTS: usize = DEFAULT_MAX_CLIENTS,
-//    const MAX_DNS: usize = DEFAULT_MAX_DNS_SERVERS,
+
+#[allow(dead_code)]
+pub enum DhcpEvent {
+    Lease(Ipv4Address, [u8; 6]),
+    Release(Ipv4Address, [u8; 6]),
+}
+
 pub struct DhcpServerState {
     command: Signal<CriticalSectionRawMutex, DhcpServerCmmand>,
-    event: Signal<CriticalSectionRawMutex, DhcpServerEvent>,
+    state_signal: Signal<CriticalSectionRawMutex, DhcpServerEvent>,
+    lease_event: Signal<CriticalSectionRawMutex, DhcpEvent>,
     dhcp_server: Mutex<CriticalSectionRawMutex, Option<LhDhcpServer<MAX_CLIENTS, MAX_DNS_SERVERS>>>,
 }
 
@@ -37,7 +39,8 @@ impl DhcpServerState {
     pub fn new() -> Self {
         Self {
             command: Signal::new(),
-            event: Signal::new(),
+            state_signal: Signal::new(),
+            lease_event: Signal::new(),
             dhcp_server: Mutex::new(None),
         }
     }
@@ -85,12 +88,6 @@ impl Default for DhcpServerConfig {
     }
 }
 
-#[allow(dead_code)]
-pub enum DhcpEvent {
-    Lease(Ipv4Address, [u8; 6]),
-    Release(Ipv4Address, [u8; 6]),
-}
-
 impl DhcpServer {
     pub async fn new(state: &'static DhcpServerState) -> Self {
         info!("Creating DHCP server instance ...");
@@ -100,15 +97,8 @@ impl DhcpServer {
         res
     }
 
-    pub async fn wait_event(&self) -> Option<DhcpEvent> {
-        match self.state.event.wait().await {
-            DhcpServerEvent::Leased(ip, mac) => Some(DhcpEvent::Lease(ip, mac)),
-            DhcpServerEvent::Released(ip, mac) => Some(DhcpEvent::Release(ip, mac)),
-            event => {
-                self.state.event.signal(event);
-                None
-            } // Re-signal other events
-        }
+    pub fn wait_event(&self) -> impl Future<Output = DhcpEvent> {
+        self.state.lease_event.wait()
     }
 
     pub async fn start(
@@ -146,11 +136,11 @@ impl DhcpServer {
             return;
         }
         self.state.command.signal(DhcpServerCmmand::Stop);
-        while self.state.event.wait().await != DhcpServerEvent::Stopped {}
+        while self.state.state_signal.wait().await != DhcpServerEvent::Stopped {}
         // Destroy existing server, if existing
         self.state.dhcp_server.lock().await.take();
         self.state.command.reset();
-        self.state.event.reset();
+        self.state.state_signal.reset();
         debug!("DHCP server stopped");
     }
 
@@ -174,25 +164,30 @@ async fn dhcp_server_task(state: &'static DhcpServerState, stack: Stack<'static>
 
     if let Some(dhcp_server) = state.dhcp_server.lock().await.as_mut() {
         info!("Starting DHCP server task");
-        state.event.signal(DhcpServerEvent::Started);
+        state.state_signal.signal(DhcpServerEvent::Started);
 
         let mut buffers = DHCPServerBuffers::new();
         let mut socket = DHCPServerSocket::new(stack, &mut buffers);
 
         loop {
-            match join(state.event.wait(), dhcp_server.lease_one(&mut socket)).await {
+            match join(
+                state.state_signal.wait(),
+                dhcp_server.lease_one(&mut socket),
+            )
+            .await
+            {
                 (DhcpServerEvent::Stopped, _) => {
-                    info!("Stopping DHCP server task");
+                    debug!("Stopping DHCP server task");
                     break;
                 }
                 (_, Ok(TransactionEvent::Leased(ip, mac))) => {
-                    info!("Leased IP: {} for MAC: {}", ip, mac);
+                    debug!("Leased IP: {} for MAC: {}", ip, mac);
                     // Wait a bit before returning to let the stack send the ACK packet
-                    state.event.signal(DhcpServerEvent::Leased(ip, mac));
+                    state.lease_event.signal(DhcpEvent::Lease(ip, mac));
                 }
                 (_, Ok(TransactionEvent::Released(ip, mac))) => {
-                    info!("Released IP: {} for MAC: {}", ip, mac);
-                    state.event.signal(DhcpServerEvent::Released(ip, mac));
+                    debug!("Released IP: {} for MAC: {}", ip, mac);
+                    state.lease_event.signal(DhcpEvent::Release(ip, mac));
                 }
                 (_, Err(e)) => {
                     error!("DHCP server error: {:?}", e);
@@ -204,5 +199,5 @@ async fn dhcp_server_task(state: &'static DhcpServerState, stack: Stack<'static>
         warn!("DHCP server instance not found, stopping DHCP server task");
     }
 
-    state.event.signal(DhcpServerEvent::Stopped);
+    state.state_signal.signal(DhcpServerEvent::Stopped);
 }

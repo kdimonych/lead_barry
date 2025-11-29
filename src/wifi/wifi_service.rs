@@ -263,8 +263,10 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
         self.init_dhcp_server().await;
 
         wifi_state_handler(ApStatus::WaitingForClient).await;
+        trace!("Wait for client connected");
         // Wait for a client to connect and get an IP address
         let new_client = self.wait_for_dhcp_client().await.unwrap();
+        trace!("Dhcp client has been connected.");
         wifi_state_handler(ApStatus::Ready(new_client)).await;
     }
 }
@@ -494,9 +496,8 @@ impl<'a> WifiServiceImpl<'a> {
     async fn wait_for_dhcp_client(&mut self) -> Result<(Ipv4Address, [u8; 6]), ()> {
         loop {
             match self.dhcp_server.wait_event().await {
-                Some(DhcpEvent::Lease(ip, mac)) => return Ok((ip, mac)),
-                Some(DhcpEvent::Release(_, _)) => { /* Ignore release events */ }
-                _ => return Err(()),
+                DhcpEvent::Lease(ip, mac) => return Ok((ip, mac)),
+                DhcpEvent::Release(_, _) => { /* Ignore release events */ }
             }
         }
     }
