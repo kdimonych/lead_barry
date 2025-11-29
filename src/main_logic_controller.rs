@@ -313,7 +313,7 @@ async fn show_time_screen(shared: &'static SharedResources) -> ! {
             core::fmt::write(
                 time_str,
                 format_args!(
-                    "{:04}-{:02}-{:02} {:02}:{:02}:{:02} t: {:.01} C",
+                    "{:04}-{:02}-{:02}\n{:02}:{:02}:{:02}\nt: {:.01} C",
                     datetime.year(),
                     datetime.month(),
                     datetime.day(),
@@ -368,7 +368,7 @@ async fn show_visit_screen(shared: &'static SharedResources) {
         let mut invitation = MessageString::complimentary_str();
         core::fmt::write(
             &mut invitation,
-            format_args!("http:// {} on your device.", ip),
+            format_args!("http://\n{} on your device.", ip),
         )
         .ok();
 

@@ -1,4 +1,7 @@
+use core::str::FromStr;
+
 use common::any_string::AnyString;
+use common::string_tools::*;
 
 use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::*},
@@ -119,106 +122,16 @@ fn try_split_at_utf8(word: &str, step: usize) -> (usize, &str, &str) {
     (i, &word[0..i], &word[i..])
 }
 
-fn len_in_chars(word: &str) -> usize {
-    word.chars().count()
-}
-
-fn split_whitespace_once(text: &str) -> (&str, &str) {
-    if let Some((first, rest)) = text.split_once(char::is_whitespace) {
-        (first, rest.trim_start())
-    } else {
-        (text, &text[text.len()..])
-    }
-}
-
-fn split_line_once(text: &str) -> (&str, &str) {
-    if let Some((first, rest)) = text.split_once(['\n', '\r']) {
-        (first, rest.trim_start())
-    } else {
-        (text, &text[text.len()..])
-    }
-}
-
-/// Fill the line with words from the message until it reaches the maximum length or runs out of words.
-/// Returns the length of the line and the remaining part of the message.
-/// If a word is too long to fit in an empty line, it will be truncated and "..." will be added.
-/// If a word is too long to fit in a non-empty line, it will be left for the next line.
-fn fill_with_words<'a>(
-    line: &mut heapless::String<MESSAGE_SIZE>,
-    msg: &'a str,
-) -> (usize, &'a str) {
-    let mut rest = msg;
-    let mut old_rest = msg;
-    let mut line_len = len_in_chars(line.as_ref());
-
-    while line.len() <= MESSAGE_LINE_LENGTH {
-        let (word, rest_msg) = split_whitespace_once(rest);
-        rest = rest_msg;
-        if word.is_empty() {
-            break;
-        }
-        let word_len = len_in_chars(word);
-        let space_len = if line_len > 0 { 1 } else { 0 };
-        if line_len + word_len + space_len <= MESSAGE_LINE_LENGTH {
-            if space_len > 0 {
-                // Add space before the word if it's not the first word in the line
-                line.push(' ').ok();
-            }
-            line.push_str(word).ok();
-            line_len += space_len + word_len;
-        } else if line.is_empty() {
-            // In case this is new line and the word is too long, we need to split it
-            let (part_len, part, _) = try_split_at_utf8(word, MESSAGE_LINE_LENGTH - space_len - 3);
-            if space_len > 0 {
-                // Add space before the word if it's not the first word in the line
-                line.push(' ').ok();
-            }
-            line.push_str(part).ok();
-            line.push_str("...").ok();
-            line_len += space_len + part_len + 3;
-            break;
-        } else {
-            // In case the line is not empty and the word is too long, we need a new line, so just return the old rest
-            rest = old_rest;
-            break;
-        }
-
-        old_rest = rest;
-    }
-    (line_len, rest)
-}
-
 // TODO: Cover with tests
 fn split_message_into_lines(message: &str) -> heapless::Vec<heapless::String<MESSAGE_SIZE>, 3> {
     let mut lines: heapless::Vec<heapless::String<MESSAGE_SIZE>, 3> = heapless::Vec::new();
-    for _ in 0..lines.capacity() {
-        lines.push(heapless::String::new()).ok();
+
+    let line_it = message.slice_by_lines(MESSAGE_LINE_LENGTH);
+    for line in line_it {
+        lines
+            .push(heapless::String::from_str(line).unwrap_or_default())
+            .ok();
     }
-
-    let mut target_lines = lines.iter_mut();
-    let mut rest = message;
-
-    while let Some(mut current_line) = target_lines.next() {
-        let (mut msg_line, msg_rest) = split_line_once(rest);
-        rest = msg_rest;
-
-        while !msg_line.is_empty() {
-            let (_, line_rest) = fill_with_words(current_line, msg_line);
-            msg_line = line_rest;
-
-            let Some(new_current_line) = target_lines.next() else {
-                return lines;
-            };
-            current_line = new_current_line;
-        }
-
-        if rest.is_empty() {
-            break;
-        }
-    }
-    // Truncate empty lines at the end
-    lines.truncate(lines.iter().filter(|line| !line.is_empty()).count());
-
     lines
 }
 
