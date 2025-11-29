@@ -21,7 +21,6 @@ mod vcp_sensors;
 mod web_server;
 mod wifi;
 
-use cyw43_pio::PioSpi;
 use defmt::*;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
