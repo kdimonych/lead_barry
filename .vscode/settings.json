@@ -1,8 +1,6 @@
 {
     "rust-analyzer.check.allTargets": false,
     "editor.formatOnSave": true,
-    "rust-analyzer.cargo.runBuildScripts": true,
-    "rust-analyzer.checkOnSave.command": "clippy",
     "editor.defaultFormatter": "rust-lang.rust-analyzer",
     "files.readonlyInclude": {
         "**/.cargo/registry/src/**/*.rs": true,
