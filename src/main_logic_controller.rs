@@ -301,18 +301,26 @@ async fn show_time_screen(shared: &'static SharedResources) -> ! {
 
     let update_time_str = async |time_str: &mut heapless::String<_>| {
         let mut rtc = shared.rtc.lock().await;
+
+        let mut t = None;
+        if let Ok(false) = rtc.busy().await {
+            rtc.convert_temperature().await.ok();
+            t = rtc.temperature().await.ok();
+        }
+
         if let Ok(datetime) = rtc.datetime().await {
             time_str.clear();
             core::fmt::write(
                 time_str,
                 format_args!(
-                    "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                    "{:04}-{:02}-{:02} {:02}:{:02}:{:02} t: {:.01} C",
                     datetime.year(),
                     datetime.month(),
                     datetime.day(),
                     datetime.hour(),
                     datetime.minute(),
-                    datetime.second()
+                    datetime.second(),
+                    t.unwrap_or_default()
                 ),
             )
             .ok();
