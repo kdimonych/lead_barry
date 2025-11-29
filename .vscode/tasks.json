@@ -36,6 +36,20 @@
                 "panel": "shared"
             },
             "problemMatcher": "$rustc"
+        },
+        {
+            "label": "cargo run embedded",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "--target", "thumbv6m-none-eabi"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$rustc"
         }
     ]
 }
