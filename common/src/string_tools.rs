@@ -39,7 +39,8 @@ impl<'a> Iterator for FitLineSlicer<'a> {
         let line_len = line.len_in_chars();
         if line_len <= self.max_len {
             // Fits entirely, return as is
-            self.message = &self.message[line.len()..];
+            line = line.trim();
+            self.message = &self.message[line.len()..].trim();
             return Some(line);
         }
 
@@ -101,14 +102,31 @@ mod tests {
 
     #[test]
     fn test_slice_by_lines() {
-        let s = "This is a test message that will be sliced into multiple lines based on the maximum length specified.";
+        let s = "This is a test message\n that will be sliced into multiple \nlines based on the maximum length specified.";
         let slicer = s.slice_by_lines(20);
         let lines: Vec<&str> = slicer.collect();
-        assert_eq!(lines.len(), 5);
+        assert_eq!(lines.len(), 7);
         assert_eq!(lines[0], "This is a test");
-        assert_eq!(lines[1], "message that will");
-        assert_eq!(lines[2], "be sliced into");
-        assert_eq!(lines[3], "multiple lines");
-        assert_eq!(lines[4], "based on the maximum length specified.");
+        assert_eq!(lines[1], "message");
+        assert_eq!(lines[2], "that will be sliced");
+        assert_eq!(lines[3], "into multiple");
+        assert_eq!(lines[4], "lines based on the");
+        assert_eq!(lines[5], "maximum length");
+        assert_eq!(lines[6], "specified.");
+    }
+
+    #[test]
+    fn test_slice_by_lines_nl_chain() {
+        let s = "This is a test message\n that will be sliced into multiple \n\n\nlines based on the maximum length specified.";
+        let slicer = s.slice_by_lines(20);
+        let lines: Vec<&str> = slicer.collect();
+        assert_eq!(lines.len(), 7);
+        assert_eq!(lines[0], "This is a test");
+        assert_eq!(lines[1], "message");
+        assert_eq!(lines[2], "that will be sliced");
+        assert_eq!(lines[3], "into multiple");
+        assert_eq!(lines[4], "lines based on the");
+        assert_eq!(lines[5], "maximum length");
+        assert_eq!(lines[6], "specified.");
     }
 }
