@@ -209,6 +209,14 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
                 .with_plain_text_body("Not Found"),
         }
     }
+
+    async fn handle_websocket_connection(
+        &mut self,
+        _request: &HttpRequest<'_>,
+        _web_socket: nanofish::WebSocket<'_, '_>,
+    ) -> Result<(), ()> {
+        Err(()) // Close the connection immediately
+    }
 }
 
 fn to_response<T>(

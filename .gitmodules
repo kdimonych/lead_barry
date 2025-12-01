@@ -4,6 +4,7 @@
 [submodule "nanofish"]
 	path = nanofish
 	url = git@github.com:kdimonych/nanofish.git
+	branch = DmytroKrasnianskyi/response_builder
 [submodule "ds323x-rs"]
 	path = ds323x-rs
 	url = git@github.com:kdimonych/ds323x-rs.git
