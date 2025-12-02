@@ -38,6 +38,8 @@
     <div class="divider"></div>
     <button onclick="sendConfig()">Save Configuration</button>
     <button onclick="sendConfigAndReboot()">Save Configuration and Reboot</button>
+    <div class="divider"></div>
+    <button onclick="testWebSocket()">Test WebSocket</button>
 
     <div id="status" class="result" style="display:none;"></div>
 
@@ -47,6 +49,31 @@
             await get_config();
             await get_date_time();
         };
+
+        async function testWebSocket() {
+            try {
+                const ws = new WebSocket(`ws://${location.host}/ws/test`);
+                ws.onopen = () => {
+                    console.log('WebSocket connection opened');
+                    ws.send('Hello from client');
+                };
+                ws.onmessage = (event) => {
+                    console.log('Message from server:', event.data);
+                    alert('Message from server: ' + event.data);
+                    ws.close();
+                };
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    alert('WebSocket error: ' + error.message);
+                };
+                ws.onclose = () => {
+                    console.log('WebSocket connection closed');
+                };
+            } catch (error) {
+                console.error('WebSocket exception:', error);
+                alert('WebSocket exception: ' + error.message);
+            }
+        }
 
         async function get_version(){
             try {

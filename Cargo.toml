@@ -4,7 +4,8 @@ members = [
     "nanofish",
     "leasehund",
     "common",
-    "ds323x-rs"
+    "ds323x-rs",
+    "protocols",
 ]
 
 [package]
