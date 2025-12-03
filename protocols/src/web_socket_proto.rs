@@ -4,23 +4,29 @@ use modular_bitfield::prelude::*;
 
 pub const WS_GUID: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 pub const MIN_WS_FRAME_HEADER_SIZE: usize = 2;
-pub const MAX_WS_EXTENDEDPAYLOAD_LEN_SHORT: usize = 2;
-pub const MAX_WS_EXTENDEDPAYLOAD_LEN_LONG: usize = 8;
-pub const MAX_WS_MASKING_KEY_LEN: usize = 4;
+pub const WS_EXTENDEDPAYLOAD_LEN_SHORT: usize = 2;
+pub const WS_EXTENDEDPAYLOAD_LEN_LONG: usize = 8;
+pub const WS_MASKING_KEY_LEN: usize = 4;
 pub const MAX_WS_FRAME_HEADER_SIZE: usize =
-    MIN_WS_FRAME_HEADER_SIZE + MAX_WS_EXTENDEDPAYLOAD_LEN_LONG + MAX_WS_MASKING_KEY_LEN; // 2 + 8 + 4
+    MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_LONG + WS_MASKING_KEY_LEN; // 2 + 8 + 4
 pub const MASKING_KEY_LEN: usize = 4;
 
 pub type MaskKey = [u8; MASKING_KEY_LEN];
 
+pub type WSRequiredSizeHint = usize;
+pub type WSReadSize = usize;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum WebSocketProtoError {
-    InvalidFrame(),
+    /// Not enough data available to read the complete frame header.
+    /// Contains the number hint of bytes needed.
+    NotEnoughData(WSRequiredSizeHint),
+    InvalidFrame,
 }
 
 #[derive(Specifier, Debug, Clone, Copy, PartialEq)]
 #[bits = 4]
-pub enum Opcode {
+pub enum WSOpcode {
     ContinuationFrame = 0x0,
     Text = 0x1,
     Binary = 0x2,
@@ -44,7 +50,7 @@ pub enum Opcode {
 struct WebSocketFrameHeaderPacked {
     // Byte 0
     #[bits = 4]
-    opcode: Opcode,
+    opcode: WSOpcode,
     #[skip]
     __: B3,
     fin: B1,
@@ -56,7 +62,7 @@ struct WebSocketFrameHeaderPacked {
 
 fn write_frame_header(
     fin: u8,
-    opcode: Opcode,
+    opcode: WSOpcode,
     payload_len: usize,
     masking_key: Option<MaskKey>,
     buffer: &mut [u8],
@@ -79,7 +85,7 @@ fn write_frame_header(
         buffer[index..index + MIN_WS_FRAME_HEADER_SIZE].copy_from_slice(&header.into_bytes());
         index += MIN_WS_FRAME_HEADER_SIZE;
     } else if payload_len <= 65535 {
-        if buffer.len() < MIN_WS_FRAME_HEADER_SIZE + MAX_WS_EXTENDEDPAYLOAD_LEN_SHORT {
+        if buffer.len() < MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_SHORT {
             return Err(());
         }
 
@@ -88,11 +94,11 @@ fn write_frame_header(
         index += MIN_WS_FRAME_HEADER_SIZE;
 
         let payload_len_sort = payload_len as u16;
-        buffer[index..index + MAX_WS_EXTENDEDPAYLOAD_LEN_SHORT]
+        buffer[index..index + WS_EXTENDEDPAYLOAD_LEN_SHORT]
             .copy_from_slice(&payload_len_sort.to_be_bytes());
         index += 2;
     } else {
-        if buffer.len() < MIN_WS_FRAME_HEADER_SIZE + MAX_WS_EXTENDEDPAYLOAD_LEN_LONG {
+        if buffer.len() < MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_LONG {
             return Err(());
         }
 
@@ -100,95 +106,128 @@ fn write_frame_header(
         buffer[index..index + MIN_WS_FRAME_HEADER_SIZE].copy_from_slice(&header.into_bytes());
         index += MIN_WS_FRAME_HEADER_SIZE;
 
-        buffer[index..index + MAX_WS_EXTENDEDPAYLOAD_LEN_LONG]
+        buffer[index..index + WS_EXTENDEDPAYLOAD_LEN_LONG]
             .copy_from_slice(&payload_len.to_be_bytes());
-        index += MAX_WS_EXTENDEDPAYLOAD_LEN_LONG;
+        index += WS_EXTENDEDPAYLOAD_LEN_LONG;
     }
 
     if let Some(mask) = masking_key {
-        if buffer.len() < index + MAX_WS_MASKING_KEY_LEN {
+        if buffer.len() < index + WS_MASKING_KEY_LEN {
             return Err(());
         }
-        buffer[index..index + MAX_WS_MASKING_KEY_LEN].copy_from_slice(&mask);
-        index += MAX_WS_MASKING_KEY_LEN;
+        buffer[index..index + WS_MASKING_KEY_LEN].copy_from_slice(&mask);
+        index += WS_MASKING_KEY_LEN;
     }
 
     Ok(index)
 }
 
-struct WebSocketFrameHeader {
+pub struct WSFrameHeader {
     fin: u8,
-    opcode: Opcode,
+    opcode: WSOpcode,
     payload_len: usize,
     masking_key: Option<MaskKey>,
 }
 
-fn read_frame_header(buffer: &[u8]) -> Result<(WebSocketFrameHeader, usize), WebSocketProtoError> {
-    if buffer.len() < MIN_WS_FRAME_HEADER_SIZE {
-        return Err(WebSocketProtoError::InvalidFrame());
+impl WSFrameHeader {
+    pub fn fin(&self) -> u8 {
+        self.fin
+    }
+
+    pub fn opcode(&self) -> WSOpcode {
+        self.opcode
+    }
+
+    pub fn payload_len(&self) -> usize {
+        self.payload_len
+    }
+
+    pub fn masking_key(&self) -> Option<MaskKey> {
+        self.masking_key
+    }
+}
+
+fn read_frame_header(buffer: &[u8]) -> Result<(WSFrameHeader, usize), WebSocketProtoError> {
+    let mut expected_size = MIN_WS_FRAME_HEADER_SIZE;
+    if buffer.len() < expected_size {
+        return Err(WebSocketProtoError::NotEnoughData(
+            expected_size, // Need at least 2 bytes
+        ));
     }
 
     let header = WebSocketFrameHeaderPacked::from_bytes([buffer[0], buffer[1]]);
-    let mut index = MIN_WS_FRAME_HEADER_SIZE;
+    let opcode = header
+        .opcode_or_err()
+        .map_err(|_| WebSocketProtoError::InvalidFrame)?;
+
+    expected_size += if header.mask() == 1 {
+        WS_MASKING_KEY_LEN
+    } else {
+        0
+    };
 
     let payload_len = match header.payload_len() {
-        len @ 0..=125 => len as usize,
+        len @ 0..=125 => {
+            if buffer.len() < expected_size {
+                return Err(WebSocketProtoError::NotEnoughData(
+                    expected_size, // Need at least 2 bytes + 2 bytes of masking key if present
+                ));
+            }
+
+            len as usize
+        }
         126 => {
-            if buffer.len() < index + MAX_WS_EXTENDEDPAYLOAD_LEN_SHORT {
-                return Err(WebSocketProtoError::InvalidFrame());
+            expected_size += WS_EXTENDEDPAYLOAD_LEN_SHORT;
+
+            if buffer.len() < expected_size {
+                return Err(WebSocketProtoError::NotEnoughData(
+                    expected_size, // Need at least 4 bytes + 2 bytes of masking key if present
+                ));
             }
 
             // The value is stored in network byte order (big-endian)
-            let extended_length: u16 = u16::from_be_bytes(
-                buffer[index..index + MAX_WS_EXTENDEDPAYLOAD_LEN_SHORT]
-                    .try_into()
-                    .unwrap(),
-            );
-            index += MAX_WS_EXTENDEDPAYLOAD_LEN_SHORT;
+            const VALUE_START: usize = MIN_WS_FRAME_HEADER_SIZE;
+            const VALUE_END: usize = MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_SHORT;
+            let extended_length: u16 =
+                u16::from_be_bytes(buffer[VALUE_START..VALUE_END].try_into().unwrap());
             extended_length as usize
         }
         127 => {
-            if buffer.len() < index + MAX_WS_EXTENDEDPAYLOAD_LEN_LONG {
-                return Err(WebSocketProtoError::InvalidFrame());
+            expected_size += WS_EXTENDEDPAYLOAD_LEN_LONG;
+
+            if buffer.len() < expected_size {
+                return Err(WebSocketProtoError::NotEnoughData(
+                    expected_size, // Need at least 4 bytes + 2 bytes of masking key if present
+                ));
             }
             // The value is stored in network byte order (big-endian)
-            let extended_length = u64::from_be_bytes(
-                buffer[index..index + MAX_WS_EXTENDEDPAYLOAD_LEN_LONG]
-                    .try_into()
-                    .unwrap(),
-            );
+            const VALUE_START: usize = MIN_WS_FRAME_HEADER_SIZE;
+            const VALUE_END: usize = MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_LONG;
+            let extended_length =
+                u64::from_be_bytes(buffer[VALUE_START..VALUE_END].try_into().unwrap());
             if extended_length >> 63 != 0 {
                 // Most significant bit must be 0
-                return Err(WebSocketProtoError::InvalidFrame());
+                return Err(WebSocketProtoError::InvalidFrame);
             }
-
-            index += MAX_WS_EXTENDEDPAYLOAD_LEN_LONG;
             extended_length as usize
         }
-        _ => return Err(WebSocketProtoError::InvalidFrame()),
+        _ => return Err(WebSocketProtoError::InvalidFrame),
     };
 
     let masking_key = if header.mask() == 1 {
-        let Ok(res) = MaskKey::try_from(&buffer[index..index + MAX_WS_MASKING_KEY_LEN]) else {
-            return Err(WebSocketProtoError::InvalidFrame());
-        };
-        index += MAX_WS_MASKING_KEY_LEN;
-
-        Some(res)
+        MaskKey::try_from(&buffer[expected_size - WS_MASKING_KEY_LEN..expected_size]).ok()
     } else {
         None
     };
 
-    let reading = WebSocketFrameHeader {
+    let reading = WSFrameHeader {
         fin: header.fin(),
-        opcode: header
-            .opcode_or_err()
-            .map_err(|_| WebSocketProtoError::InvalidFrame())?,
+        opcode,
         payload_len,
         masking_key,
     };
 
-    Ok((reading, index))
+    Ok((reading, expected_size))
 }
 
 pub trait WSMaskKeyProvider {
@@ -230,7 +269,7 @@ impl<MaskingType> WSStreamWriter<MaskingType> {
     pub fn new(
         out_buf: &mut [u8],
         fin: u8,
-        opcode: Opcode,
+        opcode: WSOpcode,
         payload_len: usize,
         masking_type: MaskingType,
     ) -> Result<(Self, usize), ()>
@@ -303,28 +342,173 @@ impl WSStreamPayloadEncoder for WSStreamWriter<WSMasked> {
     }
 }
 
-pub struct WSStreamReader {
-    header: WebSocketFrameHeader,
-    masking_idx: usize,
+pub enum WSHeaderState<E> {
+    /// Not enough data to read the complete header. Contains the number of bytes read from provided buffer.
+    PendingData(usize),
+    /// Successfully read the header. Contains the header and number of bytes read.
+    Ready(WSFrameHeader, usize),
+    Error(E),
 }
 
-impl WSStreamReader {
-    pub fn from_data(src_buf: &[u8]) -> Result<(Self, usize), ()> {
-        let (header, read_size) = read_frame_header(src_buf).map_err(|_| ())?;
-        Ok((
-            Self {
-                header,
-                masking_idx: 0,
-            },
-            read_size,
-        ))
+impl<E> WSHeaderState<E> {
+    pub fn is_ready(&self) -> bool {
+        matches!(self, WSHeaderState::Ready(_, _))
+    }
+
+    pub fn is_pending(&self) -> bool {
+        matches!(self, WSHeaderState::PendingData(_))
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self, WSHeaderState::Error(_))
+    }
+
+    pub fn unwrap_ready(self) -> (WSFrameHeader, usize) {
+        match self {
+            WSHeaderState::Ready(header, size) => (header, size),
+            _ => panic!("Called unwrap_ready on a non-ready state"),
+        }
+    }
+
+    pub fn unwrap_pending(self) -> usize {
+        match self {
+            WSHeaderState::PendingData(size) => size,
+            _ => panic!("Called unwrap_pending on a non-pending state"),
+        }
+    }
+
+    pub fn unwrap_error(self) -> E {
+        match self {
+            WSHeaderState::Error(e) => e,
+            _ => panic!("Called unwrap_error on a non-error state"),
+        }
+    }
+}
+
+pub struct WSHeaderReader {
+    header_buf: heapless::Vec<u8, MAX_WS_FRAME_HEADER_SIZE>,
+    expected_bytes: usize,
+}
+
+impl WSHeaderReader {
+    /// Creates a new WebSocket frame header reader.
+    pub const fn new() -> Self {
+        Self {
+            header_buf: heapless::Vec::new(),
+            expected_bytes: MIN_WS_FRAME_HEADER_SIZE,
+        }
+    }
+
+    /// Checks if the reader is currently reading a header.
+    pub fn is_reading(&self) -> bool {
+        !self.header_buf.is_empty()
+    }
+
+    /// Tries to read the WebSocket frame header from the provided source buffer.
+    ///
+    /// Note: This function may be called multiple times as more data becomes available.
+    /// It accumulates data internally until the complete header is read.
+    /// Returns the state of the read operation.
+    /// # Returns
+    /// - `WSHeaderReadState::Ready(WebSocketFrameHeader, usize)`: Successfully read the header.
+    /// Contains the header and number of bytes read during the last call.
+    /// - `WSHeaderReadState::PendingData(usize)`: Not enough data to read the complete header.
+    /// Contains the number of bytes read during the last call.
+    /// - `WSHeaderReadState::Error(WebSocketProtoError)`: Invalid header or other error.
+    /// # Errors
+    /// Returns `WSHeaderReadState::Error(WebSocketProtoError)` if an error occurs while reading the header.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let mut reader = WSHeaderReader::new();
+    /// let data = [0b10000001, 0b10010001, 0b01101000, 0b00010010, 0b11110001, 0b00110110];
+    /// loop{
+    ///     // Emulate a stream of incoming data
+    ///     let mut src_buf = &data[..];
+    ///
+    ///     match reader.try_read_header(src_buf) {
+    ///         WSHeaderReadState::Ready(header, read_size) => {
+    ///             // Process the header
+    ///         },
+    ///         WSHeaderReadState::PendingData(read_size) => {
+    ///             // Need more data
+    ///         },
+    ///         WSHeaderReadState::Error(e) => {
+    ///             // Handle error
+    ///         },
+    ///     }
+    /// }
+    /// ```
+    pub fn try_read_header(&mut self, mut src_buf: &[u8]) -> WSHeaderState<WebSocketProtoError> {
+        // Try to reade as many bytes as needed
+        loop {
+            if self.header_buf.is_empty() {
+                // Fast path: try to read directly from src_buf if we have enough data
+                match read_frame_header(src_buf) {
+                    Ok((header, read_size)) => return WSHeaderState::Ready(header, read_size),
+                    Err(WebSocketProtoError::NotEnoughData(required_size)) => {
+                        // Not enough data, copy what we have and update expected bytes
+                        self.header_buf.extend_from_slice(src_buf).unwrap();
+                        self.expected_bytes = required_size - src_buf.len();
+                        return WSHeaderState::PendingData(src_buf.len());
+                    }
+                    Err(e) => return WSHeaderState::Error(e),
+                }
+            } else if self.header_buf.len() + src_buf.len() < self.expected_bytes {
+                // Stilll not enough data, copy all available data to internal buffer
+                self.header_buf.extend_from_slice(src_buf).unwrap();
+                // Update expected bytes
+                self.expected_bytes -= src_buf.len();
+                return WSHeaderState::PendingData(src_buf.len());
+            } else {
+                // We probably have enough data to complete the header
+                self.header_buf
+                    .extend_from_slice(&src_buf[..self.expected_bytes])
+                    .unwrap();
+                // Remove consumed data from src_buf
+                src_buf = &src_buf[self.expected_bytes..];
+
+                // No more data need to read
+                match read_frame_header(self.header_buf.as_slice()) {
+                    Ok((header, read_size)) => {
+                        // Reset for next read
+                        self.header_buf.clear();
+                        self.expected_bytes = MIN_WS_FRAME_HEADER_SIZE;
+                        // Return the read header
+                        return WSHeaderState::Ready(header, read_size);
+                    }
+
+                    Err(WebSocketProtoError::NotEnoughData(new_required_size)) => {
+                        // Still not enough data, update expected bytes
+                        self.expected_bytes = new_required_size - self.header_buf.len();
+                        // And make another try
+                        continue;
+                    }
+                    Err(e) => return WSHeaderState::Error(e),
+                }
+            }
+        }
+    }
+}
+
+pub struct WSPayloadReader {
+    header: WSFrameHeader,
+    read_idx: usize,
+}
+
+impl WSPayloadReader {
+    pub fn from_header(header: WSFrameHeader) -> Self {
+        Self {
+            header,
+            read_idx: 0,
+        }
     }
 
     pub fn payload_len(&self) -> usize {
         self.header.payload_len
     }
 
-    pub fn opcode(&self) -> Opcode {
+    pub fn opcode(&self) -> WSOpcode {
         self.header.opcode
     }
 
@@ -340,21 +524,26 @@ impl WSStreamReader {
         self.header.masking_key.as_ref()
     }
 
-    pub fn decode_payload(
-        &mut self,
-        payload_dst: &mut [u8],
-        payload_src: &[u8],
-    ) -> Result<usize, ()> {
-        let free_space = self.header.payload_len - self.masking_idx;
-        if payload_src.len() > free_space {
-            return Err(());
-        }
+    pub fn read_bytes_remaining(&self) -> usize {
+        self.header.payload_len - self.read_idx
+    }
 
-        let size = min(min(payload_src.len(), payload_dst.len()), free_space);
+    pub fn read_bytes(&self) -> usize {
+        self.read_idx
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.read_idx >= self.header.payload_len
+    }
+
+    pub fn decode_payload(&mut self, payload_dst: &mut [u8], payload_src: &[u8]) -> usize {
+        let payload_rest = self.header.payload_len - self.read_idx;
+
+        let size = min(min(payload_src.len(), payload_dst.len()), payload_rest);
 
         if let Some(masking_key_bytes) = self.header.masking_key {
             for i in 0..size {
-                let j = (self.masking_idx + i) % masking_key_bytes.len();
+                let j = (self.read_idx + i) % masking_key_bytes.len();
                 let key_byte = masking_key_bytes[j];
                 payload_dst[i] = payload_src[i] ^ key_byte;
             }
@@ -362,16 +551,30 @@ impl WSStreamReader {
             payload_dst[..size].copy_from_slice(&payload_src[..size]);
         }
 
-        self.masking_idx += size;
-        Ok(size)
+        self.read_idx += size;
+        size
+    }
+
+    pub fn decode_payload_in_place(&mut self, payload_src: &mut [u8]) -> usize {
+        let payload_rest = self.header.payload_len - self.read_idx;
+        let size = min(payload_src.len(), payload_rest);
+
+        if let Some(masking_key_bytes) = self.header.masking_key {
+            for i in 0..size {
+                let j = (self.read_idx + i) % masking_key_bytes.len();
+                let key_byte = masking_key_bytes[j];
+                payload_src[i] ^= key_byte;
+            }
+        }
+
+        self.read_idx += size;
+        size
     }
 }
 
 // Tests
 #[cfg(test)]
 mod tests {
-    use core::fmt;
-
     use super::*;
     const REAL_WS_PACKET: [u8; 23] = [
         0b10000001, 0b10010001, 0b01101000, 0b00010010, 0b11110001, 0b00110110, 0b00100000,
@@ -385,7 +588,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&REAL_WS_PACKET).unwrap();
         assert_eq!(read_size, 6);
         assert_eq!(reading.fin, 1);
-        assert_eq!(reading.opcode, Opcode::Text);
+        assert_eq!(reading.opcode, WSOpcode::Text);
         assert_eq!(reading.payload_len, 17);
         assert_eq!(
             reading.masking_key,
@@ -404,7 +607,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&[0b0000_0000, 0b0000_0000]).unwrap();
         assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE);
         assert_eq!(reading.fin, 0);
-        assert_eq!(reading.opcode, Opcode::ContinuationFrame);
+        assert_eq!(reading.opcode, WSOpcode::ContinuationFrame);
     }
 
     #[test]
@@ -412,7 +615,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&[0b0000_0001, 0b0000_0000]).unwrap();
         assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE);
         assert_eq!(reading.fin, 0);
-        assert_eq!(reading.opcode, Opcode::Text);
+        assert_eq!(reading.opcode, WSOpcode::Text);
     }
 
     #[test]
@@ -420,7 +623,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&[0b0000_0010, 0b0000_0000]).unwrap();
         assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE);
         assert_eq!(reading.fin, 0);
-        assert_eq!(reading.opcode, Opcode::Binary);
+        assert_eq!(reading.opcode, WSOpcode::Binary);
     }
 
     #[test]
@@ -428,7 +631,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&[0b0000_1000, 0b0000_0000]).unwrap();
         assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE);
         assert_eq!(reading.fin, 0);
-        assert_eq!(reading.opcode, Opcode::Close);
+        assert_eq!(reading.opcode, WSOpcode::Close);
     }
 
     #[test]
@@ -436,7 +639,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&[0b0000_1001, 0b0000_0000]).unwrap();
         assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE);
         assert_eq!(reading.fin, 0);
-        assert_eq!(reading.opcode, Opcode::Ping);
+        assert_eq!(reading.opcode, WSOpcode::Ping);
     }
 
     #[test]
@@ -444,7 +647,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&[0b0000_1010, 0b0000_0000]).unwrap();
         assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE);
         assert_eq!(reading.fin, 0);
-        assert_eq!(reading.opcode, Opcode::Pong);
+        assert_eq!(reading.opcode, WSOpcode::Pong);
     }
 
     #[test]
@@ -452,7 +655,7 @@ mod tests {
         let Err(e) = read_frame_header(&[0b0000_0011, 0b0000_0000]) else {
             panic!("Expected error for invalid opcode");
         };
-        assert_eq!(e, WebSocketProtoError::InvalidFrame());
+        assert_eq!(e, WebSocketProtoError::InvalidFrame);
     }
 
     #[test]
@@ -480,7 +683,7 @@ mod tests {
     fn test_header_masking_key_decoding_some() {
         let (reading, read_size) =
             read_frame_header(&[0b0000_0000, 0b1000_0000, 0x12, 0x34, 0x56, 0x78]).unwrap();
-        assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE + MAX_WS_MASKING_KEY_LEN);
+        assert_eq!(read_size, MIN_WS_FRAME_HEADER_SIZE + WS_MASKING_KEY_LEN);
         assert_eq!(reading.masking_key.unwrap(), 0x12345678u32.to_be_bytes());
     }
 
@@ -496,7 +699,7 @@ mod tests {
         let (reading, read_size) = read_frame_header(&[0b0000_0000, 0x7E, 0x01, 0x2C]).unwrap();
         assert_eq!(
             read_size,
-            MIN_WS_FRAME_HEADER_SIZE + MAX_WS_EXTENDEDPAYLOAD_LEN_SHORT
+            MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_SHORT
         );
         assert_eq!(reading.payload_len, 300usize);
     }
@@ -518,19 +721,47 @@ mod tests {
         .unwrap();
         assert_eq!(
             read_size,
-            MIN_WS_FRAME_HEADER_SIZE + MAX_WS_EXTENDEDPAYLOAD_LEN_LONG
+            MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_LONG
         );
         assert_eq!(reading.payload_len, 0x0123456789abcdefusize);
     }
 
     #[test]
-    fn test_header_payload_len_invalid_field_len() {
-        let Err(e) =
-            read_frame_header(&[0b0000_0000, 0x7F, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd])
-        else {
+    fn test_header_payload_short_len_not_enough_data() {
+        let data = [0b0000_0000, 0x7E, 0x01 /*, 0x2C */];
+        let Err(e) = read_frame_header(&data) else {
             panic!("Expected error for invalid frame");
         };
-        assert_eq!(e, WebSocketProtoError::InvalidFrame());
+        assert_eq!(
+            e,
+            WebSocketProtoError::NotEnoughData(
+                MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_SHORT
+            )
+        );
+    }
+
+    #[test]
+    fn test_header_payload_long_len_not_enough_data() {
+        let data = [
+            0b0000_0000,
+            0x7F,
+            0x01,
+            0x23,
+            0x45,
+            0x67,
+            0x89,
+            0xab,
+            0xcd, /*0xef*/
+        ];
+        let Err(e) = read_frame_header(&data) else {
+            panic!("Expected error for invalid frame");
+        };
+        assert_eq!(
+            e,
+            WebSocketProtoError::NotEnoughData(
+                MIN_WS_FRAME_HEADER_SIZE + WS_EXTENDEDPAYLOAD_LEN_LONG
+            )
+        );
     }
 
     #[test]
@@ -538,7 +769,7 @@ mod tests {
         let Err(e) = read_frame_header(&[
             0b0000_0000,
             0x7F,
-            0x81,
+            0x81, // Most significant bit set
             0x23,
             0x45,
             0x67,
@@ -549,14 +780,48 @@ mod tests {
         ]) else {
             panic!("Expected error for invalid frame");
         };
-        assert_eq!(e, WebSocketProtoError::InvalidFrame());
+        assert_eq!(e, WebSocketProtoError::InvalidFrame);
+    }
+
+    #[test]
+    fn test_read_frame_header_returns_not_enough_data_when_size_0() {
+        let Err(e) = read_frame_header(&[0b0000_0000]) else {
+            panic!("Expected NotEnoughData error");
+        };
+        assert_eq!(
+            e,
+            WebSocketProtoError::NotEnoughData(MIN_WS_FRAME_HEADER_SIZE)
+        );
+    }
+
+    #[test]
+    fn test_read_frame_header_returns_not_enough_data_when_size_1() {
+        let Err(e) = read_frame_header(&[]) else {
+            panic!("Expected NotEnoughData error");
+        };
+        assert_eq!(
+            e,
+            WebSocketProtoError::NotEnoughData(MIN_WS_FRAME_HEADER_SIZE)
+        );
+    }
+
+    #[test]
+    fn test_read_frame_header_returns_not_enough_data_when_masking_key_not_enough() {
+        let Err(e) = read_frame_header(&[0b0000_0000, 0b1000_0000, 0x12, 0x34, 0x56 /*0x78*/])
+        else {
+            panic!("Expected NotEnoughData error");
+        };
+        assert_eq!(
+            e,
+            WebSocketProtoError::NotEnoughData(MIN_WS_FRAME_HEADER_SIZE + WS_MASKING_KEY_LEN)
+        );
     }
 
     #[test]
     fn test_write_and_read_frame_header() {
         let mut buffer = [0u8; MAX_WS_FRAME_HEADER_SIZE];
         let fin = 1;
-        let opcode = Opcode::Text;
+        let opcode = WSOpcode::Text;
         let payload_len = 300;
         let masking_key = Some(0xAABBCCDDu32.to_be_bytes());
 
@@ -573,24 +838,90 @@ mod tests {
     }
 
     #[test]
+    fn test_heder_reder_create() {
+        let reader = WSHeaderReader::new();
+        assert_eq!(reader.header_buf.len(), 0);
+        assert_eq!(reader.expected_bytes, MIN_WS_FRAME_HEADER_SIZE);
+    }
+
+    #[test]
+    fn test_header_reader_try_read_header_valid_full() {
+        let data = [
+            0b10000001, 0xFF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56,
+            0x78,
+        ];
+        let mut reader = WSHeaderReader::new();
+
+        let (header, read_size) = reader.try_read_header(&data).unwrap_ready();
+        assert_eq!(read_size, data.len());
+        assert_eq!(header.fin, 1);
+        assert_eq!(header.opcode, WSOpcode::Text);
+        assert_eq!(header.payload_len, 0x0123456789abcdefusize);
+        assert_eq!(header.masking_key, Some(0x12345678u32.to_be_bytes()));
+    }
+
+    #[test]
+    fn test_header_reader_try_read_header_valid_partial() {
+        let data = [
+            0b10000001, 0xFF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56,
+            0x78,
+        ];
+        let mut reader = WSHeaderReader::new();
+
+        let mut it = data.into_iter();
+        for _ in 0..data.len() - 1 {
+            let byte = [it.next().unwrap()];
+            let read_bytes = reader.try_read_header(&byte).unwrap_pending();
+            assert_eq!(read_bytes, 1);
+        }
+
+        // Now read the last byte
+        let byte = [it.next().unwrap()];
+        let (header, read_size) = reader.try_read_header(&byte).unwrap_ready();
+
+        assert_eq!(read_size, data.len());
+        assert_eq!(header.fin, 1);
+        assert_eq!(header.opcode, WSOpcode::Text);
+        assert_eq!(header.payload_len, 0x0123456789abcdefusize);
+        assert_eq!(header.masking_key, Some(0x12345678u32.to_be_bytes()));
+    }
+
+    #[test]
     fn test_read_real_ws_packet_with_ws_stream_reader() {
-        let (mut reader, read_size) = WSStreamReader::from_data(&REAL_WS_PACKET).unwrap();
+        let mut src_buf = &REAL_WS_PACKET[..];
+
+        let mut header_reader = WSHeaderReader::new();
+        let (header, read_size) = header_reader.try_read_header(src_buf).unwrap_ready();
         assert_eq!(read_size, 6);
+        assert_eq!(header.fin, 1);
+        assert_eq!(header.opcode, WSOpcode::Text);
+        assert_eq!(header.payload_len, 17);
+        assert_eq!(
+            header.masking_key.unwrap().as_slice(),
+            [0b01101000u8, 0b00010010u8, 0b11110001u8, 0b00110110u8].as_slice()
+        );
+        // Remove consumed data from src_buf
+        src_buf = &src_buf[read_size..];
+
+        let mut reader = WSPayloadReader::from_header(header);
         assert_eq!(reader.payload_len(), 17);
-        assert_eq!(reader.opcode(), Opcode::Text);
+        assert_eq!(reader.opcode(), WSOpcode::Text);
         assert_eq!(reader.fin(), 1);
+        assert_eq!(reader.read_bytes(), 0);
+        assert_eq!(reader.read_bytes_remaining(), 17);
         assert!(reader.has_masking());
         assert_eq!(
-            reader.masking_key().unwrap(),
-            &0b01101000_00010010_11110001_00110110u32.to_be_bytes()
+            reader.masking_key().unwrap().as_slice(),
+            [0b01101000u8, 0b00010010u8, 0b11110001u8, 0b00110110u8].as_slice()
         );
 
         let mut payload_buf = [0u8; 17];
-        let decoded_size = reader
-            .decode_payload(&mut payload_buf, &REAL_WS_PACKET[read_size..])
-            .unwrap();
+        let decoded_size = reader.decode_payload(&mut payload_buf, src_buf);
+        assert!(reader.is_complete());
         assert_eq!(decoded_size, 17);
         assert_eq!(decoded_size, reader.payload_len());
+        assert_eq!(reader.read_bytes(), 17);
+        assert_eq!(reader.read_bytes_remaining(), 0);
 
         std::println!("{}", String::from_utf8_lossy(&payload_buf));
 
@@ -602,16 +933,17 @@ mod tests {
 
     #[test]
     fn test_read_and_write_packet() {
+        let mut src_buf = &REAL_WS_PACKET[..];
         let mut decoded_payload_buf = [0u8; 17];
         let mut encoded_frame_buf = [0u8; REAL_WS_PACKET.len()];
 
-        let (mut reader, decoded_header_size) = WSStreamReader::from_data(&REAL_WS_PACKET).unwrap();
-        let decoded_payload_size = reader
-            .decode_payload(
-                &mut decoded_payload_buf,
-                &REAL_WS_PACKET[decoded_header_size..],
-            )
-            .unwrap();
+        let mut header_reader = WSHeaderReader::new();
+        let (header, decoded_header_size) = header_reader.try_read_header(src_buf).unwrap_ready();
+        src_buf = &src_buf[decoded_header_size..];
+
+        let mut reader = WSPayloadReader::from_header(header);
+        let decoded_payload_size = reader.decode_payload(&mut decoded_payload_buf, src_buf);
+        assert!(reader.is_complete());
         assert_eq!(decoded_payload_size, 17);
         assert_eq!(decoded_payload_size, reader.payload_len());
 
