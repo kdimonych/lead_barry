@@ -5,7 +5,6 @@ members = [
     "leasehund",
     "common",
     "ds323x-rs",
-    "protocols",
 ]
 
 [package]
