@@ -1,3 +1,10 @@
+[alias]
+test-host = "test --target x86_64-apple-darwin"
+test-embedded = "test --target thumbv6m-none-eabi"
+
+[build]
+target = "thumbv6m-none-eabi"
+
 [target.'cfg(all(target_arch = "arm", target_os = "none"))']
 # Choose a default "cargo run" tool (see README for more info)
 # - `probe-rs` provides flashing and defmt via a hardware debugger, and stack unwind on panic
@@ -20,7 +27,7 @@ rustflags = [
 ]
 
 # Override target for testing specific packages
-[target.x86_64-apple-darwin]
+[target.'cfg(all(target_arch = "x86_64", target_os = ["windows", "linux", "macos"]))']
 rustflags = []
 
 [env]

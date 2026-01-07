@@ -1,6 +1,7 @@
 {
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.target": "thumbv6m-none-eabi",
+    "rust-analyzer.runnables.test.command": "test-host",
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "rust-lang.rust-analyzer",
     "files.readonlyInclude": {
