@@ -7,7 +7,7 @@ use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
     Error, HttpHandler, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
-    HttpResponseBuilder, HttpServer, StatusCode,
+    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode,
 };
 
 use crate::configuration::{ConfigurationStorage, WiFiSettings};
@@ -34,11 +34,20 @@ pub struct HttpConfigServer {
 
 impl HttpConfigServer {
     pub fn new(spawner: Spawner, shared: &'static SharedResources) -> Self {
-        let http_server = HttpServer::new(80);
+        let mut timeouts = ServerTimeouts::default();
+        //timeouts.read_timeout = 1;
+
+        let http_server: HttpServer<RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE> =
+            HttpServer::new(80).with_timeouts(timeouts);
         Self {
             context: HttpServerContext::new(spawner, shared),
             http_server,
         }
+    }
+
+    pub fn with_auto_close_connection(mut self, auto_close: bool) -> Self {
+        self.http_server = self.http_server.with_auto_close_connection(auto_close);
+        self
     }
 
     pub async fn run(&mut self, stack: Stack<'_>) -> ! {
@@ -213,8 +222,13 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
     async fn handle_websocket_connection(
         &mut self,
         _request: &HttpRequest<'_>,
-        _web_socket: nanofish::WebSocket<'_, '_>,
+        mut web_socket: nanofish::WebSocket<'_, '_>,
     ) -> Result<(), ()> {
+        web_socket
+            .write_binary_frame("payload".as_bytes(), true)
+            .await
+            .map_err(|_| ())?;
+
         Err(()) // Close the connection immediately
     }
 }

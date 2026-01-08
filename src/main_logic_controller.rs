@@ -1,4 +1,5 @@
 use core::task::Poll;
+use core::usize;
 
 use defmt::*;
 
@@ -202,7 +203,7 @@ pub async fn main_logic_controller(
 
         for i in 0..2 {
             spawner
-                .spawn(start_http_config_server(spawner, shared, net_stack))
+                .spawn(start_http_config_server(spawner, shared, net_stack, i))
                 .unwrap();
         }
 
@@ -390,8 +391,15 @@ async fn start_http_config_server(
     spawner: Spawner,
     shared: &'static SharedResources,
     stack: Stack<'static>,
+    instance_number: usize,
 ) {
     let mut http_server = HttpConfigServer::new(spawner, shared);
+
+    // For the first instance, enable auto-close connection
+    if instance_number == 0 {
+        http_server = http_server.with_auto_close_connection(true);
+    }
+
     http_server.run(stack).await;
 }
 
