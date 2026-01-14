@@ -6,11 +6,11 @@ use defmt::*;
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
-    Error, HttpHandler, HttpHeader, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
-    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode,
+    Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
+    HttpResponseBuilder, HttpServer, ServerTimeouts, SocketBuffers, StatusCode,
 };
 
-use crate::configuration::{ConfigurationStorage, WiFiSettings};
+use crate::configuration::WiFiSettings;
 use crate::rtc::*;
 use crate::shared_resources::SharedResources;
 use crate::{reset, units::TimeExt as _};
@@ -22,22 +22,22 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 //const MAIN_CONFIGURATION_HTML: &str = include_str!("./web/main_configuration.html");
 const MAIN_CONFIGURATION_HTML_GZ: &[u8] = include_bytes!("./web/main_configuration.html.gz");
 
-const RX_SIZE: usize = 2048;
-const TX_SIZE: usize = 2048;
+const RX_SIZE: usize = 1024;
+const TX_SIZE: usize = 1024;
 const REQ_SIZE: usize = 1024;
 const MAX_RESPONSE_SIZE: usize = 8192;
 
 pub struct HttpConfigServer {
     context: HttpServerContext,
-    http_server: HttpServer<RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE>,
+    http_server: HttpServer<REQ_SIZE, MAX_RESPONSE_SIZE>,
 }
 
 impl HttpConfigServer {
     pub fn new(spawner: Spawner, shared: &'static SharedResources) -> Self {
-        let mut timeouts = ServerTimeouts::default();
+        let timeouts = ServerTimeouts::default();
         //timeouts.read_timeout = 1;
 
-        let http_server: HttpServer<RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE> =
+        let http_server: HttpServer<REQ_SIZE, MAX_RESPONSE_SIZE> =
             HttpServer::new(80).with_timeouts(timeouts);
         Self {
             context: HttpServerContext::new(spawner, shared),
@@ -51,9 +51,11 @@ impl HttpConfigServer {
     }
 
     pub async fn run(&mut self, stack: Stack<'_>) -> ! {
+        let mut buffers: [SocketBuffers<RX_SIZE, TX_SIZE>; 3] =
+            core::array::from_fn(|_| SocketBuffers::new());
         self.http_server
-            .serve(stack, HttpConfigHandler::new(&self.context))
-            .await;
+            .serve(stack, &mut buffers, HttpConfigHandler::new(&self.context))
+            .await
     }
 }
 

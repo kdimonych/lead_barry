@@ -201,7 +201,7 @@ pub async fn main_logic_controller(
         let ip = net_cfg.address.address();
         global_state().set_device_ip(Some(ip)).await;
 
-        for i in 0..2 {
+        for i in 0..1 {
             spawner
                 .spawn(start_http_config_server(spawner, shared, net_stack, i))
                 .unwrap();
@@ -386,7 +386,7 @@ async fn show_visit_screen(shared: &'static SharedResources) {
 }
 
 //HTTP configuration server task
-#[embassy_executor::task(pool_size = 2)]
+#[embassy_executor::task(pool_size = 1)]
 async fn start_http_config_server(
     spawner: Spawner,
     shared: &'static SharedResources,
