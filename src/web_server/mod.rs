@@ -7,7 +7,7 @@ use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
     Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
-    HttpResponseBuilder, HttpServer, ServerTimeouts, SocketBuffers, StatusCode,
+    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode,
 };
 
 use crate::configuration::WiFiSettings;
@@ -15,6 +15,8 @@ use crate::rtc::*;
 use crate::shared_resources::SharedResources;
 use crate::{reset, units::TimeExt as _};
 use http_server_context::HttpServerContext;
+
+pub use nanofish::HttpServerBuffers;
 
 // Get version from Cargo.toml at compile time
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -29,7 +31,7 @@ const MAX_RESPONSE_SIZE: usize = 8192;
 
 pub struct HttpConfigServer {
     context: HttpServerContext,
-    http_server: HttpServer<REQ_SIZE, MAX_RESPONSE_SIZE>,
+    http_server: HttpServer,
 }
 
 impl HttpConfigServer {
@@ -37,8 +39,7 @@ impl HttpConfigServer {
         let timeouts = ServerTimeouts::default();
         //timeouts.read_timeout = 1;
 
-        let http_server: HttpServer<REQ_SIZE, MAX_RESPONSE_SIZE> =
-            HttpServer::new(80).with_timeouts(timeouts);
+        let http_server: HttpServer = HttpServer::new(80).with_timeouts(timeouts);
         Self {
             context: HttpServerContext::new(spawner, shared),
             http_server,
@@ -50,11 +51,19 @@ impl HttpConfigServer {
         self
     }
 
-    pub async fn run(&mut self, stack: Stack<'_>) -> ! {
-        let mut buffers: [SocketBuffers<RX_SIZE, TX_SIZE>; 3] =
-            core::array::from_fn(|_| SocketBuffers::new());
+    pub async fn run<
+        const SOCKETS: usize,
+        const RX_SIZE: usize,
+        const TX_SIZE: usize,
+        const REQ_SIZE: usize,
+        const MAX_RESPONSE_SIZE: usize,
+    >(
+        &mut self,
+        stack: Stack<'_>,
+        buffers: &mut HttpServerBuffers<SOCKETS, RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE>,
+    ) -> ! {
         self.http_server
-            .serve(stack, &mut buffers, HttpConfigHandler::new(&self.context))
+            .serve(stack, buffers, HttpConfigHandler::new(&self.context))
             .await
     }
 }

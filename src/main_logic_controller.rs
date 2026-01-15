@@ -23,7 +23,7 @@ use crate::shared_resources::*;
 use crate::ui::*;
 use crate::units::TimeExt as _;
 use crate::vcp_sensors::VcpSensorsEvents;
-use crate::web_server::HttpConfigServer;
+use crate::web_server::{HttpConfigServer, HttpServerBuffers};
 use crate::wifi::*;
 
 pub async fn main_logic_controller(
@@ -400,7 +400,16 @@ async fn start_http_config_server(
         http_server = http_server.with_auto_close_connection(true);
     }
 
-    http_server.run(stack).await;
+    const SOCKETS: usize = 3;
+    const RX_SIZE: usize = 64;
+    const TX_SIZE: usize = 64;
+    const REQ_SIZE: usize = 1024;
+    const MAX_RESPONSE_SIZE: usize = 8192;
+
+    //As long as this is an async task, the buffers will be kept in a static memory area
+    let mut buffers =
+        HttpServerBuffers::<SOCKETS, RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE>::new();
+    http_server.run(stack, &mut buffers).await;
 }
 
 /* Helper Functions */
