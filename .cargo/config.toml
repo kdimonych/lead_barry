@@ -1,5 +1,6 @@
 [alias]
 test-host = "test --target x86_64-apple-darwin"
+debug-test-host = "test --target x86_64-apple-darwin --no-run"
 test-embedded = "test --target thumbv6m-none-eabi"
 
 [build]

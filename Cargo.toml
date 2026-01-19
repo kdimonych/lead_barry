@@ -146,6 +146,8 @@ debug-assertions = true
 incremental = false
 opt-level = 0
 overflow-checks = true
+panic = "unwind"       # Better stack traces
+strip = false          # Keep debug symbols
 
 # cargo test --release
 [profile.bench]
