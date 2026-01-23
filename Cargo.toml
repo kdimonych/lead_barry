@@ -67,7 +67,7 @@ leasehund = { path = "./leasehund", features = ["defmt"] }
 
 # HTTP server/client
 # nanofish = "0.9.1"
-nanofish = { path = "./nanofish", features = ["ws"] }
+nanofish = { path = "./nanofish", features = ["ws", "defmt"] }
 
 # Alternative: Use rp-pico but you'll need to handle CYW43 separately
 # rp-pico = "0.9"
