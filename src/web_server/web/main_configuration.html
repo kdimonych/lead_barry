@@ -58,7 +58,7 @@
                     ws.send('Hello from client');
                 };
                 ws.onmessage = (event) => {
-                    console.log('Message from server:', event.data);
+                    console.log('Message from server:');
                     alert('Message from server: ' + event.data);
                     ws.close();
                 };

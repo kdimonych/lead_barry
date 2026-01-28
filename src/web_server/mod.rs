@@ -231,11 +231,20 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         mut web_socket: nanofish::WebSocket<'_, '_>,
     ) -> Result<(), ()> {
         web_socket
-            .write_binary_frame("payload".as_bytes(), true)
+            .read_with(256, |buf: &mut [u8]| {
+                defmt::info!("Reading WebSocket frame of up to {} bytes", buf.len());
+                let str = core::str::from_utf8(buf).unwrap_or("<invalid utf-8>");
+                defmt::info!("Received WebSocket frame: {}", str);
+            })
             .await
             .map_err(|_| ())?;
 
-        Err(()) // Close the connection immediately
+        web_socket
+            .write_text_frame("payload", false)
+            .await
+            .map_err(|_| ())?;
+
+        Ok(()) // Close the connection immediately
     }
 }
 
