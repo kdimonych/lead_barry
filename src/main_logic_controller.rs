@@ -401,8 +401,8 @@ async fn start_http_config_server(
     }
 
     const SOCKETS: usize = 3;
-    const RX_SIZE: usize = 64;
-    const TX_SIZE: usize = 64;
+    const RX_SIZE: usize = 256;
+    const TX_SIZE: usize = 256;
     const REQ_SIZE: usize = 1024;
     const MAX_RESPONSE_SIZE: usize = 8192;
 
