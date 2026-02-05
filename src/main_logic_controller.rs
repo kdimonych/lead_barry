@@ -395,10 +395,10 @@ async fn start_http_config_server(
 ) {
     let mut http_server = HttpConfigServer::new(spawner, shared);
 
-    // For the first instance, enable auto-close connection
-    if instance_number == 0 {
-        http_server = http_server.with_auto_close_connection(true);
-    }
+    // // For the first instance, enable auto-close connection
+    // if instance_number == 0 {
+    //     http_server = http_server.with_auto_close_connection(true);
+    // }
 
     const SOCKETS: usize = 3;
     const RX_SIZE: usize = 256;
