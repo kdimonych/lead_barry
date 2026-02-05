@@ -3,6 +3,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests",
+            "cargo": {
+                "args": ["test", "--no-run", "--lib"],
+                "filter": {
+                    "kind": "lib"
+                }
+            },
+            "args": ["--nocapture"],
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false,
+            "sourceLanguages": ["rust"]
+        },
+        {
             "preLaunchTask": "build_for_rp2040",
             "type": "probe-rs-debug",
             "request": "launch",
