@@ -1,25 +1,49 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Lead Barry</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        input, button { padding: 10px; margin: 5px; font-size: 16px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        input,
+        button {
+            padding: 10px;
+            margin: 5px;
+            font-size: 16px;
+        }
+
         input[type="datetime-local"] {
             padding: 10px;
             font-size: 16px;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
+
         .divider {
             border-top: 1px solid #ccc;
             margin: 20px 0;
         }
-        button { background: #4CAF50; color: white; border: none; cursor: pointer; }
-        .result { margin-top: 20px; padding: 10px; background: #f0f0f0; }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+        }
     </style>
 </head>
+
 <body>
     <h1>Device Configuration</h1>
 
@@ -44,38 +68,68 @@
     <div id="status" class="result" style="display:none;"></div>
 
     <script>
-        window.onload = async function() {
+        window.onload = async function () {
             await get_version();
             await get_config();
             await get_date_time();
         };
 
+        function safeUtf8ToString(binaryData) {
+            let message;
+
+            if (typeof binaryData === 'string') {
+                message = binaryData;
+            } else if (binaryData instanceof ArrayBuffer) {
+                // Create decoder with error handling options
+                const decoder = new TextDecoder('utf-8', {
+                    fatal: false,    // Don't throw on invalid sequences
+                    ignoreBOM: true  // Ignore byte order mark if present
+                });
+
+                try {
+                    message = decoder.decode(binaryData);
+                } catch (error) {
+                    console.error('UTF-8 decoding error:', error);
+                    return null; // or return empty string ''
+                }
+            } else {
+                message = 'Unexpected data type: ' + typeof binaryData;
+            }
+            return message;
+        }
+
         async function testWebSocket() {
             try {
                 const ws = new WebSocket(`ws://${location.host}/ws/test`);
+                // Force binary data to be received as ArrayBuffer instead of Blob
+                ws.binaryType = 'arraybuffer';
+
                 ws.onopen = () => {
                     console.log('WebSocket connection opened');
+
                     ws.send('Hello from client');
                 };
                 ws.onmessage = (event) => {
-                    console.log('Message from server:');
-                    alert('Message from server: ' + event.data);
+                    console.log('Message type:', typeof event.data);
+                    console.log('Message constructor:', event.data.constructor.name);
+                    console.log('Raw message:', event.data);
+                    alert('Message from server: ' + safeUtf8ToString(event.data));
                     ws.close();
                 };
                 ws.onerror = (error) => {
                     console.error('WebSocket error:', error);
-                    alert('WebSocket error: ' + error.message);
+                    alert('WebSocket error type: ' + typeof error);
                 };
                 ws.onclose = () => {
                     console.log('WebSocket connection closed');
                 };
             } catch (error) {
                 console.error('WebSocket exception:', error);
-                alert('WebSocket exception: ' + error.message);
+                alert('WebSocket exception type: ' + typeof error);
             }
         }
 
-        async function get_version(){
+        async function get_version() {
             try {
                 const response = await fetch('/api/version', {
                     headers: { 'Connection': 'close', 'Cache-Control': 'no-cache' }
@@ -88,8 +142,7 @@
             }
         }
 
-        async function get_config()
-        {
+        async function get_config() {
             try {
                 const response = await fetch('/api/wifi_config', {
                     headers: { 'Connection': 'close', 'Cache-Control': 'no-cache' }
@@ -97,7 +150,7 @@
                 const config = await response.json();
                 document.getElementById('ssid').value = config.ssid || '';
                 if (config.password == null)
-                        document.getElementById('password').value = '';
+                    document.getElementById('password').value = '';
                 else {
                     if (config.ssid == "")
                         document.getElementById('password').value = '';
@@ -159,9 +212,8 @@
             }
         }
 
-        async function get_date_time()
-        {
-            try{
+        async function get_date_time() {
+            try {
                 const response = await fetch('/api/date_time', {
                     headers: { 'Connection': 'close', 'Cache-Control': 'no-cache' }
                 });
@@ -193,8 +245,7 @@
             );
         }
 
-        async function set_date_time()
-        {
+        async function set_date_time() {
             const date_time_str = document.getElementById('date_time').value;
             console.info('date_time_str:', date_time_str);
             const date = parseExactDateTime(date_time_str);
@@ -238,4 +289,5 @@
         }
     </script>
 </body>
+
 </html>

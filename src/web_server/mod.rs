@@ -7,7 +7,8 @@ use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
     Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
-    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode,
+    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode, WebSocket, WebSocketError,
+    WebSocketRead, WebSocketState, WebSocketWrite,
 };
 
 use crate::configuration::WiFiSettings;
@@ -225,24 +226,21 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         }
     }
 
-    async fn handle_websocket_connection(
+    async fn handle_websocket_connection<'h>(
         &mut self,
         _request: &HttpRequest<'_>,
-        mut web_socket: nanofish::WebSocket<'_, '_>,
+        mut web_socket: WebSocket<'h, '_>,
     ) -> Result<(), ()> {
+        let mut buffer = [0u8; 128];
+        let len = web_socket.read(&mut buffer).await.map_err(|_| ())?;
+        let str = core::str::from_utf8(&buffer[..len]).unwrap_or("<invalid utf-8>");
+        defmt::info!("Received WebSocket frame: {}", str);
         web_socket
-            .read_with(256, |buf: &mut [u8]| {
-                defmt::info!("Reading WebSocket frame of up to {} bytes", buf.len());
-                let str = core::str::from_utf8(buf).unwrap_or("<invalid utf-8>");
-                defmt::info!("Received WebSocket frame: {}", str);
-            })
+            .write_all(b"Hello from WebSocket!")
             .await
             .map_err(|_| ())?;
 
-        web_socket
-            .write_text_frame("payload", false)
-            .await
-            .map_err(|_| ())?;
+        web_socket.close().await.map_err(|_| ())?;
 
         Ok(()) // Close the connection immediately
     }

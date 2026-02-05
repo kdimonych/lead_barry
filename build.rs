@@ -43,29 +43,91 @@ fn forvard_dbg_var() {
     }
 }
 
+fn compress_bin_to_file(input_data: &[u8], output_file: &str) -> Result<(), ()> {
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
+    encoder.write_all(&input_data).map_err(|e| {
+        println!(
+            "cargo:error=Failed to write data to encoder for {}",
+            output_file
+        );
+        ()
+    })?;
+
+    let compressed_data = encoder.finish().map_err(|e| {
+        println!("cargo:error=Failed to compress to {}", output_file);
+        ()
+    })?;
+
+    std::fs::write(&output_file, compressed_data).map_err(|e| {
+        println!(
+            "cargo:error=Failed to write compressed file {}",
+            output_file
+        );
+        ()
+    })?;
+
+    // Force rebuild when HTML files change
+
+    Ok(())
+}
+
+use minify_html::{Cfg, minify};
+use regex::Regex;
 // Compress the files with gzip and include them in the binary
-fn compress(files: &[&str]) {
+fn compress_html(file: &str, output_file: &str) -> Result<(), ()> {
+    let html_bin = std::fs::read(&file).expect("Failed to read input file");
+    let html_str = std::str::from_utf8(&html_bin).map_err(|e| {
+        println!("cargo:error=Failed to parse HTML file as UTF-8: {}", e);
+        ()
+    })?;
+
+    // Remove single-line JS comments using regex
+    let js_comment = Regex::new(r"\s*\/\/\s[\w\s\'\.,:\(\)\[\]]*\n").unwrap();
+    let html_str = js_comment.replace_all(html_str, "\n");
+
+    let cfg = Cfg {
+        minify_css: true,
+        minify_js: true,
+        keep_comments: false,
+        minify_doctype: true,
+        ..Cfg::default()
+    };
+
+    let minified_html = minify(html_str.as_bytes(), &cfg);
+    compress_bin_to_file(&minified_html, &output_file)?;
+    Ok(())
+}
+
+fn compress_file(file: &str, output_file: &str) -> Result<(), ()> {
+    let input_data = std::fs::read(file).expect("Failed to read input file");
+
+    compress_bin_to_file(&input_data, &output_file)?;
+    Ok(())
+}
+
+// Compress the files with gzip and include them in the binary
+fn compress(files: &[&str]) -> Result<(), ()> {
     for &file in files {
         let output_file = format!("{}.gz", file);
-        let input_data = std::fs::read(file).expect("Failed to read input file");
+        if file.ends_with(".html") {
+            println!("cargo:info=Compressed HTML");
+            compress_html(&file, &output_file)?;
+        } else {
+            compress_file(&file, &output_file)?;
+        }
 
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
-        encoder
-            .write_all(&input_data)
-            .expect("Failed to write data to encoder");
-        let compressed_data = encoder.finish().expect("Failed to finish compression");
-
-        std::fs::write(&output_file, compressed_data).expect("Failed to write compressed file");
-        println!("cargo:warning=Compressed {} to {}", file, output_file);
+        println!("cargo:info=Compressed {} to {}", file, output_file);
         // Force rebuild when HTML files change
         println!("cargo:rerun-if-changed={}", file);
+        println!("cargo:rerun-if-changed={}", output_file);
         println!("cargo:rerun-if-not-exists={}", output_file);
     }
+    Ok(())
 }
 
 fn main() {
     let files_to_compress = ["./src/web_server/web/main_configuration.html"];
-    compress(&files_to_compress);
+    compress(&files_to_compress).expect("Failed to compress files");
 
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
