@@ -25,6 +25,10 @@ impl HttpServerContext {
         self.shared.configuration_storage
     }
 
+    pub const fn shared_resources(&self) -> &'static SharedResources {
+        self.shared
+    }
+
     pub const fn rtc(&self) -> &'static RtcDs3231Ref<I2c1Device<'static>> {
         self.shared.rtc
     }

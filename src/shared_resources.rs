@@ -1,6 +1,8 @@
 use crate::global_types::{I2c0Bus, I2c1Bus, I2c1Device};
 
 use crate::configuration::ConfigurationStorage;
+pub use crate::led_controller::LedController;
+
 use crate::rtc::RtcDs3231Ref;
 use crate::ui::UiControl;
 use crate::vcp_sensors::VcpControl;
@@ -13,4 +15,6 @@ pub struct SharedResources {
     pub vcp_control: &'static VcpControl<'static>,
     pub rtc: &'static RtcDs3231Ref<I2c1Device<'static>>,
     pub configuration_storage: &'static ConfigurationStorage<'static>,
+
+    pub led_controller: LedController,
 }

@@ -11,6 +11,7 @@ mod configuration;
 mod global_state;
 mod global_types;
 mod input;
+mod led_controller;
 mod main_logic_controller;
 mod reset;
 mod rtc;
@@ -27,17 +28,20 @@ use embassy_executor::{Executor, Spawner};
 use embassy_rp::peripherals::{DMA_CH0, I2C1, PIO0};
 use embassy_rp::pio::InterruptHandler as PioInterruptHandler;
 use embassy_rp::{
-    Peri, bind_interrupts,
-    gpio::{Level, Output},
+    bind_interrupts,
     i2c::{self, I2c, InterruptHandler as I2cInterruptHandler},
     multicore::Stack,
-    peripherals::{I2C0, PIN_22},
+    peripherals::I2C0,
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Ticker};
 use static_cell::StaticCell;
 
 use crate::configuration::{ConfigurationStorageBuilder, Storage};
+
+use crate::led_controller::{
+    Led, LedAnimation, LedControllerBuilder, LedControllerRunner, PwmHardwareConfig, Repetitions,
+};
 use crate::rtc::RtcDs3231Ref;
 use crate::units::{FrequencyExt, TimeExt};
 use global_types::*;
@@ -79,17 +83,16 @@ static VCP_SENSORS_STATE: StaticCell<VcpSensorsState<VCP_SENSORS_EVENT_QUEUE_SIZ
 static VCP_SENSORS_CONTROL: StaticCell<VcpControl> = StaticCell::new();
 static I2C0_BUS: StaticCell<I2c0Bus> = StaticCell::new();
 static I2C1_BUS: StaticCell<I2c1Bus> = StaticCell::new();
-static LED_PIN: StaticCell<Output> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
 static RTC_DS3231: StaticCell<RtcDs3231Ref<I2c1Device<'static>>> = StaticCell::new();
 
 struct ResourcesCore0 {
     // Owned resources
     button_controller_builder: ButtonControllerBuilder,
-    led_pin: Peri<'static, PIN_22>,
 
     vcp_runner: Option<VcpSensorsRunner<'static>>,
     wifi_service_builder: WiFiServiceBuilder<PIO0, DMA_CH0>,
+    led_controller_runner: LedControllerRunner,
 
     // Shared resources
     shared_resources: &'static SharedResources,
@@ -148,8 +151,25 @@ fn debug_memory_layout() {
 #[cortex_m_rt::entry]
 fn main() -> ! {
     debug_memory_layout();
-
     let p: embassy_rp::Peripherals = embassy_rp::init(Default::default());
+
+    // Bind led pins
+    let config = PwmHardwareConfig {
+        slice1: p.PWM_SLICE1,
+        slice3: p.PWM_SLICE3,
+        led_red: p.PIN_18,
+        led_yellow: p.PIN_19,
+        led_blue: p.PIN_22,
+    };
+
+    // Initialize the LED controller builder and build the controller and runner
+    let led_controller_builder = LedControllerBuilder::new(config);
+    let (led_controller, led_controller_runner) = led_controller_builder.build_once();
+
+    // Set heartbeat animation on blue LED to verify it's working
+    led_controller
+        .try_set_animation(Led::Blue, LedAnimation::Sine(5000, Repetitions::Infinite))
+        .unwrap();
 
     log_system_frequencies();
 
@@ -202,7 +222,7 @@ fn main() -> ! {
     );
     let vcp_control: &'static VcpControl = VCP_SENSORS_CONTROL.init(vcp_control);
 
-    let wifi_cfg = WiFiConfig::<PIO0, DMA_CH0> {
+    let wifi_cfg: WiFiConfig<PIO0, DMA_CH0> = WiFiConfig::<PIO0, DMA_CH0> {
         pwr_pin: p.PIN_23, // Power pin, pin 23
         cs_pin: p.PIN_25,  // Chip select pin, pin 25
         dio_pin: p.PIN_24, // Data In/Out pin, pin 24
@@ -224,6 +244,7 @@ fn main() -> ! {
         ui_control,
         vcp_control,
         configuration_storage,
+        led_controller,
     });
 
     // Spawn core threads
@@ -253,9 +274,9 @@ fn main() -> ! {
                 ResourcesCore0 {
                     button_controller_builder,
                     vcp_runner: Some(vcp_runner),
-                    led_pin: p.PIN_22,
                     wifi_service_builder,
                     shared_resources,
+                    led_controller_runner,
                 },
             ))
             .unwrap();
@@ -270,8 +291,10 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     // Spawn the LED blink task on Core 0
     info!("Spawn LED task on core 0");
     // For regular GPIO LED (if you connect an external LED to a GPIO pin)
-    let led = LED_PIN.init(Output::new(resources.led_pin, Level::Low));
-    spawner.spawn(led_task(led)).unwrap();
+
+    spawner
+        .spawn(led_controller_task(resources.led_controller_runner))
+        .unwrap();
 
     // Spawn the VCP sensors task on Core 0
     if let Some(vcp_runner) = resources.vcp_runner {
@@ -312,22 +335,23 @@ async fn buttons_controller_task(button_controller_runner: ButtonControllerRunne
     button_controller_runner.run().await
 }
 
+use core::f32::consts::PI;
+use libm::sinf;
+
+fn sine_generator(frequency: f32, sample_rate: usize) -> impl Iterator<Item = f32> + Clone {
+    let dt = 1.0 / sample_rate as f32;
+    let angular_freq = 2.0 * PI * frequency;
+
+    (0..sample_rate).map(move |n| {
+        let time = n as f32 * dt;
+        sinf(angular_freq * time)
+    })
+}
+
 #[embassy_executor::task]
-async fn led_task(led: &'static mut Output<'static>) -> ! {
-    let mut ticker = Ticker::every(1500.ms());
-
-    let mut led_state = false;
-
-    loop {
-        if led_state {
-            led.set_low();
-        } else {
-            led.set_high();
-        }
-        led_state = !led_state;
-
-        ticker.next().await;
-    }
+async fn led_controller_task(led_controller_runner: LedControllerRunner) -> ! {
+    debug!("Starting led controller task...");
+    led_controller_runner.run().await;
 }
 
 #[embassy_executor::task]

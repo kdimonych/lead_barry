@@ -12,6 +12,7 @@ use nanofish::{
 };
 
 use crate::configuration::WiFiSettings;
+use crate::led_controller::{Led, LedAnimation};
 use crate::rtc::*;
 use crate::shared_resources::SharedResources;
 use crate::{reset, units::TimeExt as _};
@@ -73,17 +74,8 @@ impl<'a> HttpConfigHandler<'a> {
     fn new(context: &'a HttpServerContext) -> Self {
         Self { context }
     }
-}
 
-fn trace_headers(request: &HttpRequest<'_>) {
-    debug!("Request header");
-    for header in request.headers.iter() {
-        debug!(" - : {}: {}", header.name, header.value);
-    }
-}
-
-impl<'a> HttpHandler for HttpConfigHandler<'a> {
-    async fn handle_request(
+    async fn handle_request_impl(
         &mut self,
         request: &HttpRequest<'_>,
         response_buffer: HttpResponseBufferRef<'_>,
@@ -226,7 +218,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         }
     }
 
-    async fn handle_websocket_connection<'h>(
+    async fn handle_websocket_connection_impl<'h>(
         &mut self,
         _request: &HttpRequest<'_>,
         mut web_socket: WebSocket<'h, '_>,
@@ -243,6 +235,49 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         web_socket.close().await.map_err(|_| ())?;
 
         Ok(()) // Close the connection immediately
+    }
+}
+
+fn trace_headers(request: &HttpRequest<'_>) {
+    debug!("Request header");
+    for header in request.headers.iter() {
+        debug!(" - : {}: {}", header.name, header.value);
+    }
+}
+
+impl<'a> HttpHandler for HttpConfigHandler<'a> {
+    async fn handle_request(
+        &mut self,
+        request: &HttpRequest<'_>,
+        response_buffer: HttpResponseBufferRef<'_>,
+    ) -> Result<HttpResponse, Error> {
+        self.context
+            .shared_resources()
+            .led_controller
+            .set_animation(Led::Yellow, LedAnimation::Decay(300))
+            .await;
+
+        let res = self.handle_request_impl(request, response_buffer).await;
+
+        res
+    }
+
+    async fn handle_websocket_connection<'h>(
+        &mut self,
+        _request: &HttpRequest<'_>,
+        web_socket: WebSocket<'h, '_>,
+    ) -> Result<(), ()> {
+        self.context
+            .shared_resources()
+            .led_controller
+            .set_animation(Led::Yellow, LedAnimation::Decay(300))
+            .await;
+
+        let res = self
+            .handle_websocket_connection_impl(_request, web_socket)
+            .await;
+
+        res
     }
 }
 
