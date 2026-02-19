@@ -131,7 +131,10 @@ fn main() {
 
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
-    let out = &PathBuf::from(env::var_os("OUT_DIR").unwrap());
+
+    let out_dir: std::ffi::OsString = env::var_os("OUT_DIR").unwrap();
+    println!("cargo:info=out_dir: {}", out_dir.to_string_lossy());
+    let out = &PathBuf::from(&out_dir);
     File::create(out.join("memory.x"))
         .unwrap()
         .write_all(include_bytes!("memory.x"))
@@ -146,7 +149,7 @@ fn main() {
 
     // Load .env file if it exists
     if dotenvy::dotenv().is_ok() {
-        println!("cargo:warning=Loaded .env file");
+        println!("cargo:info=Loaded .env file");
     } else {
         println!("cargo:warning=No .env file found, using defaults");
     }

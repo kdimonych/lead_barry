@@ -1,0 +1,133 @@
+[package]
+name = "lead_barry"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cortex-m = "0.7"
+cortex-m-rt = { version = "0.7", features = ["set-sp"] }
+embedded-hal-async = "1.0"
+embedded-hal = "1.0"
+# Embedded graphics support
+embedded-graphics = "0.8"
+display-interface = { version = "0.5" }
+
+# Debug logging
+defmt = { version = "1", optional = true }
+defmt-rtt = { version = "1", optional = true }
+panic-probe = { version = "1" }
+defmt-or-log = { version = "0.2.3", default-features = false }
+log = { version = "0.4.29", optional = true }                  # For debug porpouses when not using defmt
+env_logger = { version = "0.11", optional = true }             # For debug porpouses when not using defmt
+# Optional: for RTT panic output when using log
+panic-rtt-target = { version = "0.2.0", optional = true }
+rtt-target = { version = "0.6.2", optional = true }
+panic-halt = "1.0"
+
+heapless = { version = "0.8", features = ["serde"] }
+
+# Critical section and atomics for embedded
+portable-atomic = { version = "1.11.1", features = ["critical-section"] }
+critical-section = "1.2.0"
+static_cell = "2.1.1"
+# For safe casting of types
+bytemuck = { version = "1.24.0", features = ["derive"] }
+postcard = { version = "1.1", default-features = false, features = ["use-crc"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde-json-core = { version = "0.6.0" }
+
+# Embassy
+embassy-embedded-hal = { version = "0.5.0" }
+embassy-executor = { version = "0.9", features = [
+  "arch-cortex-m",
+  "executor-thread",
+] }
+embassy-time = { version = "0.5" }
+embassy-rp = { version = "0.8", features = [
+  "rp2040",
+  "rt",
+  "unstable-pac",
+  "time-driver",
+  "critical-section-impl",
+  "intrinsics",
+  "rom-v2-intrinsics",
+] }
+embassy-sync = "0.7"
+embassy-futures = "0.1"
+embassy-net = { version = "0.7", features = [
+  "tcp",
+  "udp",
+  "dhcpv4",
+  "medium-ethernet",
+] }
+
+# WiFi/bluetooth driver for the CYW43 chip on the Pico W
+# cyw43 = { version = "0.5", features = ["firmware-logs","defmt"] }
+cyw43 = "0.5"
+cyw43-pio = "0.8"
+# Firmware for CYW43 (Needed to include firmware binary for the CYW43 chip used in raspberry Pi Pico W)
+cyw43-firmware = { version = "0.1.0", features = ["bluetooth", "wifi"] }
+
+# DHCP server
+leasehund = { path = "../leasehund" }
+
+# HTTP server/client
+nanofish = { path = "../nanofish", features = ["ws"] }
+
+# Prerepherial device drivers
+ssd1306 = { version = "0.10", features = ["async"] }
+ina3221_async = { git = "https://github.com/kdimonych/ina3221_async", branch = "main", features = [
+  "async",
+] }
+crc = "3.3.0"
+
+# EEPROM
+eeprom24x = "0.7.2"
+
+# RTC
+# ds323x = "0.7.0"
+ds323x = { path = "../ds323x-rs", features = ["async"] }
+
+# Matrix and linear algebra libraries for embedded systems
+nalgebra = { version = "0.34.1", default-features = false, features = [
+  "macros",
+  "libm",
+] }
+libm = "0.2.16"
+
+# Internal workspace crates
+common = { path = "../common" }
+
+[features]
+default = ["defmt"]
+log = [
+  "dep:panic-rtt-target",
+  "dep:rtt-target",
+  "dep:env_logger",
+  "dep:log",
+  "defmt-or-log/log",
+  "nanofish/log",
+]
+defmt = [
+  "dep:defmt",
+  "dep:defmt-rtt",
+  "defmt-or-log/defmt",
+  "panic-probe/print-defmt",
+  "ds323x/defmt",
+  "nanofish/defmt",
+  "leasehund/defmt",
+  "embassy-net/defmt",
+  "embassy-rp/defmt",
+  "embassy-time/defmt",
+  "embassy-time/defmt-timestamp-uptime",
+  "embassy-executor/defmt",
+  "embassy-embedded-hal/defmt",
+  "serde-json-core/defmt",
+  "display-interface/defmt-03",
+]
+
+[build-dependencies]
+dotenvy = "0.15"
+flate2 = "1.1.5"
+minify-html = "0.18.1"
+regex = "1.12.3"
