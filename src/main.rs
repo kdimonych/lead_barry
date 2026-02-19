@@ -388,7 +388,7 @@ async fn display_runner_task(mut ui_runner: UiRunner<'static>) -> ! {
 #[embassy_executor::task]
 async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunner<'static>) -> ! {
     log::debug!("Starting VCP sensors task...");
-    vcp_sensors_runner.run().await;
+    vcp_sensors_runner.run().await
 }
 
 #[embassy_executor::task]

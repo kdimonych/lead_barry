@@ -145,7 +145,6 @@ impl<'a, SharedI2cDevice, const EVENT_QUEUE_SIZE: usize>
     VcpSensorsRunner<'a, SharedI2cDevice, EVENT_QUEUE_SIZE>
 where
     SharedI2cDevice: embedded_hal_async::i2c::I2c,
-    <SharedI2cDevice as embedded_hal_async::i2c::ErrorType>::Error: defmt_or_log::FormatOrDebug,
 {
     async fn read_bus_voltage(
         &mut self,
