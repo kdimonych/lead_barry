@@ -1,4 +1,4 @@
-use defmt::info;
+use defmt_or_log as log;
 use embassy_rp::Peri;
 use embassy_rp::dma::Channel;
 use embassy_rp::flash::{ASYNC_READ_SIZE, Async, ERASE_SIZE, Flash};
@@ -66,7 +66,7 @@ pub fn get_user_flash_size() -> u32 {
 impl<'a> Storage<'a> {
     pub fn new(flash_peripheral: Peri<'static, FLASH>, dma: Peri<'static, impl Channel>) -> Self {
         let flash = FlashType::new(flash_peripheral, dma);
-        info!("Flash storage capacity:  size={:#X}", flash.capacity());
+        log::info!("Flash storage capacity:  size={:#X}", flash.capacity());
         Self { flash }
     }
 

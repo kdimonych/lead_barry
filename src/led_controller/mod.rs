@@ -5,12 +5,11 @@ mod sine_animation;
 
 use constants::*;
 use decay_animation::DecayAnimation;
-use postcard::fixint::le;
 pub use pwm_led_driver::PwmHardwareConfig;
 use pwm_led_driver::PwmLedDriver;
 use sine_animation::SineAnimation;
 
-use defmt as log;
+use defmt_or_log as log;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::{Channel, Receiver, Sender};
 use embassy_time::Ticker;
@@ -34,14 +33,16 @@ pub type PeriodMs = u16;
 /// - Infinite: Repeat indefinitely
 /// - Finite(u8): Repeat a finite number of times
 #[allow(dead_code)]
-#[derive(defmt::Format, Clone, Copy)]
+#[derive(Clone, Copy)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum Repetitions {
     Infinite,
     Finite(u8),
 }
 
 #[allow(dead_code)]
-#[derive(defmt::Format, Clone, Copy)]
+#[derive(Clone, Copy)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum LedAnimation {
     /// Turn on the LED at full brightnes
     On,

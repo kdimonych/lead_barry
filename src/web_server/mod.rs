@@ -2,7 +2,7 @@ mod http_server_context;
 
 use core::str::FromStr;
 
-use defmt::*;
+use defmt_or_log as log;
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
@@ -82,7 +82,7 @@ impl<'a> HttpConfigHandler<'a> {
     ) -> Result<HttpResponse, Error> {
         if request.path == "/" {
             // Show main page
-            debug!("Serving main configuration page");
+            log::debug!("Serving main configuration page");
             //trace_headers(request);
 
             return HttpResponseBuilder::new(response_buffer)
@@ -103,17 +103,17 @@ impl<'a> HttpConfigHandler<'a> {
         match (request.method, api) {
             (HttpMethod::OPTIONS, command) => {
                 //TODO: Implement more strict header checking
-                debug!("Serving {} preflight request", command);
+                log::debug!("Serving {} preflight request", command);
                 HttpResponseBuilder::new(response_buffer).preflight_response()
             }
             (HttpMethod::GET, "version") => {
-                debug!("Serving version info");
+                log::debug!("Serving version info");
                 HttpResponseBuilder::new(response_buffer)
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body(VERSION)
             }
             (HttpMethod::GET, "reboot") => {
-                info!("Serving reboot request");
+                log::info!("Serving reboot request");
                 reset::deferred_system_reset(self.context.spawner(), 1.s());
                 // The reset function does not return, but we provide a response for completeness
                 HttpResponseBuilder::new(response_buffer)
@@ -121,7 +121,7 @@ impl<'a> HttpConfigHandler<'a> {
                     .with_plain_text_body("System is resetting...")
             }
             (HttpMethod::GET, "wifi_config") => {
-                debug!("Serving configuration request");
+                log::debug!("Serving configuration request");
                 let mut wifi_settings = self
                     .context
                     .configuration_storage()
@@ -138,7 +138,7 @@ impl<'a> HttpConfigHandler<'a> {
                 to_response(response_buffer, &wifi_settings)
             }
             (HttpMethod::POST, "set_wifi_config") => {
-                debug!("Serving set configuration request");
+                log::debug!("Serving set configuration request");
                 //TODO: Implement data integrity checks
                 let mut wifi_settings: WiFiSettings = from_request(request)?;
                 if wifi_settings.password.is_none() {
@@ -163,7 +163,7 @@ impl<'a> HttpConfigHandler<'a> {
                         .with_status(StatusCode::Ok)?
                         .with_plain_text_body("WiFi configuration updated"),
                     Err(e) => {
-                        error!("Failed to save configuration: {:?}", e);
+                        log::error!("Failed to save configuration: {:?}", e);
                         HttpResponseBuilder::new(response_buffer)
                             .with_status(StatusCode::InternalServerError)?
                             .with_plain_text_body("Failed to save WiFi configuration")
@@ -171,11 +171,11 @@ impl<'a> HttpConfigHandler<'a> {
                 }
             }
             (HttpMethod::GET, "date_time") => {
-                debug!("Serving date_time request");
+                log::debug!("Serving date_time request");
 
                 let mut rtc = self.context.rtc().lock().await;
                 let datetime = rtc.datetime().await.map_err(|e| {
-                    error!("RTC datetime read error: {}", e);
+                    log::error!("RTC datetime read error: {}", e);
                     Error::NoResponse
                 })?;
 
@@ -191,19 +191,19 @@ impl<'a> HttpConfigHandler<'a> {
             }
 
             (HttpMethod::POST, "set_date_time") => {
-                debug!("Serving set_date_time request");
+                log::debug!("Serving set_date_time request");
                 let date_time_str = core::str::from_utf8(request.body).map_err(|_| {
-                    error!("Invalid UTF-8 in request body");
+                    log::error!("Invalid UTF-8 in request body");
                     Error::NoResponse
                 })?;
                 let date_time = NaiveDateTime::from_str(date_time_str).map_err(|_| {
-                    error!("Invalid date time format: {}", date_time_str);
+                    log::error!("Invalid date time format: {}", date_time_str);
                     Error::NoResponse
                 })?;
 
                 let mut rtc = self.context.rtc().lock().await;
                 rtc.set_datetime(&date_time).await.map_err(|e| {
-                    error!("RTC datetime set error: {}", e);
+                    log::error!("RTC datetime set error: {}", e);
                     Error::NoResponse
                 })?;
 
@@ -226,7 +226,7 @@ impl<'a> HttpConfigHandler<'a> {
         let mut buffer = [0u8; 128];
         let len = web_socket.read(&mut buffer).await.map_err(|_| ())?;
         let str = core::str::from_utf8(&buffer[..len]).unwrap_or("<invalid utf-8>");
-        defmt::info!("Received WebSocket frame: {}", str);
+        log::info!("Received WebSocket frame: {}", str);
         web_socket
             .write_all(b"Hello from WebSocket!")
             .await
@@ -239,9 +239,9 @@ impl<'a> HttpConfigHandler<'a> {
 }
 
 fn trace_headers(request: &HttpRequest<'_>) {
-    debug!("Request header");
+    log::debug!("Request header");
     for header in request.headers.iter() {
-        debug!(" - : {}: {}", header.name, header.value);
+        log::debug!(" - : {}: {}", header.name, header.value);
     }
 }
 
@@ -293,7 +293,7 @@ where
         .with_header("Content-Type", "application/json")?
         .with_body_filler(|buf| {
             serde_json_core::to_slice(value, buf).map_err(|e| {
-                error!("Serialization error: {}", e);
+                log::error!("Serialization error: {}", e);
                 Error::NoResponse
             })
         })
@@ -304,7 +304,7 @@ where
     T: serde::Deserialize<'de>,
 {
     let (value, _) = serde_json_core::from_slice(request.body).map_err(|e| {
-        error!("Deserialization error: {}", e);
+        log::error!("Deserialization error: {}", e);
         nanofish::Error::NoResponse
     })?;
 
@@ -313,7 +313,7 @@ where
 
 // fn from_http_response(request: &HttpRequest<'de>) -> Result<T, nanofish::Error> {
 //     let (value, _) = serde_json_core::from_slice(request.body).map_err(|e| {
-//         error!("Deserialization error: {}", e);
+//         log::error!("Deserialization error: {}", e);
 //         nanofish::Error::NoResponse
 //     })?;
 

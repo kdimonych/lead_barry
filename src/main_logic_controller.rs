@@ -1,7 +1,7 @@
 use core::task::Poll;
 use core::usize;
 
-use defmt::*;
+use defmt_or_log as log;
 
 use ds323x::DateTimeAccess;
 use ds323x::Timelike;
@@ -38,11 +38,11 @@ pub async fn main_logic_controller(
             do_factory_reset(shared.ui_control, shared.configuration_storage).await;
         }
         AfterResetActions::ApMode => {
-            info!("Force AP mode was triggered after reset");
+            log::info!("Force AP mode was triggered after reset");
             is_force_ap_mode_triggered = true;
         }
         AfterResetActions::None => {
-            info!("No special actions after reset");
+            log::info!("No special actions after reset");
         }
     }
 
@@ -60,16 +60,19 @@ pub async fn main_logic_controller(
     // Flush button events to avoid misdetection after long operations
     button_controller.flush();
 
-    debug!(
+    log::debug!(
         "WiFi Configured: {}, Fallback AP: {}, Force AP: {}, Using AP mode: {}",
-        is_wifi_configured, is_fallback_ap_set, is_force_ap_mode_triggered, use_ap_mode
+        is_wifi_configured,
+        is_fallback_ap_set,
+        is_force_ap_mode_triggered,
+        use_ap_mode
     );
 
     if !use_ap_mode {
         wifi_service
             .join(&settings.network_settings.wifi_settings, async |status| {
                 // Handle join status updates here
-                info!("Join Status: {:?}", status);
+                log::info!("Join Status: {:?}", status);
 
                 match status {
                     JoiningStatus::JoiningAP => {
@@ -95,7 +98,7 @@ pub async fn main_logic_controller(
                         set_screen(ScWifiStats::new(wifi_status).into()).await;
                     }
                     JoiningStatus::Failed => {
-                        error!("Failed to join WiFi network. Falling back to AP mode");
+                        log::error!("Failed to join WiFi network. Falling back to AP mode");
                         let msg = ScMessageData {
                             title: MsgTitleString::from_str("ERROR"),
                             message: MessageString::from_str(
@@ -118,7 +121,7 @@ pub async fn main_logic_controller(
             .await;
 
         if network_ready {
-            info!("Joined WiFi network done");
+            log::info!("Joined WiFi network done");
             global_state().set_wifi_mode(WiFiMode::Client).await;
         }
 
@@ -128,7 +131,7 @@ pub async fn main_logic_controller(
     // If not joined, start AP mode
     if !network_ready {
         if settings.fallback_ap {
-            info!("Starting in fallback AP mode as per settings");
+            log::info!("Starting in fallback AP mode as per settings");
             shared
                 .configuration_storage
                 .modify_settings(|settings| {
@@ -137,7 +140,7 @@ pub async fn main_logic_controller(
                 .await;
             shared.configuration_storage.save().await.ok();
         } else {
-            info!("Starting AP mode");
+            log::info!("Starting AP mode");
         }
 
         let mut wifi_ap_settings = settings.network_settings.wifi_ap_settings.clone();
@@ -153,7 +156,7 @@ pub async fn main_logic_controller(
         wifi_service
             .start_ap(&wifi_ap_settings, async |status| {
                 // Handle AP status updates here
-                info!("AP Status: {:?}", status);
+                log::info!("AP Status: {:?}", status);
 
                 match status {
                     ApStatus::StartingAP => {
@@ -163,8 +166,8 @@ pub async fn main_logic_controller(
                     }
                     ApStatus::WaitingForClient => {
                         // Set wifi ap screen with not ready state
-                        debug!("Waiting for client to connect...");
-                        debug!(
+                        log::debug!("Waiting for client to connect...");
+                        log::debug!(
                             "AP SSID: {}, Password: {}",
                             wifi_ap_settings.ssid,
                             wifi_ap_settings
@@ -182,7 +185,7 @@ pub async fn main_logic_controller(
                     ApStatus::Ready((ip, mac)) => {
                         //net_stack.
                         // Set wifi ap screen with not ready state
-                        trace!("Ap ready. Client connected.");
+                        log::trace!("Ap ready. Client connected.");
                         network_ready = true;
                         let wifi_ap_data =
                             ScWifiApData::Connected(ScvClientInfo { ip, mac: Some(mac) });
@@ -192,7 +195,7 @@ pub async fn main_logic_controller(
             })
             .await;
         global_state().set_wifi_mode(WiFiMode::AccessPoint).await;
-        info!("AP mode done");
+        log::info!("AP mode done");
         Timer::after(3.s()).await;
     };
 
@@ -226,7 +229,7 @@ pub async fn main_logic_controller(
                 .await;
             }
             ActiveScrean::VoltageScreen => {
-                debug!("Showing voltage for channel {}", channel);
+                log::debug!("Showing voltage for channel {}", channel);
                 current_screan = on_repeat(
                     &current_screan,
                     do_until_bt_action(&button_controller, || async {
@@ -235,7 +238,7 @@ pub async fn main_logic_controller(
                     .await,
                     || async {
                         channel = (channel + 1) % 3;
-                        debug!("Switching to voltage channel {}", channel);
+                        log::debug!("Switching to voltage channel {}", channel);
                     },
                 )
                 .await;
@@ -288,7 +291,7 @@ where
     .await;
     match res {
         Either::First(new_screan) => new_screan,
-        Either::Second(_) => defmt::unreachable!(),
+        Either::Second(_) => log::unreachable!(),
     }
 }
 
@@ -462,7 +465,7 @@ async fn do_factory_reset(
     };
     ui_control.switch(ScMessage::new(msg).into()).await;
     let res = if let Err(e) = configuration_storage.factory_reset().await {
-        error!("Factory reset failed: {:?}", e);
+        log::error!("Factory reset failed: {:?}", e);
         let msg = ScMessageData {
             title: MsgTitleString::from_str("ERROR"),
             message: MessageString::from_str("Factory reset failed."),
@@ -470,7 +473,7 @@ async fn do_factory_reset(
         ui_control.switch(ScMessage::new(msg).into()).await;
         false
     } else {
-        info!("Factory reset completed successfully");
+        log::info!("Factory reset completed successfully");
         let msg = ScMessageData {
             title: MsgTitleString::from_str("INFO"),
             message: MessageString::from_str("Factory reset completed successfully."),
@@ -499,10 +502,10 @@ async fn detect_after_reset_actions(button_controller: ButtonController<'_>) -> 
         .unwrap();
 
     if y_state == ButtonState::Pressed && b_state == ButtonState::Pressed {
-        info!("Factory reset was triggered");
+        log::info!("Factory reset was triggered");
         return AfterResetActions::FactoryReset;
     } else if y_state == ButtonState::Pressed {
-        info!("AP mode was triggered");
+        log::info!("AP mode was triggered");
         return AfterResetActions::ApMode;
     }
     AfterResetActions::None

@@ -1,4 +1,4 @@
-use defmt as log;
+use defmt_or_log as log;
 use embassy_rp::Peri;
 use embassy_rp::peripherals::{PIN_18, PIN_19, PIN_22, PWM_SLICE1, PWM_SLICE3};
 use embassy_rp::pwm::{Config, Pwm, PwmError, PwmOutput, SetDutyCycle};
@@ -10,7 +10,7 @@ pub type LedError = PwmError;
 
 #[allow(dead_code)]
 #[repr(usize)]
-#[derive(defmt::Format, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum PwmLed {
     Red = 0,
     Yellow = 1,

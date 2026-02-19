@@ -7,7 +7,7 @@ pub use crate::async_infinite_stream::*;
 const BUTTON_EVENT_QUEUE_SIZE: usize = 8;
 const BUTTONS_COUNT: usize = 2;
 
-#[derive(Clone, Copy, Debug, defmt::Format, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Buttons {
     Yellow,
     Blue,

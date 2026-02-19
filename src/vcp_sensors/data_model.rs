@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone, defmt::Format)]
+#[derive(Debug, Copy, Clone)]
 pub enum VcpState {
     Normal(f32),
     Low(f32),
@@ -7,7 +7,7 @@ pub enum VcpState {
 
 pub type ChannelNum = u8;
 
-#[derive(Debug, Copy, Clone, defmt::Format)]
+#[derive(Debug, Copy, Clone)]
 pub struct VcpReading {
     pub voltage: VcpState,
     pub current: VcpState,

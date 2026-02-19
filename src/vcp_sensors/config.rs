@@ -1,6 +1,7 @@
 use crate::vcp_sensors::data_model::ChannelNum;
+use defmt_or_log as log;
 
-#[derive(Debug, Copy, Clone, defmt::Format)]
+#[derive(Debug, Copy, Clone)]
 pub struct VcpLimits {
     pub min_voltage: f32,
     pub max_voltage: f32,
@@ -100,13 +101,13 @@ impl VcpConfig {
 
     pub fn with_shunt_resistance(mut self, shunt_resistance: &'static [f32; 3]) -> Self {
         if shunt_resistance[0] <= 0.0 {
-            panic!("Shunt 0 resistance values must be positive and non-zero");
+            log::panic!("Shunt 0 resistance values must be positive and non-zero");
         }
         if shunt_resistance[1] <= 0.0 {
-            panic!("Shunt 1 resistance values must be positive and non-zero");
+            log::panic!("Shunt 1 resistance values must be positive and non-zero");
         }
         if shunt_resistance[2] <= 0.0 {
-            panic!("Shunt 2 resistance values must be positive and non-zero");
+            log::panic!("Shunt 2 resistance values must be positive and non-zero");
         }
 
         self.shunt_resistance = shunt_resistance;

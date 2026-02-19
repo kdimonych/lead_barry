@@ -11,7 +11,7 @@ pub use static_ip_config::*;
 pub use wifi_ap_settings::*;
 pub use wifi_settings::*;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, defmt::Format)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct Settings {
     pub network_settings: NetworkSettings,

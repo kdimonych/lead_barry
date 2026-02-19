@@ -10,7 +10,7 @@ use ssd1306::Ssd1306Async;
 use ssd1306::prelude::*;
 
 use crate::units::TimeExt;
-use defmt::*;
+use defmt_or_log as log;
 
 pub struct UiSharedState<ScreenSet> {
     screen_channel: Channel<CriticalSectionRawMutex, ScreenSet, 1>,
@@ -46,7 +46,7 @@ impl<'a, ScreenSet> UiControl<'a, ScreenSet> {
         &self,
         new_screen: ScreenSet,
     ) -> SendFuture<'a, CriticalSectionRawMutex, ScreenSet, 1> {
-        trace!("Send switching to new screen ...");
+        log::trace!("Send switching to new screen ...");
         self.screen_sender.send(new_screen)
     }
 }
@@ -115,12 +115,12 @@ where
         )
         .into_buffered_graphics_mode();
 
-        debug!("Initializing the display ...");
+        log::debug!("Initializing the display ...");
         display.init().await.unwrap_or_else(|e| {
-            error!("Init error: {:?}", e);
+            log::error!("Init error: {:?}", e);
         });
         display.flush().await.unwrap_or_else(|e| {
-            error!("Flush error: {:?}", e);
+            log::error!("Flush error: {:?}", e);
         });
 
         // Frame rate ticker for 25 FPS
@@ -132,7 +132,7 @@ where
 
         loop {
             if let Ok(mut new_screen) = self.screen_receiver.try_receive() {
-                trace!("Switching to new screen ...");
+                log::trace!("Switching to new screen ...");
                 if let Some(old_screen) = self.active_screen {
                     old_screen.exit(&mut display);
                 }
@@ -140,13 +140,13 @@ where
                 new_screen.enter(&mut display);
                 self.active_screen.replace(new_screen);
 
-                trace!("Switching to new screen complete");
+                log::trace!("Switching to new screen complete");
             } else if let Some(active_screen) = self.active_screen {
                 active_screen.redraw(&mut display);
             }
 
             display.flush().await.unwrap_or_else(|e| {
-                error!("Flush error: {:?}", e);
+                log::error!("Flush error: {:?}", e);
             });
             ticker.next().await;
         }

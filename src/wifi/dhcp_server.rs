@@ -1,4 +1,4 @@
-use defmt::*;
+use defmt_or_log as log;
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_net::{Ipv4Address, Stack};
@@ -90,10 +90,10 @@ impl Default for DhcpServerConfig {
 
 impl DhcpServer {
     pub async fn new(state: &'static DhcpServerState) -> Self {
-        info!("Creating DHCP server instance ...");
+        log::info!("Creating DHCP server instance ...");
         let res = Self { state };
         res.stop().await;
-        info!("DHCP server instance created");
+        log::info!("DHCP server instance created");
         res
     }
 
@@ -107,7 +107,7 @@ impl DhcpServer {
         stack: Stack<'static>,
         dhcp_config: DhcpServerConfig,
     ) {
-        debug!("Starting DHCP server ...");
+        log::debug!("Starting DHCP server ...");
         // Stop existing server, if existing
         self.stop().await;
 
@@ -124,14 +124,14 @@ impl DhcpServer {
 
         //Spawn DHCP server task
         while spawner.spawn(dhcp_server_task(self.state, stack)).is_err() {
-            error!("Failed to spawn DHCP server task, retrying ...");
+            log::error!("Failed to spawn DHCP server task, retrying ...");
             embassy_futures::yield_now().await;
         }
-        debug!("DHCP server started");
+        log::debug!("DHCP server started");
     }
 
     pub async fn stop(&self) {
-        debug!("Stopping DHCP server ...");
+        log::debug!("Stopping DHCP server ...");
         if !self.is_server_running() {
             return;
         }
@@ -141,7 +141,7 @@ impl DhcpServer {
         self.state.dhcp_server.lock().await.take();
         self.state.command.reset();
         self.state.state_signal.reset();
-        debug!("DHCP server stopped");
+        log::debug!("DHCP server stopped");
     }
 
     fn is_server_running(&self) -> bool {
@@ -149,7 +149,7 @@ impl DhcpServer {
             if dhcp_server.is_none() {
                 return false;
             }
-            warn!("DHCP server is not running but still initialized, destroying instance");
+            log::warn!("DHCP server is not running but still initialized, destroying instance");
             dhcp_server.take();
             return false;
         }
@@ -163,7 +163,7 @@ async fn dhcp_server_task(state: &'static DhcpServerState, stack: Stack<'static>
     //let cmd = state.command.wait().await;
 
     if let Some(dhcp_server) = state.dhcp_server.lock().await.as_mut() {
-        info!("Starting DHCP server task");
+        log::info!("Starting DHCP server task");
         state.state_signal.signal(DhcpServerEvent::Started);
 
         let mut buffers = DHCPServerBuffers::new();
@@ -177,26 +177,26 @@ async fn dhcp_server_task(state: &'static DhcpServerState, stack: Stack<'static>
             .await
             {
                 (DhcpServerEvent::Stopped, _) => {
-                    debug!("Stopping DHCP server task");
+                    log::debug!("Stopping DHCP server task");
                     break;
                 }
                 (_, Ok(TransactionEvent::Leased(ip, mac))) => {
-                    debug!("Leased IP: {} for MAC: {}", ip, mac);
+                    log::debug!("Leased IP: {} for MAC: {}", ip, mac);
                     // Wait a bit before returning to let the stack send the ACK packet
                     state.lease_event.signal(DhcpEvent::Lease(ip, mac));
                 }
                 (_, Ok(TransactionEvent::Released(ip, mac))) => {
-                    debug!("Released IP: {} for MAC: {}", ip, mac);
+                    log::debug!("Released IP: {} for MAC: {}", ip, mac);
                     state.lease_event.signal(DhcpEvent::Release(ip, mac));
                 }
                 (_, Err(e)) => {
-                    error!("DHCP server error: {:?}", e);
+                    log::error!("DHCP server error: {:?}", e);
                     embassy_futures::yield_now().await;
                 }
             }
         }
     } else {
-        warn!("DHCP server instance not found, stopping DHCP server task");
+        log::warn!("DHCP server instance not found, stopping DHCP server task");
     }
 
     state.state_signal.signal(DhcpServerEvent::Stopped);

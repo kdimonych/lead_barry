@@ -6,7 +6,7 @@ use crate::{
 
 use super::dhcp_server::{DhcpServer, DhcpServerConfig, DhcpServerState};
 use cyw43_pio::PioSpi;
-use defmt::*;
+use defmt_or_log as log;
 use embassy_executor::Spawner;
 use embassy_net::{ConfigV4, DhcpConfig, Ipv4Address, Ipv4Cidr, Stack, StackResources};
 use embassy_rp::{
@@ -26,7 +26,8 @@ static WIFI_SERVICE_IMPL: StaticCell<WiFiServiceImplType> = StaticCell::new();
 static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
 static DHCP_SERVER_STATE: StaticCell<DhcpServerState> = StaticCell::new();
 
-#[derive(Clone, Copy, defmt::Format, Debug)]
+#[derive(Clone, Copy, Debug)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum JoiningStatus {
     JoiningAP,
     Dhcp,
@@ -34,7 +35,8 @@ pub enum JoiningStatus {
     Failed,
 }
 
-#[derive(Clone, Copy, defmt::Format, Debug)]
+#[derive(Clone, Copy, Debug)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum ApStatus {
     StartingAP,
     WaitingForClient,
@@ -83,7 +85,7 @@ where
         let wifi_driver_builder = self.take_appart();
 
         //Initialize wifi controller
-        info!("Create wifi controller");
+        log::info!("Create wifi controller");
         let wifi_static_data = WIFI_STATIC_DATA.init(WiFiStaticData::new());
         let (wifi_controller, wifi_network_driver) = wifi_driver_builder
             .build(wifi_static_data, spawner, wifi_runner_task)
@@ -103,7 +105,7 @@ where
         );
 
         // Spawn network driver task
-        info!("Spawn network driver task");
+        log::info!("Spawn network driver task");
         spawner.spawn(net_driver_task(runner)).unwrap();
 
         // Initialize DHCP server state
@@ -263,10 +265,10 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
         self.init_dhcp_server().await;
 
         wifi_state_handler(ApStatus::WaitingForClient).await;
-        trace!("Wait for client connected");
+        log::trace!("Wait for client connected");
         // Wait for a client to connect and get an IP address
         let new_client = self.wait_for_dhcp_client().await.unwrap();
-        trace!("Dhcp client has been connected.");
+        log::trace!("Dhcp client has been connected.");
         wifi_state_handler(ApStatus::Ready(new_client)).await;
     }
 }
@@ -291,20 +293,20 @@ impl<'a> WifiServiceImpl<'a> {
         net_stack: Stack<'tr>,
     ) -> WiFiCtrlState<'tr> {
         // Implement transition to Idle state
-        info!("Transitioning to Idle state...");
+        log::info!("Transitioning to Idle state...");
         let mut controller = match wifi_control_state {
             WiFiCtrlState::Joined(controller) => controller.leave().await,
             WiFiCtrlState::Ap(controller) => controller.close_ap().await,
             WiFiCtrlState::Idle(idle) => idle,
             WiFiCtrlState::Uninitialized => {
-                defmt::panic!("WiFi controller in uninitialized state, cannot transition to Idle");
+                log::panic!("WiFi controller in uninitialized state, cannot transition to Idle");
             }
         };
 
-        debug!("Waiting for link down...");
+        log::debug!("Waiting for link down...");
         net_stack.wait_link_down().await;
         // TODO: Check if this step is necessary
-        debug!("Waiting for config down...");
+        log::debug!("Waiting for config down...");
         net_stack.wait_config_down().await;
 
         // Ensure LED is off in idle state
@@ -319,7 +321,7 @@ impl<'a> WifiServiceImpl<'a> {
         wifi_ap_settings: &WiFiApSettings,
     ) -> WiFiCtrlState<'tr> {
         // Implement transition to Idle state
-        info!("Transitioning to Ap state...");
+        log::info!("Transitioning to Ap state...");
 
         // TODO: Not quit sure if we need to go to idle first, but doing it for safety
         controller_state = Self::idle_transition(controller_state, net_stack).await;
@@ -333,19 +335,19 @@ impl<'a> WifiServiceImpl<'a> {
             };
             net_stack.set_config_v4(ConfigV4::Static(config));
 
-            debug!("Starting AP mode...");
+            log::debug!("Starting AP mode...");
 
             let password: heapless::String<64> =
                 wifi_ap_settings.password.clone().unwrap_or_default();
 
             let mut ap_controller = if password.is_empty() {
-                debug!("Open AP mode...");
+                log::debug!("Open AP mode...");
                 // Use open AP if password is empty
                 controller
                     .start_ap_open(wifi_ap_settings.ssid.as_str(), wifi_ap_settings.channel)
                     .await
             } else {
-                debug!("WPA2 AP mode...");
+                log::debug!("WPA2 AP mode...");
                 controller
                     .start_ap_wpa2(
                         wifi_ap_settings.ssid.as_str(),
@@ -356,18 +358,18 @@ impl<'a> WifiServiceImpl<'a> {
             };
 
             // TODO: notify process of AP mode start
-            // debug!("Waiting for link up...");
+            // log::debug!("Waiting for link up...");
             // net_stack.wait_link_up().await;
-            debug!("Waiting for config up...");
+            log::debug!("Waiting for config up...");
             net_stack.wait_config_up().await;
 
-            debug!("AP mode ready.");
+            log::debug!("AP mode ready.");
             ap_controller.led(true).await;
 
             ap_controller.into()
         } else {
             // Should not reach here
-            defmt::unreachable!()
+            log::panic!("Unexpected state in AP transition");
         }
     }
 
@@ -380,25 +382,25 @@ impl<'a> WifiServiceImpl<'a> {
     where
         H: AsyncFnMut(JoiningStatus) -> (),
     {
-        info!("Joining to WiFi ap state...");
+        log::info!("Joining to WiFi ap state...");
 
         // TODO: Not quit sure if we need to go to idle first, but doing it for safety
         controller_state = Self::idle_transition(controller_state, net_stack).await;
 
-        debug!("Attempting to join SSID: {}", wifi_settings.ssid.as_str());
+        log::debug!("Attempting to join SSID: {}", wifi_settings.ssid.as_str());
 
         let join_options = if let Some(psw) = &wifi_settings.password {
             let mut join_options = JoinOptions::new(psw.as_bytes());
             join_options.auth = if psw.is_empty() {
-                debug!("Using open authentication as password is empty");
+                log::debug!("Using open authentication as password is empty");
                 JoinAuth::Open
             } else {
-                debug!("Using WPA2/WPA3 authentication");
+                log::debug!("Using WPA2/WPA3 authentication");
                 JoinAuth::Wpa2Wpa3
             };
             join_options
         } else {
-            debug!("Using open authentication");
+            log::debug!("Using open authentication");
             let mut join_options = JoinOptions::new(b"");
             join_options.auth = JoinAuth::Open;
             join_options
@@ -407,13 +409,13 @@ impl<'a> WifiServiceImpl<'a> {
         for i in 0..JOIN_RETRY_COUNT {
             match controller_state {
                 WiFiCtrlState::Idle(controller) => {
-                    debug!("Attempt {}", i + 1);
+                    log::debug!("Attempt {}", i + 1);
                     controller_state = controller
                         .join(&wifi_settings.ssid, join_options.clone())
                         .await
                         .map_or_else(
                             |(idle, e)| {
-                                error!("Join failed with status={}", e.status);
+                                log::error!("Join failed with status={}", e.status);
                                 idle.into()
                             },
                             |joined| joined.into(),
@@ -421,21 +423,21 @@ impl<'a> WifiServiceImpl<'a> {
                 }
 
                 WiFiCtrlState::Joined(mut controller) => {
-                    debug!("Joined to a network.");
+                    log::debug!("Joined to a network.");
 
                     //Init DHCP client and wait for network read
                     let ip_config = if wifi_settings.use_static_ip_config {
                         if let Some(static_ip_config) = &wifi_settings.static_ip_config {
-                            info!("Using static network settings: {}", static_ip_config);
+                            log::info!("Using static network settings: {}", static_ip_config);
                             ConfigV4::Static(static_ip_config.into())
                         } else {
-                            error!(
+                            log::error!(
                                 "Static IP config selected but not configured, falling back to DHCP"
                             );
                             ConfigV4::Dhcp(DhcpConfig::default())
                         }
                     } else {
-                        info!("Use DHCP provided network settings");
+                        log::info!("Use DHCP provided network settings");
                         ConfigV4::Dhcp(DhcpConfig::default())
                     };
 
@@ -445,11 +447,11 @@ impl<'a> WifiServiceImpl<'a> {
 
                     net_stack.set_config_v4(ip_config);
 
-                    debug!("Waiting for link up...");
+                    log::debug!("Waiting for link up...");
                     net_stack.wait_link_up().await;
-                    debug!("Waiting for config up...");
+                    log::debug!("Waiting for config up...");
                     net_stack.wait_config_up().await;
-                    debug!("Connected to WiFi network.");
+                    log::debug!("Connected to WiFi network.");
 
                     wifi_state_handler(JoiningStatus::Ready).await;
 
@@ -458,7 +460,7 @@ impl<'a> WifiServiceImpl<'a> {
                 }
 
                 _ => {
-                    defmt::unreachable!()
+                    log::unreachable!()
                 }
             }
         }
@@ -488,7 +490,7 @@ impl<'a> WifiServiceImpl<'a> {
                 .start(self.spawner, self.net_stack, dhcp_config)
                 .await;
         } else {
-            error!("Cannot init DHCP server, no valid network config");
+            log::error!("Cannot init DHCP server, no valid network config");
             self.reset_dhcp_server().await;
         }
     }

@@ -1,7 +1,7 @@
 use embassy_sync::lazy_lock::LazyLock;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 
-#[derive(Clone, Copy, defmt::Format, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum WiFiMode {
     None,
     Client,

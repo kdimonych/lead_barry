@@ -22,7 +22,7 @@ mod vcp_sensors;
 mod web_server;
 mod wifi;
 
-use defmt::*;
+use defmt_or_log as log;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
 use embassy_rp::peripherals::{DMA_CH0, I2C1, PIO0};
@@ -34,7 +34,7 @@ use embassy_rp::{
     peripherals::I2C0,
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
-use embassy_time::{Duration, Ticker};
+use embassy_time::Duration;
 use static_cell::StaticCell;
 
 use crate::configuration::{ConfigurationStorageBuilder, Storage};
@@ -43,7 +43,7 @@ use crate::led_controller::{
     Led, LedAnimation, LedControllerBuilder, LedControllerRunner, PwmHardwareConfig, Repetitions,
 };
 use crate::rtc::RtcDs3231Ref;
-use crate::units::{FrequencyExt, TimeExt};
+use crate::units::FrequencyExt;
 use global_types::*;
 use input::*;
 use main_logic_controller::*;
@@ -52,8 +52,15 @@ use ui::*;
 use vcp_sensors::*;
 use wifi::*;
 
-// Display driver imports
+// Configure panic behavior based on features
+#[cfg(feature = "defmt")]
 use {defmt_rtt as _, panic_probe as _};
+
+#[cfg(all(feature = "log", not(feature = "defmt")))]
+use {panic_rtt_target as _, rtt_target as _};
+
+#[cfg(not(any(feature = "defmt", feature = "log")))]
+use panic_halt as _;
 
 // Constants
 const CORE1_STACK_SIZE: usize = 4096 * 4;
@@ -113,14 +120,14 @@ fn log_system_frequencies() {
     let rtc_freq = embassy_rp::clocks::clk_rtc_freq();
     let xosc_freq = embassy_rp::clocks::xosc_freq();
 
-    info!("=== System Clock Frequencies ===");
-    info!("System Clock:     {} MHz", sys_freq / 1_000_000);
-    info!("Peripheral Clock: {} MHz", peri_freq / 1_000_000);
-    info!("USB Clock:        {} MHz", usb_freq / 1_000_000);
-    info!("ADC Clock:        {} MHz", adc_freq / 1_000_000);
-    info!("RTC Clock:        {} Hz", rtc_freq);
-    info!("XOSC Clock:       {} MHz", xosc_freq / 1_000_000);
-    info!("================================");
+    log::info!("=== System Clock Frequencies ===");
+    log::info!("System Clock:     {} MHz", sys_freq / 1_000_000);
+    log::info!("Peripheral Clock: {} MHz", peri_freq / 1_000_000);
+    log::info!("USB Clock:        {} MHz", usb_freq / 1_000_000);
+    log::info!("ADC Clock:        {} MHz", adc_freq / 1_000_000);
+    log::info!("RTC Clock:        {} Hz", rtc_freq);
+    log::info!("XOSC Clock:       {} MHz", xosc_freq / 1_000_000);
+    log::info!("================================");
 }
 
 fn debug_memory_layout() {
@@ -139,13 +146,13 @@ fn debug_memory_layout() {
     let current_sp = cortex_m::register::msp::read() as usize;
     let stack_size = { &raw const _stack_size as usize };
 
-    info!("=== Memory Layout ===");
-    info!("RAM Start:    0x{:08x}", ram_start);
-    info!("RAM End:      0x{:08x}", ram_end);
-    info!("Stack Start:  0x{:08x}", stack_start);
-    info!("Stack End:    0x{:08x}", stack_end);
-    info!("Current SP:   0x{:08x}", current_sp);
-    info!("Stack Size:   {} bytes", stack_size);
+    log::info!("=== Memory Layout ===");
+    log::info!("RAM Start:    0x{:08x}", ram_start);
+    log::info!("RAM End:      0x{:08x}", ram_end);
+    log::info!("Stack Start:  0x{:08x}", stack_start);
+    log::info!("Stack End:    0x{:08x}", stack_end);
+    log::info!("Current SP:   0x{:08x}", current_sp);
+    log::info!("Stack Size:   {} bytes", stack_size);
 }
 
 #[cortex_m_rt::entry]
@@ -250,7 +257,7 @@ fn main() -> ! {
     // Spawn core threads
     embassy_rp::multicore::spawn_core1(p.CORE1, core1_stack, move || {
         let executor1 = EXECUTOR1.init(Executor::new());
-        debug!("Starting executor on core 1");
+        log::debug!("Starting executor on core 1");
         executor1.run(|spawner| {
             spawner
                 .spawn(core1_init(
@@ -267,7 +274,7 @@ fn main() -> ! {
 
     let executor0 = EXECUTOR0.init(Executor::new());
     executor0.run(move |spawner| {
-        debug!("Starting executor on core 0");
+        log::debug!("Starting executor on core 0");
         spawner
             .spawn(core0_init(
                 spawner,
@@ -289,7 +296,7 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     spawner.spawn(core_0_stack_monitor_task()).unwrap();
 
     // Spawn the LED blink task on Core 0
-    info!("Spawn LED task on core 0");
+    log::info!("Spawn LED task on core 0");
     // For regular GPIO LED (if you connect an external LED to a GPIO pin)
 
     spawner
@@ -299,7 +306,7 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     // Spawn the VCP sensors task on Core 0
     if let Some(vcp_runner) = resources.vcp_runner {
         // Spawn the VCP sensors task on core 0
-        info!("Spawn vcp sensors task on core 0");
+        log::info!("Spawn vcp sensors task on core 0");
         spawner.spawn(vcp_sensors_runner_task(vcp_runner)).unwrap();
     }
 
@@ -308,12 +315,12 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
     let (button_controller, button_controller_runner) = resources
         .button_controller_builder
         .build(button_controller_state);
-    info!("Spawn buttons controller task on core 0");
+    log::info!("Spawn buttons controller task on core 0");
     spawner
         .spawn(buttons_controller_task(button_controller_runner))
         .unwrap();
 
-    info!("Create wifi service");
+    log::info!("Create wifi service");
     let wifi_service = resources
         .wifi_service_builder
         .build(spawner, cyw43_task)
@@ -331,7 +338,7 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
 
 #[embassy_executor::task]
 async fn buttons_controller_task(button_controller_runner: ButtonControllerRunner<'static>) -> ! {
-    debug!("Starting buttons controller task...");
+    log::debug!("Starting buttons controller task...");
     button_controller_runner.run().await
 }
 
@@ -350,7 +357,7 @@ fn sine_generator(frequency: f32, sample_rate: usize) -> impl Iterator<Item = f3
 
 #[embassy_executor::task]
 async fn led_controller_task(led_controller_runner: LedControllerRunner) -> ! {
-    debug!("Starting led controller task...");
+    log::debug!("Starting led controller task...");
     led_controller_runner.run().await;
 }
 
@@ -367,26 +374,26 @@ async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
     // Spawn the UI task on Core 1
     if let Some(ui_runner) = resources.ui_runner {
         // Spawn the display task on Core 1
-        debug!("Spawn display task on core 1");
+        log::debug!("Spawn display task on core 1");
         spawner.spawn(display_runner_task(ui_runner)).unwrap();
     }
 }
 
 #[embassy_executor::task]
 async fn display_runner_task(mut ui_runner: UiRunner<'static>) -> ! {
-    debug!("Starting display task...");
+    log::debug!("Starting display task...");
     ui_runner.run().await;
 }
 
 #[embassy_executor::task]
 async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunner<'static>) -> ! {
-    debug!("Starting VCP sensors task...");
+    log::debug!("Starting VCP sensors task...");
     vcp_sensors_runner.run().await;
 }
 
 #[embassy_executor::task]
 async fn cyw43_task(runner: WiFiDriverRunner<PIO0, DMA_CH0>) -> ! {
-    debug!("Starting CYW43 driver task...");
+    log::debug!("Starting CYW43 driver task...");
     runner.run().await
 }
 
@@ -409,7 +416,7 @@ async fn core_0_stack_monitor_task() -> ! {
     loop {
         let (stack_used, stack_size) = get_core_0_stack_usage();
         if stack_used > (stack_size as f32 * 0.8) as usize {
-            defmt::warn!(
+            log::warn!(
                 "❗ [ATTENTION!] High stack usage at core 0: {} bytes of {} bytes",
                 stack_used,
                 stack_size
@@ -423,7 +430,7 @@ async fn core_0_stack_monitor_task() -> ! {
 
 fn get_core_1_stack_usage(core1_stack_base: usize, core1_stack_end: usize) -> (usize, usize) {
     let current_sp = cortex_m::register::msp::read() as usize;
-    defmt::debug_assert!(core1_stack_end > core1_stack_base);
+    log::debug_assert!(core1_stack_end > core1_stack_base);
 
     (
         core1_stack_end - current_sp,
@@ -436,7 +443,7 @@ async fn core_1_stack_monitor_task(core1_stack_base: usize, core1_stack_end: usi
     loop {
         let (stack_used, stack_size) = get_core_1_stack_usage(core1_stack_base, core1_stack_end);
         if stack_used > (stack_size as f32 * 0.8) as usize {
-            defmt::warn!(
+            log::warn!(
                 "❗ [ATTENTION!] High stack usage at core 1: {} bytes of {} bytes",
                 stack_used,
                 stack_size

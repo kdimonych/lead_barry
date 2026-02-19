@@ -3,13 +3,14 @@ use super::settings::*;
 #[cfg(feature_use_static_ip_config)]
 use crate::configuration::settings;
 use crc::{CRC_32_ISCSI, Crc};
-use defmt::*;
+use defmt_or_log as log;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use static_cell::StaticCell;
 
 static SHARED_STORAGE: StaticCell<ConfigurationStorage<'static>> = StaticCell::new();
 
-#[derive(defmt::Format, Debug)]
+#[derive(Debug)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum Error {
     StorageRead(embassy_rp::flash::Error),
     StorageErase(embassy_rp::flash::Error),
@@ -32,13 +33,13 @@ impl ConfigurationStorageBuilder {
             Ok(settings) => settings,
 
             Err(error) => {
-                error!(
+                log::error!(
                     "Can't load settings from storage: {}. Using default settings.",
                     error
                 );
                 let default_settings = Settings::default();
                 if let Err(error) = sync_save(&mut self.flash_storage, &default_settings) {
-                    error!("Can't save default settings to storage: {}", error);
+                    log::error!("Can't save default settings to storage: {}", error);
                 }
                 default_settings
             }
@@ -116,7 +117,7 @@ impl<'a> ConfigurationStorage<'a> {
         let used = postcard::to_slice_crc32(&storage.settings_cache, &mut buffer, crc.digest())
             .map_err(|_| Error::Serialization)?;
 
-        debug!(
+        log::debug!(
             "Used during save size: {} , \n\tdata: {:?}",
             used.len(),
             &used
@@ -176,7 +177,7 @@ fn sync_save(flash_storage: &mut Storage<'_>, settings: &Settings) -> Result<(),
     let used = postcard::to_slice_crc32(settings, &mut buffer, crc.digest())
         .map_err(|_| Error::Serialization)?;
 
-    debug!(
+    log::debug!(
         "Used during sync save size: {} , \n\tdata: {:?}",
         used.len(),
         &used

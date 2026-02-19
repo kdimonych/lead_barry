@@ -1,4 +1,4 @@
-use defmt::*;
+use defmt_or_log as log;
 use embassy_futures::*;
 use embassy_sync::{
     blocking_mutex::raw::CriticalSectionRawMutex,
@@ -20,7 +20,8 @@ use crate::{
 const POLL_TIMEOUT_MS: u64 = 40;
 const HARDWARE_RESPONSE_TIMEOUT_MS: u64 = 100;
 
-#[derive(defmt::Format)]
+#[derive(Debug)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum VcpCommand {
     EnableChannel(ChannelNum),
     DisableChannel(ChannelNum),
@@ -144,7 +145,7 @@ impl<'a, SharedI2cDevice, const EVENT_QUEUE_SIZE: usize>
     VcpSensorsRunner<'a, SharedI2cDevice, EVENT_QUEUE_SIZE>
 where
     SharedI2cDevice: embedded_hal_async::i2c::I2c,
-    <SharedI2cDevice as embedded_hal_async::i2c::ErrorType>::Error: defmt::Format,
+    <SharedI2cDevice as embedded_hal_async::i2c::ErrorType>::Error: defmt_or_log::FormatOrDebug,
 {
     async fn read_bus_voltage(
         &mut self,
@@ -153,7 +154,10 @@ where
     ) -> Result<VcpState, VcpError> {
         match ina.get_bus_voltage(channel).await {
             Err(e) => {
-                error!("INA3221 bus voltage read error: {:?}", e);
+                log::error!(
+                    "INA3221 bus voltage read error: {:?}",
+                    defmt_or_log::Debug2Format(&e)
+                );
                 Err(VcpError::I2cError("INA3221 bus voltage read error"))
             }
             Ok(voltage) => {
@@ -175,7 +179,10 @@ where
     ) -> Result<VcpState, VcpError> {
         match ina.get_shunt_voltage(channel).await {
             Err(e) => {
-                error!("INA3221 shunt voltage read error: {:?}", e);
+                log::error!(
+                    "INA3221 shunt voltage read error: {:?}",
+                    defmt_or_log::Debug2Format(&e)
+                );
                 Err(VcpError::I2cError("INA3221 shunt voltage read error"))
             }
             Ok(shunt_voltage) => {
@@ -209,7 +216,10 @@ where
     async fn configure(&mut self, ina: &mut INA3221Async<SharedI2cDevice>) -> Result<(), VcpError> {
         // Set operating mode to continuous
         ina.set_mode(OperatingMode::Continuous).await.map_err(|e| {
-            error!("INA3221 set mode error: {:?}", e);
+            log::error!(
+                "INA3221 set mode error: {:?}",
+                defmt_or_log::Debug2Format(&e)
+            );
             VcpError::I2cError("INA3221 set mode error")
         })?;
 
@@ -218,7 +228,11 @@ where
             ina.set_channel_enabled(i as u8, *enable)
                 .await
                 .map_err(|e| {
-                    error!("INA3221 set channel {} enabled error: {:?}", i, e);
+                    log::error!(
+                        "INA3221 set channel {} enabled error: {:?}",
+                        i,
+                        defmt_or_log::Debug2Format(&e)
+                    );
                     VcpError::I2cError("INA3221 set channel enabled error")
                 })?;
         }
@@ -231,30 +245,30 @@ where
             VcpCommand::EnableChannel(channel) => {
                 if (channel as usize) < self.config.enabled_channels.len() {
                     self.config.enabled_channels[channel as usize] = true;
-                    info!("Enabled channel {}", channel);
+                    log::info!("Enabled channel {}", channel);
                 } else {
-                    warn!("Invalid channel number: {}", channel);
+                    log::warn!("Invalid channel number: {}", channel);
                 }
             }
             VcpCommand::DisableChannel(channel) => {
                 if (channel as usize) < self.config.enabled_channels.len() {
                     self.config.enabled_channels[channel as usize] = false;
-                    info!("Disabled channel {}", channel);
+                    log::info!("Disabled channel {}", channel);
                 } else {
-                    warn!("Invalid channel number: {}", channel);
+                    log::warn!("Invalid channel number: {}", channel);
                 }
             }
             VcpCommand::EnableAllChannels => {
                 for ch in 0u8..3u8 {
                     self.config.enabled_channels[ch as usize] = true;
                 }
-                info!("Enabled all channels");
+                log::info!("Enabled all channels");
             }
             VcpCommand::DisableAllChannels => {
                 for ch in 0u8..3u8 {
                     self.config.enabled_channels[ch as usize] = false;
                 }
-                info!("Disabled all channels");
+                log::info!("Disabled all channels");
             }
         }
     }
@@ -265,7 +279,7 @@ where
             self.event_sender.clear();
         }
         if self.event_sender.try_send(event).is_err() {
-            error!("Failed to send VCP event");
+            log::error!("Failed to send VCP event");
         }
     }
 
@@ -276,7 +290,7 @@ where
 
         // Configure the INA3221
         if let Err(e) = self.configure(&mut ina).await {
-            error!("Failed to configure INA3221: {:?}", e);
+            log::error!("Failed to configure INA3221: {:?}", e);
             self.event_sender
                 .send(VcpSensorsEvents::Error(
                     e.error_description().unwrap_or("Unknown error"),
@@ -290,7 +304,7 @@ where
             match select::select(self.command_sender.receive(), ticker.next()).await {
                 select::Either::First(command) => {
                     // Handle incoming command
-                    debug!("Handled VCP command: {}", command);
+                    log::debug!("Handled VCP command: {}", command);
                     self.handle_command(&mut ina, command);
                 }
                 select::Either::Second(_) => {}
@@ -307,12 +321,12 @@ where
                 .await;
                 match reading {
                     Err(_) => {
-                        error!("Timeout reading channel {}", ch);
+                        log::error!("Timeout reading channel {}", ch);
                         self.push_event(VcpSensorsEvents::Error("Timeout reading VCP channel"));
                         continue;
                     }
                     Ok(Err(e)) => {
-                        error!("Error reading channel {}: {:?}", ch, e);
+                        log::error!("Error reading channel {}: {:?}", ch, e);
                         self.push_event(VcpSensorsEvents::Error(
                             e.error_description().unwrap_or("Unknown error"),
                         ));

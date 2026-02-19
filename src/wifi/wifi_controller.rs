@@ -18,7 +18,7 @@ pub use cyw43::ScanOptions;
 pub use cyw43::Scanner;
 
 use super::wifi_control_state::WiFiControlerState;
-use defmt::debug;
+use defmt_or_log as log;
 use embassy_executor::Spawner;
 use embassy_rp::{
     gpio::{Level, Output},
@@ -162,22 +162,22 @@ where
         let fw = CYW43_43439A0; // Firmware binary included in the cyw43_firmware crate;
 
         let state = &mut wifi_static_state.cyw43_state;
-        debug!("Creating WiFi driver...");
+        log::debug!("Creating WiFi driver...");
         let (net_device, mut control, cyw43_runner) =
             cyw43::new(state, self.step.pwr, self.step.pio_spi, fw).await;
-        debug!("WiFi driver created.");
+        log::debug!("WiFi driver created.");
 
         // Spawn the CYW43 runner task. Spawning this task here guarantees the WiFi driver operates correctly.
         spawner.spawn(wifi_runner_task(cyw43_runner)).unwrap();
 
         // Initialize the WiFi hardware with CLM data
-        debug!("Initializing WiFi driver...");
+        log::debug!("Initializing WiFi driver...");
         let clm = CYW43_43439A0_CLM; // CLM binary included in the cyw43_firmware crate;
         control.init(clm).await;
         control
             .set_power_management(cyw43::PowerManagementMode::Performance)
             .await;
-        debug!("WiFi driver initialized.");
+        log::debug!("WiFi driver initialized.");
 
         (
             WiFiController {
