@@ -89,15 +89,10 @@ embassy-net = { version = "0.7", features = [
 ] }
 
 # DHCP server
-#leasehund = "0.2.0"
 leasehund = { path = "./leasehund" }
 
 # HTTP server/client
-# nanofish = "0.9.1"
 nanofish = { path = "./nanofish", features = ["ws"] }
-
-# Alternative: Use rp-pico but you'll need to handle CYW43 separately
-# rp-pico = "0.9"
 
 # WiFi/bluetooth driver for the CYW43 chip on the Pico W
 # cyw43 = { version = "0.5", features = ["firmware-logs","defmt"] }
@@ -105,16 +100,6 @@ cyw43 = "0.5"
 cyw43-pio = "0.8"
 # Firmware for CYW43 (Needed to include firmware binary for the CYW43 chip used in raspberry Pi Pico W)
 cyw43-firmware = { version = "0.1.0", features = ["bluetooth", "wifi"] }
-
-# BLE stack
-# trouble-host = "0.4.0"
-
-# but you can use any BSP. Uncomment this to use the pro_micro_rp2040 BSP instead
-# sparkfun-pro-micro-rp2040 = "0.8"
-
-# If you're not going to use a Board Support Package you'll need these:
-# rp2040-hal = { version="0.11", features=["rt", "critical-section-impl"] }
-# rp2040-boot2 = "0.3"
 
 # Prerepherial device drivers
 ssd1306 = { version = "0.10", features = ["async"] }
