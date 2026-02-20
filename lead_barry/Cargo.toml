@@ -131,3 +131,5 @@ dotenvy = "0.15"
 flate2 = "1.1.5"
 minify-html = "0.18.1"
 regex = "1.12.3"
+build_log = { path = "../build_utils/build_log" }
+cargo_command = { path = "../build_utils/cargo_command" }

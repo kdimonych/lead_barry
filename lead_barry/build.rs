@@ -9,14 +9,17 @@
 //! new memory settings.
 
 use std::env;
-use std::fs::File;
+// use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
+// use std::path::PathBuf;
 
 use flate2::Compression;
 use flate2::write::GzEncoder;
-use std::io;
-use std::io::prelude::*;
+// use std::io;
+// use std::io::prelude::*;
+
+use build_log as log;
+use cargo_command as cargo;
 
 fn forvard_dbg_var() {
     let forward_list = [
@@ -46,22 +49,24 @@ fn forvard_dbg_var() {
 fn compress_bin_to_file(input_data: &[u8], output_file: &str) -> Result<(), ()> {
     let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
     encoder.write_all(&input_data).map_err(|e| {
-        println!(
-            "cargo:error=Failed to write data to encoder for {}",
-            output_file
+        log::error!(
+            "Failed to write data to encoder for {}. Error: {}",
+            output_file,
+            e
         );
         ()
     })?;
 
     let compressed_data = encoder.finish().map_err(|e| {
-        println!("cargo:error=Failed to compress to {}", output_file);
+        log::error!("Failed to compress to {}. Error: {}", output_file, e);
         ()
     })?;
 
     std::fs::write(&output_file, compressed_data).map_err(|e| {
-        println!(
-            "cargo:error=Failed to write compressed file {}",
-            output_file
+        log::error!(
+            "Failed to write compressed file {}. Error: {}",
+            output_file,
+            e
         );
         ()
     })?;
@@ -77,7 +82,7 @@ use regex::Regex;
 fn compress_html(file: &str, output_file: &str) -> Result<(), ()> {
     let html_bin = std::fs::read(&file).expect("Failed to read input file");
     let html_str = std::str::from_utf8(&html_bin).map_err(|e| {
-        println!("cargo:error=Failed to parse HTML file as UTF-8: {}", e);
+        log::error!("Failed to parse HTML file as UTF-8: {}", e);
         ()
     })?;
 
@@ -110,17 +115,17 @@ fn compress(files: &[&str]) -> Result<(), ()> {
     for &file in files {
         let output_file = format!("{}.gz", file);
         if file.ends_with(".html") {
-            println!("cargo:info=Compressed HTML");
+            log::info!("Compressed HTML");
             compress_html(&file, &output_file)?;
         } else {
             compress_file(&file, &output_file)?;
         }
 
-        println!("cargo:info=Compressed {} to {}", file, output_file);
+        log::info!("Compressed {} to {}", file, output_file);
         // Force rebuild when HTML files change
-        println!("cargo:rerun-if-changed={}", file);
-        println!("cargo:rerun-if-changed={}", output_file);
-        println!("cargo:rerun-if-not-exists={}", output_file);
+        cargo::cmd!("rerun-if-changed={}", file);
+        cargo::cmd!("rerun-if-changed={}", output_file);
+        cargo::cmd!("rerun-if-not-exists={}", output_file);
     }
     Ok(())
 }
@@ -132,37 +137,36 @@ fn main() {
     // Put `memory.x` in our output directory and ensure it's
     // on the linker search path.
 
-    let out_dir: std::ffi::OsString = env::var_os("OUT_DIR").unwrap();
-    println!("cargo:info=out_dir: {}", out_dir.to_string_lossy());
-    let out = &PathBuf::from(&out_dir);
-    File::create(out.join("memory.x"))
-        .unwrap()
-        .write_all(include_bytes!("memory.x"))
-        .unwrap();
-    println!("cargo:rustc-link-search={}", out.display());
+    // let out_dir: std::ffi::OsString = env::var_os("OUT_DIR").unwrap();
+    // log::info!(" >>>>> out_dir: {}", out_dir.to_string_lossy());
+    // let out = &PathBuf::from(&out_dir);
+    // File::create(out.join("memory.x"))
+    //     .unwrap()
+    //     .write_all(include_bytes!("memory.x"))
+    //     .unwrap();
+    // cargo::cmd!("rustc-link-search={}", out.display());
 
-    // By default, Cargo will re-run a build script whenever
-    // any file in the project changes. By specifying `memory.x`
-    // here, we ensure the build script is only re-run when
-    // `memory.x` is changed.
-    println!("cargo:rerun-if-changed=memory.x");
+    // // By default, Cargo will re-run a build script whenever
+    // // any file in the project changes. By specifying `memory.x`
+    // // here, we ensure the build script is only re-run when
+    // // `memory.x` is changed.
+    // cargo::cmd!("rerun-if-changed=memory.x");
 
     // Load .env file if it exists
     if dotenvy::dotenv().is_ok() {
-        println!("cargo:info=Loaded .env file");
+        log::info!("Loaded .env file");
     } else {
-        println!("cargo:warning=No .env file found, using defaults");
+        log::warning!("No .env file found, using defaults");
     }
 
     // Read environment variables and pass them to rustc
-
     if env::var("DBG_OVERWRITE_WITH_DEBUG_SETTINGS").is_ok() {
-        println!("cargo:rustc-cfg=feature_overwrite_with_debug_settings");
+        cargo::cmd!("rustc-cfg=feature_overwrite_with_debug_settings");
     }
-    println!("cargo:rustc-check-cfg=cfg(feature_overwrite_with_debug_settings)");
+    cargo::cmd!("rustc-check-cfg=cfg(feature_overwrite_with_debug_settings)");
 
     forvard_dbg_var();
 
     // Rebuild if .env file changes
-    println!("cargo:rerun-if-changed=.env");
+    cargo::cmd!("rerun-if-changed=.env");
 }
