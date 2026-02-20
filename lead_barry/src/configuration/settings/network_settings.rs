@@ -10,6 +10,7 @@ pub struct NetworkSettings {
     pub wifi_ap_settings: WiFiApSettings,
 }
 
+#[allow(dead_code)]
 impl NetworkSettings {
     pub const fn new() -> Self {
         Self {

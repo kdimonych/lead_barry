@@ -140,7 +140,10 @@ fn copy_file(src: &str, dst: &str) -> Result<(), ()> {
 
 fn copy_memory_x() -> Result<(), ()> {
     let out_dir: std::ffi::OsString = env::var_os("OUT_DIR").unwrap();
-    log::info!(" >>>>> out_dir: {}", out_dir.to_string_lossy());
+    log::info!(
+        "The memory.x was copied to the: {} directory",
+        out_dir.to_string_lossy()
+    );
     let out = &std::path::PathBuf::from(&out_dir);
     copy_file("memory.x", &out.join("memory.x").to_string_lossy())?;
     cargo::cmd!("rustc-link-search={}", out.display());

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::future::poll_fn;
 use core::pin::Pin;
 use core::task::{Context, Poll};

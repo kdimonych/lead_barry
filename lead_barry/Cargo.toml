@@ -132,3 +132,9 @@ minify-html = "0.18.1"
 regex = "1.12.3"
 build_log = { path = "../build_utils/build_log" }
 cargo_command = { path = "../build_utils/cargo_command" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(feature_use_debug_settings)',
+  'cfg(feature_use_static_ip_config)',
+] }

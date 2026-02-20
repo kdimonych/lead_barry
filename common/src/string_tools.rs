@@ -1,5 +1,4 @@
 use core::iter::Iterator;
-use core::option::Option::{self, None, Some};
 
 pub trait StringSlicer {
     fn slice_by_lines(&self, max_len: usize) -> impl Iterator<Item = &'_ str>;

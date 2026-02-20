@@ -1,19 +1,26 @@
+#![allow(dead_code)]
+
 use super::common::{DetailString, ScStatusImpl, StatusString, TrStatus};
 
 pub use super::common::TitleString as IpTitleString;
 
+#[derive(Debug, Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum ScvState {
     Disconnected,
     Connecting,
     Dhcp,
     Connected,
 }
-
+#[derive(Debug, Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum ScvIpState {
-    GettingIp,
     IpAssigned,
+    GettingIp,
 }
 
+#[derive(Debug, Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
 pub struct ScIpData {
     pub state: ScvIpState,
     pub ip: embassy_net::Ipv4Address,

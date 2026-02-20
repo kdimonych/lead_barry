@@ -45,6 +45,7 @@ pub struct PwmLedDriver {
     leds: [PwmOutput<'static>; LED_COUNT],
 }
 
+#[allow(dead_code)]
 impl PwmLedDriver {
     pub fn new(config: PwmHardwareConfig) -> Self {
         let desired_freq_hz = PWM_FREQUENCY_HZ;

@@ -1,5 +1,9 @@
+#![allow(dead_code)]
+
 use super::common::{DetailString, ScStatusImpl, StatusString, TitleString, TrStatus};
 
+#[derive(Debug, Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum ScvState {
     Disconnected,
     Connecting,

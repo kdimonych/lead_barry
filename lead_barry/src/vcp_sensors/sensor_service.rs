@@ -86,6 +86,7 @@ pub struct VcpControl<'a, const EVENT_QUEUE_SIZE: usize> {
     command_receiver: Sender<'a, CriticalSectionRawMutex, VcpCommand, 1>,
 }
 
+#[allow(dead_code)]
 impl<'a, const EVENT_QUEUE_SIZE: usize> VcpControl<'a, EVENT_QUEUE_SIZE> {
     pub fn receive_event(&self) -> VcpEventReceiveFuture<'_, EVENT_QUEUE_SIZE> {
         self.event_receiver.receive()
@@ -157,7 +158,7 @@ where
                     "INA3221 bus voltage read error: {:?}",
                     defmt_or_log::Debug2Format(&e)
                 );
-                Err(VcpError::I2cError("INA3221 bus voltage read error"))
+                Err(VcpError::I2c)
             }
             Ok(voltage) => {
                 if voltage.volts() < self.config.limits[channel as usize].min_voltage {
@@ -182,7 +183,7 @@ where
                     "INA3221 shunt voltage read error: {:?}",
                     defmt_or_log::Debug2Format(&e)
                 );
-                Err(VcpError::I2cError("INA3221 shunt voltage read error"))
+                Err(VcpError::I2c)
             }
             Ok(shunt_voltage) => {
                 let shunt_resistance = self.config.shunt_resistance(channel);
@@ -219,7 +220,7 @@ where
                 "INA3221 set mode error: {:?}",
                 defmt_or_log::Debug2Format(&e)
             );
-            VcpError::I2cError("INA3221 set mode error")
+            VcpError::I2c
         })?;
 
         // Enable selected channels
@@ -232,14 +233,14 @@ where
                         i,
                         defmt_or_log::Debug2Format(&e)
                     );
-                    VcpError::I2cError("INA3221 set channel enabled error")
+                    VcpError::I2c
                 })?;
         }
 
         Ok(())
     }
 
-    fn handle_command(&mut self, ina: &mut INA3221Async<SharedI2cDevice>, command: VcpCommand) {
+    fn handle_command(&mut self, _: &mut INA3221Async<SharedI2cDevice>, command: VcpCommand) {
         match command {
             VcpCommand::EnableChannel(channel) => {
                 if (channel as usize) < self.config.enabled_channels.len() {
@@ -290,11 +291,7 @@ where
         // Configure the INA3221
         if let Err(e) = self.configure(&mut ina).await {
             log::error!("Failed to configure INA3221: {:?}", e);
-            self.event_sender
-                .send(VcpSensorsEvents::Error(
-                    e.error_description().unwrap_or("Unknown error"),
-                ))
-                .await;
+            self.event_sender.send(VcpSensorsEvents::Error(e)).await;
         }
 
         let mut ticker = Ticker::every(POLL_TIMEOUT_MS.ms());
@@ -321,14 +318,12 @@ where
                 match reading {
                     Err(_) => {
                         log::error!("Timeout reading channel {}", ch);
-                        self.push_event(VcpSensorsEvents::Error("Timeout reading VCP channel"));
+                        self.push_event(VcpSensorsEvents::Error(VcpError::Timeout));
                         continue;
                     }
                     Ok(Err(e)) => {
                         log::error!("Error reading channel {}: {:?}", ch, e);
-                        self.push_event(VcpSensorsEvents::Error(
-                            e.error_description().unwrap_or("Unknown error"),
-                        ));
+                        self.push_event(VcpSensorsEvents::Error(e));
                         continue;
                     }
                     Ok(Ok(reading)) => self.push_event(VcpSensorsEvents::Reading(reading)),
@@ -336,11 +331,4 @@ where
             }
         }
     }
-}
-
-mod private {
-    pub trait Sealed {}
-
-    // Implement Sealed for the enum itself
-    impl Sealed for super::VcpCommand {}
 }

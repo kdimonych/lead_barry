@@ -1,9 +1,11 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 mod network_settings;
 mod static_ip_config;
 mod wifi_ap_settings;
 mod wifi_settings;
 
-use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 pub use network_settings::*;

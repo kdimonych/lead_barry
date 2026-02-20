@@ -1,8 +1,10 @@
+#![allow(dead_code)]
+
 use embedded_graphics::{
     mono_font::{MonoTextStyle, MonoTextStyleBuilder, ascii::FONT_10X20},
     pixelcolor::BinaryColor,
     prelude::*,
-    primitives::{Polyline, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle, StrokeAlignment},
+    primitives::{Polyline, PrimitiveStyle, PrimitiveStyleBuilder, StrokeAlignment},
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
@@ -31,7 +33,8 @@ const VALUE_TEXT_STYLE: TextStyle = TextStyleBuilder::new()
 
 pub type VcpTitleString<'a> = TitleString<'a>;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug, Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum ScvBaseUnits {
     Volts,
     Amps,

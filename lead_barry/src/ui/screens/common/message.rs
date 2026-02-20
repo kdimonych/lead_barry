@@ -113,15 +113,6 @@ fn align_text_center_vertically(
     }
 }
 
-fn try_split_at_utf8(word: &str, step: usize) -> (usize, &str, &str) {
-    let mut i: usize = 0;
-    while word.chars().next().is_some() && i < step {
-        i += 1;
-    }
-
-    (i, &word[0..i], &word[i..])
-}
-
 // TODO: Cover with tests
 fn split_message_into_lines(message: &str) -> heapless::Vec<heapless::String<MESSAGE_SIZE>, 3> {
     let mut lines: heapless::Vec<heapless::String<MESSAGE_SIZE>, 3> = heapless::Vec::new();

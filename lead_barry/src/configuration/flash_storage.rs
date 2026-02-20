@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use defmt_or_log as log;
 use embassy_rp::Peri;
 use embassy_rp::dma::Channel;

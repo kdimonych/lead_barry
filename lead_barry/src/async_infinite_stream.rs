@@ -9,6 +9,7 @@ pub trait AsyncInfiniteStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Item>;
 }
 
+#[allow(dead_code)]
 pub trait InfiniteStreamExt: AsyncInfiniteStream {
     /// Map combinator
     /// Creates a stream that applies a function to each item of the original stream.
@@ -128,6 +129,7 @@ pub struct Map<S, F> {
     f: F,
 }
 
+#[allow(dead_code)]
 impl<S, F> Map<S, F> {
     fn new(stream: S, f: F) -> Self {
         Self { stream, f }

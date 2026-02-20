@@ -1,9 +1,11 @@
-use crate::vcp_sensors::data_model::{ChannelNum, VcpReading, VcpState};
+use crate::vcp_sensors::data_model::VcpReading;
+use crate::vcp_sensors::error::VcpError;
 
 #[derive(Debug, Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
 pub enum VcpSensorsEvents {
     Reading(VcpReading),
-    Error(&'static str),
+    Error(VcpError),
 }
 
 impl VcpSensorsEvents {

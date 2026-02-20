@@ -1,4 +1,3 @@
-use core::task::Poll;
 use core::usize;
 
 use defmt_or_log as log;
@@ -204,9 +203,9 @@ pub async fn main_logic_controller(
         let ip = net_cfg.address.address();
         global_state().set_device_ip(Some(ip)).await;
 
-        for i in 0..1 {
+        for _ in 0..1 {
             spawner
-                .spawn(start_http_config_server(spawner, shared, net_stack, i))
+                .spawn(start_http_config_server(spawner, shared, net_stack))
                 .unwrap();
         }
 
@@ -394,14 +393,8 @@ async fn start_http_config_server(
     spawner: Spawner,
     shared: &'static SharedResources,
     stack: Stack<'static>,
-    instance_number: usize,
 ) {
     let mut http_server = HttpConfigServer::new(spawner, shared);
-
-    // // For the first instance, enable auto-close connection
-    // if instance_number == 0 {
-    //     http_server = http_server.with_auto_close_connection(true);
-    // }
 
     const SOCKETS: usize = 3;
     const RX_SIZE: usize = 256;

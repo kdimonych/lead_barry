@@ -7,8 +7,8 @@ use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
     Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
-    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode, WebSocket, WebSocketError,
-    WebSocketRead, WebSocketState, WebSocketWrite,
+    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode, WebSocket, WebSocketRead,
+    WebSocketWrite,
 };
 
 use crate::configuration::WiFiSettings;
@@ -31,6 +31,7 @@ pub struct HttpConfigServer {
     http_server: HttpServer,
 }
 
+#[allow(dead_code)]
 impl HttpConfigServer {
     pub fn new(spawner: Spawner, shared: &'static SharedResources) -> Self {
         let timeouts = ServerTimeouts::default();

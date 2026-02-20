@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use super::flash_storage::*;
 use super::settings::*;
 #[cfg(feature_use_static_ip_config)]

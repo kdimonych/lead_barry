@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::vcp_sensors::data_model::ChannelNum;
 use defmt_or_log as log;
 

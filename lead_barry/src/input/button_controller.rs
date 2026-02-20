@@ -1,4 +1,5 @@
-use core::future::poll_fn;
+#![allow(dead_code)]
+
 use core::task::Poll;
 
 use embassy_rp::gpio::Pin;

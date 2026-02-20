@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use embassy_sync::lazy_lock::LazyLock;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 

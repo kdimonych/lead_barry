@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 mod config;
 mod data_model;
 mod error;

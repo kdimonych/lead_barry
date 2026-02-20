@@ -243,8 +243,6 @@ fn main() -> ! {
     let rtc_ds3231_ref: &'static RtcDs3231Ref<I2c1Device<'static>> = RTC_DS3231.init(rtc_ds3231);
 
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
-        i2c0_bus,
-        i2c1_bus,
         rtc: rtc_ds3231_ref,
         ui_control,
         vcp_control,
@@ -338,19 +336,6 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
 async fn buttons_controller_task(button_controller_runner: ButtonControllerRunner<'static>) -> ! {
     log::debug!("Starting buttons controller task...");
     button_controller_runner.run().await
-}
-
-use core::f32::consts::PI;
-use libm::sinf;
-
-fn sine_generator(frequency: f32, sample_rate: usize) -> impl Iterator<Item = f32> + Clone {
-    let dt = 1.0 / sample_rate as f32;
-    let angular_freq = 2.0 * PI * frequency;
-
-    (0..sample_rate).map(move |n| {
-        let time = n as f32 * dt;
-        sinf(angular_freq * time)
-    })
 }
 
 #[embassy_executor::task]

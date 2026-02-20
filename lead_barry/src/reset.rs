@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+
 use cortex_m::peripheral::SCB;
-use embassy_executor::{Executor, Spawner};
+use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 
 pub fn trigger_system_reset() -> ! {
