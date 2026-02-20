@@ -1,0 +1,39 @@
+[alias]
+# Builds the lead_barry firmware in debug mode, with defmt logging enabled and runs with probe-rs.
+run_lead_barry_dbg = "--config ./lead_barry/.cargo/config.toml run --package lead_barry --target thumbv6m-none-eabi --features defmt"
+# Builds the lead_barry firmware in release mode, with no logging enabled and runs with probe-rs.
+run_lead_barry_release = "--config ./lead_barry/.cargo/config.toml run --package lead_barry --target thumbv6m-none-eabi --release"
+# Builds the lead_barry firmware in release mode, flash it with picotool. Requires both picotool to be installed
+# and manual switch the RP2040 to boot mode.
+build_flash_lead_barry = "--config ./lead_barry/.cargo/config_flash.toml run --package lead_barry --target thumbv6m-none-eabi --release"
+
+# Builds the lead_barry firmware in debug mode, with defmt logging enabled.
+build_lead_barry_dbg = "--config ./lead_barry/.cargo/config.toml build --package lead_barry --target thumbv6m-none-eabi --features defmt"
+# Builds the lead_barry firmware in release mode, with no logging enabled.
+build_lead_barry_release = "--config ./lead_barry/.cargo/config.toml build --package lead_barry --target thumbv6m-none-eabi --release"
+
+test-host = "test --target x86_64-apple-darwin"
+debug-test-host = "test --target x86_64-apple-darwin --no-run"
+
+# Choose a default "cargo run" tool (see README for more info)
+# - `probe-rs` provides flashing and defmt via a hardware debugger, and stack unwind on panic
+# - `picotool` loads firmware over USB when the rp2040 is in boot mode
+# runner = "probe-rs run --chip RP2040 --protocol swd"
+# runner = "picotool load --update --verify --execute -t elf"
+# Use option --verify to add verification step after flashing
+# Code-size optimizations.
+#   trap unreachable can save a lot of space, but requires nightly compiler.
+#   uncomment the next line if you wish to enable it
+# "-Z", "trap-unreachable=no",
+
+# Global target configuration for all ARM Cortex-M0+ targets (like RP2040)
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+rustflags = []
+
+# Global target configuration for host platforms (x86_64)
+[target.'cfg(all(target_arch = "x86_64", target_os = ["windows", "linux", "macos"]))']
+rustflags = []
+
+[env]
+DEFMT_LOG = "debug"
+DBG_PRINT = "1"

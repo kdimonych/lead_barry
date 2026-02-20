@@ -24,15 +24,4 @@ SECTIONS {
     {
         KEEP(*(.boot2));
     } > BOOT2
-
-    /* ### User flash storage - zero initialized */
-    /*
-    .user_data _user_flash_start : AT(_user_flash_start)
-    {
-        . = ALIGN(4);
-        _user_data_start = .;
-        . = . + LENGTH(USER_FLASH);
-        _user_data_end = .;
-    } > USER_FLASH = 0x00
-    */
 } INSERT BEFORE .text;

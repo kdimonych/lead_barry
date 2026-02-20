@@ -130,27 +130,27 @@ fn compress(files: &[&str]) -> Result<(), ()> {
     Ok(())
 }
 
+fn copy_file(src: &str, dst: &str) -> Result<(), ()> {
+    std::fs::copy(src, dst).map_err(|e| {
+        log::error!("Failed to copy file from {} to {}. Error: {}", src, dst, e);
+        ()
+    })?;
+    Ok(())
+}
+
+fn copy_memory_x() -> Result<(), ()> {
+    let out_dir: std::ffi::OsString = env::var_os("OUT_DIR").unwrap();
+    log::info!(" >>>>> out_dir: {}", out_dir.to_string_lossy());
+    let out = &std::path::PathBuf::from(&out_dir);
+    copy_file("memory.x", &out.join("memory.x").to_string_lossy())?;
+    cargo::cmd!("rustc-link-search={}", out.display());
+    cargo::cmd!("rerun-if-changed=memory.x");
+    Ok(())
+}
+
 fn main() {
     let files_to_compress = ["./src/web_server/web/main_configuration.html"];
     compress(&files_to_compress).expect("Failed to compress files");
-
-    // Put `memory.x` in our output directory and ensure it's
-    // on the linker search path.
-
-    // let out_dir: std::ffi::OsString = env::var_os("OUT_DIR").unwrap();
-    // log::info!(" >>>>> out_dir: {}", out_dir.to_string_lossy());
-    // let out = &PathBuf::from(&out_dir);
-    // File::create(out.join("memory.x"))
-    //     .unwrap()
-    //     .write_all(include_bytes!("memory.x"))
-    //     .unwrap();
-    // cargo::cmd!("rustc-link-search={}", out.display());
-
-    // // By default, Cargo will re-run a build script whenever
-    // // any file in the project changes. By specifying `memory.x`
-    // // here, we ensure the build script is only re-run when
-    // // `memory.x` is changed.
-    // cargo::cmd!("rerun-if-changed=memory.x");
 
     // Load .env file if it exists
     if dotenvy::dotenv().is_ok() {
@@ -169,4 +169,18 @@ fn main() {
 
     // Rebuild if .env file changes
     cargo::cmd!("rerun-if-changed=.env");
+
+    /**************************************************************************************
+     *  Linker configuration
+     **************************************************************************************/
+
+    // Put `memory.x` in our output directory and ensure it's
+    // on the linker search path.
+    copy_memory_x().expect("Failed to copy memory.x");
+
+    // Specify link flags for the linker script and other settings.
+    if env::var("CARGO_FEATURE_DEFMT").is_ok() {
+        cargo::cmd!("rustc-link-arg-bins=-Tdefmt.x");
+        log::info!("defmt feature is enabled");
+    }
 }

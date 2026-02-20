@@ -6,7 +6,7 @@
 target = "thumbv6m-none-eabi"
 
 [target.thumbv6m-none-eabi]
-runner = "probe-rs run --chip RP2040 --protocol swd"
+runner = "picotool load --update --verify --execute -t elf"
 linker = "flip-link"
 rustflags = [
   "-C",

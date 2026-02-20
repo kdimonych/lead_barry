@@ -13,10 +13,10 @@ macro_rules! info {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::INFO{}]", BLUE, BOLD, RESET
+                "cargo:warning=[{}{}BUILD::INFO{}]", BLUE, BOLD, RESET
             );
             } else {
-                println!("[{}{}build.rs::INFO{}]", BLUE, BOLD, RESET);
+                println!("[{}{}BUILD::INFO{}]", BLUE, BOLD, RESET);
             }
         }};
 
@@ -24,10 +24,10 @@ macro_rules! info {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::INFO{}] {}", BLUE, BOLD, RESET, format!($($arg)*)
+                "cargo:warning=[{}{}BUILD::INFO{}] {}", BLUE, BOLD, RESET, format!($($arg)*)
             );
             } else {
-                println!("[{}{}build.rs::INFO{}] {}", BLUE, BOLD, RESET, format!($($arg)*));
+                println!("[{}{}BUILD::INFO{}] {}", BLUE, BOLD, RESET, format!($($arg)*));
             }
         }};
     }
@@ -38,10 +38,10 @@ macro_rules! debug {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::DBG{}]", GRAY, BOLD, RESET
+                "cargo:warning=[{}{}BUILD::DBG{}]", GRAY, BOLD, RESET
             );
             } else {
-                println!("[{}{}build.rs::DBG{}]", GRAY, BOLD, RESET);
+                println!("[{}{}BUILD::DBG{}]", GRAY, BOLD, RESET);
             }
         }};
 
@@ -49,11 +49,11 @@ macro_rules! debug {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::DBG{}] {}",
+                "cargo:warning=[{}{}BUILD::DBG{}] {}",
                 GRAY, BOLD, RESET, format!($($arg)*)
             );
             } else {
-                println!("[{}{}build.rs::DBG{}] {}", GRAY, BOLD, RESET, format!($($arg)*));
+                println!("[{}{}BUILD::DBG{}] {}", GRAY, BOLD, RESET, format!($($arg)*));
             }
         }};
     }
@@ -64,10 +64,10 @@ macro_rules! warning {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::WARNING{}]", YELLOW, BOLD, RESET
+                "cargo:warning=[{}{}BUILD::WARNING{}]", YELLOW, BOLD, RESET
             );
             } else {
-                println!("[{}{}build.rs::WARNING{}]", YELLOW, BOLD, RESET);
+                println!("[{}{}BUILD::WARNING{}]", YELLOW, BOLD, RESET);
             }
         }};
 
@@ -75,11 +75,11 @@ macro_rules! warning {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::WARNING{}] {}",
+                "cargo:warning=[{}{}BUILD::WARNING{}] {}",
                 YELLOW, BOLD, RESET, format!($($arg)*)
             );
             } else {
-                println!("[{}{}build.rs::WARNING{}] {}", YELLOW, BOLD, RESET, format!($($arg)*));
+                println!("[{}{}BUILD::WARNING{}] {}", YELLOW, BOLD, RESET, format!($($arg)*));
             }
         }};
     }
@@ -90,10 +90,10 @@ macro_rules! error {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::ERROR{}]", RED, BOLD, RESET
+                "cargo:warning=[{}{}BUILD::ERROR{}]", RED, BOLD, RESET
             );
             } else {
-                println!("[{}{}build.rs::ERROR{}]", RED, BOLD, RESET);
+                println!("[{}{}BUILD::ERROR{}]", RED, BOLD, RESET);
             }
         }};
 
@@ -101,11 +101,11 @@ macro_rules! error {
             use build_log::build_log_impl::*;
             if std::env::var("DBG_PRINT").is_ok() {
             println!(
-                "cargo:warning=[{}{}build.rs::ERROR{}] {}",
+                "cargo:warning=[{}{}BUILD::ERROR{}] {}",
                 RED, BOLD, RESET, format!($($arg)*)
             );
             } else {
-                println!("[{}{}build.rs::ERROR{}] {}", RED, BOLD, RESET, format!($($arg)*));
+                println!("[{}{}BUILD::ERROR{}] {}", RED, BOLD, RESET, format!($($arg)*));
             }
         }};
     }
@@ -115,13 +115,13 @@ macro_rules! fatal {
         () => {{
             use build_log::build_log_impl::*;
             println!(
-                "cargo:error=[{}{}build.rs::FATAL{}]", RED, BOLD, RESET
+                "cargo:error=[{}{}BUILD::FATAL{}]", RED, BOLD, RESET
             );
         }};
         ($($arg:tt)*) => {{
             use build_log::build_log_impl::*;
             println!(
-                "cargo:error=[{}{}build.rs::FATAL{}] {}",
+                "cargo:error=[{}{}BUILD::FATAL{}] {}",
                 RED, BOLD, RESET, format!($($arg)*)
             );
         }};

@@ -53,14 +53,12 @@ use vcp_sensors::*;
 use wifi::*;
 
 // Configure panic behavior based on features
-#[cfg(feature = "defmt")]
-use {defmt_rtt as _, panic_probe as _};
-
-#[cfg(all(feature = "log", not(feature = "defmt")))]
-use {panic_rtt_target as _, rtt_target as _};
-
 #[cfg(not(any(feature = "defmt", feature = "log")))]
 use panic_halt as _;
+#[cfg(feature = "defmt")]
+use {defmt_rtt as _, panic_probe as _};
+#[cfg(all(feature = "log", not(feature = "defmt")))]
+use {panic_rtt_target as _, rtt_target as _};
 
 // Constants
 const CORE1_STACK_SIZE: usize = 4096 * 4;
