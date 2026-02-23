@@ -8,3 +8,6 @@
 [submodule "ds323x-rs"]
 	path = ds323x-rs
 	url = git@github.com:kdimonych/ds323x-rs.git
+[submodule "lora-rs"]
+	path = lora-rs
+	url = git@github.com:kdimonych/lora-rs.git

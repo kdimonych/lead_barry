@@ -1,6 +1,17 @@
 [workspace]
 resolver = "3"
-members = ["lead_barry", "nanofish", "leasehund", "common", "ds323x-rs"]
+members = [
+  "lead_barry",
+  "nanofish",
+  "leasehund",
+  "common",
+  "ds323x-rs",
+  "lora-rs/lora-modulation",
+  "lora-rs/lora-phy",
+  "lora-rs/lorawan-device",
+  "lora-rs/lorawan-encoding",
+  "lora-rs/lorawan-macros",
+]
 
 [workspace.package]
 version = "0.1.0"
