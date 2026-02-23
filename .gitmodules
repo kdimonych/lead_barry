@@ -8,7 +8,3 @@
 [submodule "ds323x-rs"]
 	path = ds323x-rs
 	url = git@github.com:kdimonych/ds323x-rs.git
-[submodule "sx127x_lora"]
-	path = sx127x_lora
-	url = git@github.com:kdimonych/sx127x_lora.git
-	branch = DmytroKrasnianskyi/async

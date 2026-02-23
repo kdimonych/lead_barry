@@ -1,14 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-  "lead_barry",
-  "nanofish",
-  "leasehund",
-  "common",
-  "ds323x-rs",
-  "sx127x_lora",
-  "sx127x_lora/examples/rp2040",
-]
+members = ["lead_barry", "nanofish", "leasehund", "common", "ds323x-rs"]
 
 [workspace.package]
 version = "0.1.0"
