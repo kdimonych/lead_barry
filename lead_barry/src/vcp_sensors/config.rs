@@ -25,12 +25,7 @@ pub struct VcpConfig {
 }
 
 impl VcpLimits {
-    pub const fn new(
-        min_voltage: f32,
-        max_voltage: f32,
-        min_current: f32,
-        max_current: f32,
-    ) -> Self {
+    pub const fn new(min_voltage: f32, max_voltage: f32, min_current: f32, max_current: f32) -> Self {
         Self {
             min_voltage,
             max_voltage,
@@ -70,11 +65,7 @@ impl VcpLimits {
 }
 
 impl VcpConfig {
-    pub const fn new(
-        limits: [VcpLimits; 3],
-        enabled_channels: [bool; 3],
-        shunt_resistance: &'static [f32; 3],
-    ) -> Self {
+    pub const fn new(limits: [VcpLimits; 3], enabled_channels: [bool; 3], shunt_resistance: &'static [f32; 3]) -> Self {
         if shunt_resistance[0] <= 0.0 {
             panic!("Shunt 0 resistance values must be positive and non-zero");
         }
@@ -118,11 +109,7 @@ impl VcpConfig {
 
     /// Const version of default
     pub const fn const_default() -> Self {
-        Self::new(
-            [VcpLimits::const_default(); 3],
-            [true; 3],
-            &DEFAULT_SHUNT_RESISTANCE,
-        )
+        Self::new([VcpLimits::const_default(); 3], [true; 3], &DEFAULT_SHUNT_RESISTANCE)
     }
 
     pub fn shunt_resistance(&self, channel: ChannelNum) -> f32 {

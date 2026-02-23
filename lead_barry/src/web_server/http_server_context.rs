@@ -1,8 +1,7 @@
 use embassy_executor::Spawner;
 
 use crate::{
-    configuration::ConfigurationStorage, global_types::I2c1Device, rtc::RtcDs3231Ref,
-    shared_resources::SharedResources,
+    configuration::ConfigurationStorage, global_types::I2c1Device, rtc::RtcDs3231Ref, shared_resources::SharedResources,
 };
 
 pub struct HttpServerContext {

@@ -16,10 +16,8 @@ use embassy_time::Ticker;
 use static_cell::StaticCell;
 
 type LedMessageChanel = Channel<CriticalSectionRawMutex, LedMessage, MAX_MESSAGE_QUEUE_SIZE>;
-type LedMessageSender =
-    Sender<'static, CriticalSectionRawMutex, LedMessage, MAX_MESSAGE_QUEUE_SIZE>;
-type LedMessageReceiver =
-    Receiver<'static, CriticalSectionRawMutex, LedMessage, MAX_MESSAGE_QUEUE_SIZE>;
+type LedMessageSender = Sender<'static, CriticalSectionRawMutex, LedMessage, MAX_MESSAGE_QUEUE_SIZE>;
+type LedMessageReceiver = Receiver<'static, CriticalSectionRawMutex, LedMessage, MAX_MESSAGE_QUEUE_SIZE>;
 
 static LED_CONTROLLER_STATE: StaticCell<State> = StaticCell::new();
 
@@ -99,9 +97,7 @@ impl LedControllerBuilder {
             receiver: self.receiver,
         };
 
-        let controller = LedController {
-            sender: self.sender,
-        };
+        let controller = LedController { sender: self.sender };
 
         (controller, runner)
     }
@@ -115,9 +111,7 @@ pub struct LedController {
 impl LedController {
     #[inline]
     pub fn try_set_animation(&self, led: Led, animation: LedAnimation) -> Result<(), ()> {
-        self.sender
-            .try_send(LedMessage { led, animation })
-            .map_err(|_| ())
+        self.sender.try_send(LedMessage { led, animation }).map_err(|_| ())
     }
 
     pub async fn set_animation(&self, led: Led, animation: LedAnimation) {
@@ -163,12 +157,8 @@ impl LedControllerRunner {
                             Repetitions::Finite(n) => base_animation_period * n as u32,
                         };
 
-                        active_animator[message.led as usize] = Animator::Sine(SineAnimation::new(
-                            animation_period,
-                            MAGNITUDE,
-                            1,
-                            infinite,
-                        ));
+                        active_animator[message.led as usize] =
+                            Animator::Sine(SineAnimation::new(animation_period, MAGNITUDE, 1, infinite));
                     }
                     LedAnimation::Decay(period_ms) => {
                         let animation_period = (SAMPLE_RATE * period_ms as u32) / 1000 + 1;
@@ -192,9 +182,7 @@ impl LedControllerRunner {
                         .unwrap();
                 } else {
                     // Animation finished, disable animator
-                    led_driver
-                        .led_off(animator_idx.try_into().unwrap())
-                        .unwrap();
+                    led_driver.led_off(animator_idx.try_into().unwrap()).unwrap();
                     *animator = Animator::None;
                 }
             }

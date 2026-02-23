@@ -5,9 +5,7 @@ use embassy_net::{Ipv4Address, Stack};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
 use embassy_sync::signal::Signal;
-use leasehund::{
-    DHCPServerBuffers, DHCPServerSocket, DhcpServer as LhDhcpServer, TransactionEvent,
-};
+use leasehund::{DHCPServerBuffers, DHCPServerSocket, DhcpServer as LhDhcpServer, TransactionEvent};
 
 const MAX_CLIENTS: usize = 2;
 const MAX_DNS_SERVERS: usize = 1;
@@ -101,12 +99,7 @@ impl DhcpServer {
         self.state.lease_event.wait()
     }
 
-    pub async fn start(
-        &self,
-        spawner: Spawner,
-        stack: Stack<'static>,
-        dhcp_config: DhcpServerConfig,
-    ) {
+    pub async fn start(&self, spawner: Spawner, stack: Stack<'static>, dhcp_config: DhcpServerConfig) {
         log::debug!("Starting DHCP server ...");
         // Stop existing server, if existing
         self.stop().await;
@@ -170,12 +163,7 @@ async fn dhcp_server_task(state: &'static DhcpServerState, stack: Stack<'static>
         let mut socket = DHCPServerSocket::new(stack, &mut buffers);
 
         loop {
-            match join(
-                state.state_signal.wait(),
-                dhcp_server.lease_one(&mut socket),
-            )
-            .await
-            {
+            match join(state.state_signal.wait(), dhcp_server.lease_one(&mut socket)).await {
                 (DhcpServerEvent::Stopped, _) => {
                     log::debug!("Stopping DHCP server task");
                     break;

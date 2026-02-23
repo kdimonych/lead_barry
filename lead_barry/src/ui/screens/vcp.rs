@@ -77,11 +77,7 @@ fn prefix(value: f32) -> (&'static str, f32) {
 }
 
 impl ScVcp {
-    pub fn new(
-        voltage: &'static DataModel<f32>,
-        base_unit: ScvBaseUnits,
-        title: VcpTitleString<'static>,
-    ) -> Self {
+    pub fn new(voltage: &'static DataModel<f32>, base_unit: ScvBaseUnits, title: VcpTitleString<'static>) -> Self {
         let (unit_prefix, _) = prefix(0.0);
 
         Self {
@@ -111,34 +107,19 @@ fn adaptive_precision_format<const N: usize>(
 
     if abs_value < 1.0 {
         // 0.136578 -> 0.137 (3 decimal places)
-        core::fmt::write(
-            buffer,
-            format_args!("{:.3}{:>2}{}", value, unit_prefix, unit),
-        )?;
+        core::fmt::write(buffer, format_args!("{:.3}{:>2}{}", value, unit_prefix, unit))?;
     } else if abs_value < 10.0 {
         // 1.36578 -> 1.366 (3 decimal places)
-        core::fmt::write(
-            buffer,
-            format_args!("{:.3}{:>2}{}", value, unit_prefix, unit),
-        )?;
+        core::fmt::write(buffer, format_args!("{:.3}{:>2}{}", value, unit_prefix, unit))?;
     } else if abs_value < 100.0 {
         // 13.6578 -> 13.66 (2 decimal places)
-        core::fmt::write(
-            buffer,
-            format_args!("{:.2}{:>2}{}", value, unit_prefix, unit),
-        )?;
+        core::fmt::write(buffer, format_args!("{:.2}{:>2}{}", value, unit_prefix, unit))?;
     } else if abs_value < 1000.0 {
         // 136.578 -> 136.6 (1 decimal place)
-        core::fmt::write(
-            buffer,
-            format_args!("{:.1}{:>2}{}", value, unit_prefix, unit),
-        )?;
+        core::fmt::write(buffer, format_args!("{:.1}{:>2}{}", value, unit_prefix, unit))?;
     } else {
         // 136578 -> 136578 (0 decimal places, but could be scientific notation)
-        core::fmt::write(
-            buffer,
-            format_args!("{:.0}{:>2}{}", value, unit_prefix, unit),
-        )?;
+        core::fmt::write(buffer, format_args!("{:.0}{:>2}{}", value, unit_prefix, unit))?;
     }
     Ok(())
 }
@@ -161,20 +142,9 @@ impl Screen for ScVcp {
         // Draw voltage
         let mut buffer = heapless::String::<32>::new();
 
-        adaptive_precision_format(
-            &mut buffer,
-            self.voltage_cache,
-            self.unit_prefix,
-            unit(&self.base_unit),
-        )
-        .ok();
+        adaptive_precision_format(&mut buffer, self.voltage_cache, self.unit_prefix, unit(&self.base_unit)).ok();
 
-        let value_text = Text::with_text_style(
-            &buffer,
-            VALUE_TEXT_POSITION,
-            CHARACTER_STYLE,
-            VALUE_TEXT_STYLE,
-        );
+        let value_text = Text::with_text_style(&buffer, VALUE_TEXT_POSITION, CHARACTER_STYLE, VALUE_TEXT_STYLE);
         let text_box = value_text.bounding_box().offset(2);
 
         let frame_y_mid = text_box.top_left.y + (text_box.size.height as i32) / 2;

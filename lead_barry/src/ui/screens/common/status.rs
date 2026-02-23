@@ -111,9 +111,9 @@ where
         }
 
         text_box = text_box.offset(2);
-        if text_box.size.le(&STATUS_FRAME_BORDER
-            .offset(-(STATUS_FRAME_THICKNESS as i32) - 3)
-            .size)
+        if text_box
+            .size
+            .le(&STATUS_FRAME_BORDER.offset(-(STATUS_FRAME_THICKNESS as i32) - 3).size)
         {
             let frame_y_mid = text_box.top_left.y + (text_box.size.height as i32) / 2;
             let text_box_right_side_x = text_box.top_left.x + text_box.size.width as i32 - 1;
@@ -186,11 +186,10 @@ const FRAME_BORDER_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> = Primitive
     .stroke_color(BinaryColor::On)
     .stroke_width(STATUS_FRAME_THICKNESS);
 const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = FRAME_BORDER_STYLE_BUILDER.build();
-const TEXT_FIELD_FRAME_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> =
-    FRAME_BORDER_STYLE_BUILDER
-        .fill_color(BinaryColor::Off)
-        .stroke_width(TEXT_FRAME_THICKNESS)
-        .stroke_alignment(StrokeAlignment::Center);
+const TEXT_FIELD_FRAME_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> = FRAME_BORDER_STYLE_BUILDER
+    .fill_color(BinaryColor::Off)
+    .stroke_width(TEXT_FRAME_THICKNESS)
+    .stroke_alignment(StrokeAlignment::Center);
 const TEXT_FIELD_FRAME_STYLE: PrimitiveStyle<BinaryColor> = TEXT_FIELD_FRAME_STYLE_BUILDER.build();
 const TITLE_BOX_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::new()
     .stroke_color(BinaryColor::Off)
@@ -212,28 +211,21 @@ const TITLE_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> = MonoTextStyle
     .font(&FONT_8X13_BOLD)
     .text_color(BinaryColor::Off)
     .build();
-const STATUS_CHARACTER_STYLE_BUILDER: MonoTextStyleBuilder<'static, BinaryColor> =
-    MonoTextStyleBuilder::new()
-        .font(&FONT_7X14_BOLD)
-        .text_color(BinaryColor::On);
-const STATUS_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> =
-    STATUS_CHARACTER_STYLE_BUILDER.build();
+const STATUS_CHARACTER_STYLE_BUILDER: MonoTextStyleBuilder<'static, BinaryColor> = MonoTextStyleBuilder::new()
+    .font(&FONT_7X14_BOLD)
+    .text_color(BinaryColor::On);
+const STATUS_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> = STATUS_CHARACTER_STYLE_BUILDER.build();
 
-const DESCRIPTION_CHARACTER_STYLE_BUILDER: MonoTextStyleBuilder<'static, BinaryColor> =
-    STATUS_CHARACTER_STYLE_BUILDER;
+const DESCRIPTION_CHARACTER_STYLE_BUILDER: MonoTextStyleBuilder<'static, BinaryColor> = STATUS_CHARACTER_STYLE_BUILDER;
 
-const DESCRIPTION_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> =
-    DESCRIPTION_CHARACTER_STYLE_BUILDER.build();
+const DESCRIPTION_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> = DESCRIPTION_CHARACTER_STYLE_BUILDER.build();
 
 fn draw_main_screen_layout<D>(draw_target: &mut D)
 where
     D: DrawTarget<Color = BinaryColor>,
 {
     // Draw title box
-    TITLE_BOX
-        .into_styled(TITLE_BOX_STYLE)
-        .draw(draw_target)
-        .ok();
+    TITLE_BOX.into_styled(TITLE_BOX_STYLE).draw(draw_target).ok();
 
     // Draw a frame border
     STATUS_FRAME_BORDER

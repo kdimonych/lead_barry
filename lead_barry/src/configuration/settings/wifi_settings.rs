@@ -26,8 +26,7 @@ impl Default for WiFiSettings {
     fn default() -> Self {
         Self {
             ssid: heapless::String::from_str(option_env!("DBG_WIFI_SSID").unwrap_or("")).unwrap(),
-            password: option_env!("DBG_WIFI_PASSWORD")
-                .map(|s| heapless::String::from_str(s).unwrap_or_default()),
+            password: option_env!("DBG_WIFI_PASSWORD").map(|s| heapless::String::from_str(s).unwrap_or_default()),
             use_static_ip_config: option_env!("DBG_USE_STATIC_IP_CONFIG")
                 .map(|str| str.parse().unwrap_or(false))
                 .unwrap_or(false),

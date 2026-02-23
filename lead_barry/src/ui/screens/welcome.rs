@@ -47,12 +47,7 @@ impl Screen for ScWelcome {
         // Clear the display
         draw_target.clear(BinaryColor::Off).ok();
 
-        let value_text = Text::with_text_style(
-            "Lead Barry",
-            VALUE_TEXT_POSITION,
-            CHARACTER_STYLE,
-            VALUE_TEXT_STYLE,
-        );
+        let value_text = Text::with_text_style("Lead Barry", VALUE_TEXT_POSITION, CHARACTER_STYLE, VALUE_TEXT_STYLE);
         let text_box = value_text.bounding_box().offset(2);
 
         let frame_y_mid = text_box.top_left.y + (text_box.size.height as i32) / 2;
@@ -67,10 +62,7 @@ impl Screen for ScWelcome {
             Point::new(text_box.top_left.x, text_box.top_left.y),
             Point::new(text_box_right_side_x, text_box.top_left.y),
             right_corner,
-            Point::new(
-                FRAME_BORDER.top_left.x + FRAME_BORDER.size.width as i32,
-                frame_y_mid,
-            ),
+            Point::new(FRAME_BORDER.top_left.x + FRAME_BORDER.size.width as i32, frame_y_mid),
         ])
         .into_styled(TEXT_FIELD_FRAME_STYLE)
         .draw(draw_target)
@@ -88,9 +80,6 @@ impl Screen for ScWelcome {
 
         value_text.draw(draw_target).ok();
         // Draw a frame border
-        FRAME_BORDER
-            .into_styled(FRAME_BORDER_STYLE)
-            .draw(draw_target)
-            .ok();
+        FRAME_BORDER.into_styled(FRAME_BORDER_STYLE).draw(draw_target).ok();
     }
 }

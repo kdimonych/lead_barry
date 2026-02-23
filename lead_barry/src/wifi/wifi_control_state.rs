@@ -81,10 +81,7 @@ impl<IdleState, JoinedState, ApState> WiFiControlerState<IdleState, JoinedState,
         }
     }
 
-    pub fn map_idle<FIdle, NewIdleState>(
-        self,
-        f_idle: FIdle,
-    ) -> WiFiControlerState<NewIdleState, JoinedState, ApState>
+    pub fn map_idle<FIdle, NewIdleState>(self, f_idle: FIdle) -> WiFiControlerState<NewIdleState, JoinedState, ApState>
     where
         FIdle: FnOnce(IdleState) -> NewIdleState,
     {
@@ -111,10 +108,7 @@ impl<IdleState, JoinedState, ApState> WiFiControlerState<IdleState, JoinedState,
         }
     }
 
-    pub fn map_ap<FAp, NewApState>(
-        self,
-        f_ap: FAp,
-    ) -> WiFiControlerState<IdleState, JoinedState, NewApState>
+    pub fn map_ap<FAp, NewApState>(self, f_ap: FAp) -> WiFiControlerState<IdleState, JoinedState, NewApState>
     where
         FAp: FnOnce(ApState) -> NewApState,
     {

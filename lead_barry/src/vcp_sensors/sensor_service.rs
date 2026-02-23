@@ -13,8 +13,7 @@ use embassy_time::{Ticker, with_timeout};
 use ina3221_async::*;
 
 use crate::{
-    units::TimeExt, vcp_sensors::config::*, vcp_sensors::data_model::*, vcp_sensors::error::*,
-    vcp_sensors::events::*,
+    units::TimeExt, vcp_sensors::config::*, vcp_sensors::data_model::*, vcp_sensors::error::*, vcp_sensors::events::*,
 };
 
 const POLL_TIMEOUT_MS: u64 = 40;
@@ -29,34 +28,15 @@ pub enum VcpCommand {
     DisableAllChannels,
 }
 
-type VcpEventChannel<const EVENT_QUEUE_SIZE: usize> = PriorityChannel<
-    CriticalSectionRawMutex,
-    VcpSensorsEvents,
-    MaxPriorityOrdering,
-    EVENT_QUEUE_SIZE,
->;
-pub type VcpEventReceiver<'a, const EVENT_QUEUE_SIZE: usize> = PriorityReceiver<
-    'a,
-    CriticalSectionRawMutex,
-    VcpSensorsEvents,
-    MaxPriorityOrdering,
-    EVENT_QUEUE_SIZE,
->;
-pub type VcpEventReceiveFuture<'a, const EVENT_QUEUE_SIZE: usize> = ReceiveFuture<
-    'a,
-    CriticalSectionRawMutex,
-    VcpSensorsEvents,
-    MaxPriorityOrdering,
-    EVENT_QUEUE_SIZE,
->;
+type VcpEventChannel<const EVENT_QUEUE_SIZE: usize> =
+    PriorityChannel<CriticalSectionRawMutex, VcpSensorsEvents, MaxPriorityOrdering, EVENT_QUEUE_SIZE>;
+pub type VcpEventReceiver<'a, const EVENT_QUEUE_SIZE: usize> =
+    PriorityReceiver<'a, CriticalSectionRawMutex, VcpSensorsEvents, MaxPriorityOrdering, EVENT_QUEUE_SIZE>;
+pub type VcpEventReceiveFuture<'a, const EVENT_QUEUE_SIZE: usize> =
+    ReceiveFuture<'a, CriticalSectionRawMutex, VcpSensorsEvents, MaxPriorityOrdering, EVENT_QUEUE_SIZE>;
 
-type VcpEventSender<'a, const EVENT_QUEUE_SIZE: usize> = PrioritySender<
-    'a,
-    CriticalSectionRawMutex,
-    VcpSensorsEvents,
-    MaxPriorityOrdering,
-    EVENT_QUEUE_SIZE,
->;
+type VcpEventSender<'a, const EVENT_QUEUE_SIZE: usize> =
+    PrioritySender<'a, CriticalSectionRawMutex, VcpSensorsEvents, MaxPriorityOrdering, EVENT_QUEUE_SIZE>;
 type VcpCommandChannel = Channel<CriticalSectionRawMutex, VcpCommand, 1>;
 type VcpCommandSendFuture<'a> = SendFuture<'a, CriticalSectionRawMutex, VcpCommand, 1>;
 
@@ -97,13 +77,11 @@ impl<'a, const EVENT_QUEUE_SIZE: usize> VcpControl<'a, EVENT_QUEUE_SIZE> {
     }
 
     pub fn enable_channel(&self, channel: ChannelNum) -> VcpCommandSendFuture<'_> {
-        self.command_receiver
-            .send(VcpCommand::EnableChannel(channel))
+        self.command_receiver.send(VcpCommand::EnableChannel(channel))
     }
 
     pub fn disable_channel(&self, channel: ChannelNum) -> VcpCommandSendFuture<'_> {
-        self.command_receiver
-            .send(VcpCommand::DisableChannel(channel))
+        self.command_receiver.send(VcpCommand::DisableChannel(channel))
     }
     pub fn enable_all_channels(&self) -> impl Future<Output = ()> + '_ {
         self.command_receiver.send(VcpCommand::EnableAllChannels)
@@ -142,8 +120,7 @@ impl VcpSensorsService {
     }
 }
 
-impl<'a, SharedI2cDevice, const EVENT_QUEUE_SIZE: usize>
-    VcpSensorsRunner<'a, SharedI2cDevice, EVENT_QUEUE_SIZE>
+impl<'a, SharedI2cDevice, const EVENT_QUEUE_SIZE: usize> VcpSensorsRunner<'a, SharedI2cDevice, EVENT_QUEUE_SIZE>
 where
     SharedI2cDevice: embedded_hal_async::i2c::I2c,
 {
@@ -154,10 +131,7 @@ where
     ) -> Result<VcpState, VcpError> {
         match ina.get_bus_voltage(channel).await {
             Err(e) => {
-                log::error!(
-                    "INA3221 bus voltage read error: {:?}",
-                    defmt_or_log::Debug2Format(&e)
-                );
+                log::error!("INA3221 bus voltage read error: {:?}", defmt_or_log::Debug2Format(&e));
                 Err(VcpError::I2c)
             }
             Ok(voltage) => {
@@ -179,10 +153,7 @@ where
     ) -> Result<VcpState, VcpError> {
         match ina.get_shunt_voltage(channel).await {
             Err(e) => {
-                log::error!(
-                    "INA3221 shunt voltage read error: {:?}",
-                    defmt_or_log::Debug2Format(&e)
-                );
+                log::error!("INA3221 shunt voltage read error: {:?}", defmt_or_log::Debug2Format(&e));
                 Err(VcpError::I2c)
             }
             Ok(shunt_voltage) => {
@@ -199,11 +170,7 @@ where
         }
     }
 
-    async fn read_channel(
-        &mut self,
-        ina: &INA3221Async<SharedI2cDevice>,
-        channel: u8,
-    ) -> Result<VcpReading, VcpError> {
+    async fn read_channel(&mut self, ina: &INA3221Async<SharedI2cDevice>, channel: u8) -> Result<VcpReading, VcpError> {
         let voltage = self.read_bus_voltage(ina, channel).await?;
         let current = self.read_shunt_voltage(ina, channel).await?;
         Ok(VcpReading {
@@ -216,25 +183,20 @@ where
     async fn configure(&mut self, ina: &mut INA3221Async<SharedI2cDevice>) -> Result<(), VcpError> {
         // Set operating mode to continuous
         ina.set_mode(OperatingMode::Continuous).await.map_err(|e| {
-            log::error!(
-                "INA3221 set mode error: {:?}",
-                defmt_or_log::Debug2Format(&e)
-            );
+            log::error!("INA3221 set mode error: {:?}", defmt_or_log::Debug2Format(&e));
             VcpError::I2c
         })?;
 
         // Enable selected channels
         for (i, enable) in self.config.enabled_channels.iter().enumerate() {
-            ina.set_channel_enabled(i as u8, *enable)
-                .await
-                .map_err(|e| {
-                    log::error!(
-                        "INA3221 set channel {} enabled error: {:?}",
-                        i,
-                        defmt_or_log::Debug2Format(&e)
-                    );
-                    VcpError::I2c
-                })?;
+            ina.set_channel_enabled(i as u8, *enable).await.map_err(|e| {
+                log::error!(
+                    "INA3221 set channel {} enabled error: {:?}",
+                    i,
+                    defmt_or_log::Debug2Format(&e)
+                );
+                VcpError::I2c
+            })?;
         }
 
         Ok(())
@@ -310,11 +272,7 @@ where
                 if !self.config.enabled_channels[ch as usize] {
                     continue;
                 }
-                let reading = with_timeout(
-                    HARDWARE_RESPONSE_TIMEOUT_MS.ms(),
-                    self.read_channel(&ina, ch),
-                )
-                .await;
+                let reading = with_timeout(HARDWARE_RESPONSE_TIMEOUT_MS.ms(), self.read_channel(&ina, ch)).await;
                 match reading {
                     Err(_) => {
                         log::error!("Timeout reading channel {}", ch);

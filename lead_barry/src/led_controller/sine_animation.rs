@@ -10,12 +10,7 @@ pub struct SineAnimation {
 }
 
 impl SineAnimation {
-    pub fn new(
-        animation_period: u32,
-        magnitude: u16,
-        frequency_multiplier: u8,
-        infinite: bool,
-    ) -> Self {
+    pub fn new(animation_period: u32, magnitude: u16, frequency_multiplier: u8, infinite: bool) -> Self {
         let angular_freq = 2.0 * PI * frequency_multiplier as f32 / animation_period as f32;
         let mid = magnitude / 2;
 
@@ -42,8 +37,7 @@ impl Iterator for SineAnimation {
         }
 
         let time = self.n as f32;
-        let sample =
-            (sinf(self.angular_freq * time - PI / 2.0) * self.mid as f32) as i32 + self.mid as i32;
+        let sample = (sinf(self.angular_freq * time - PI / 2.0) * self.mid as f32) as i32 + self.mid as i32;
         self.n += 1;
         Some(sample as u16)
     }

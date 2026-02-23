@@ -49,11 +49,7 @@ fn forvard_dbg_var() {
 fn compress_bin_to_file(input_data: &[u8], output_file: &str) -> Result<(), ()> {
     let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
     encoder.write_all(&input_data).map_err(|e| {
-        log::error!(
-            "Failed to write data to encoder for {}. Error: {}",
-            output_file,
-            e
-        );
+        log::error!("Failed to write data to encoder for {}. Error: {}", output_file, e);
         ()
     })?;
 
@@ -63,11 +59,7 @@ fn compress_bin_to_file(input_data: &[u8], output_file: &str) -> Result<(), ()> 
     })?;
 
     std::fs::write(&output_file, compressed_data).map_err(|e| {
-        log::error!(
-            "Failed to write compressed file {}. Error: {}",
-            output_file,
-            e
-        );
+        log::error!("Failed to write compressed file {}. Error: {}", output_file, e);
         ()
     })?;
 

@@ -240,10 +240,7 @@ pub struct Take<S> {
 
 impl<S> Take<S> {
     fn new(stream: S, n: usize) -> Self {
-        Self {
-            stream,
-            remaining: n,
-        }
+        Self { stream, remaining: n }
     }
 }
 

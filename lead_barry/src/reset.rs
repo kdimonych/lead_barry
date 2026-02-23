@@ -34,9 +34,7 @@ pub fn reset_to_bootloader() -> ! {
 pub fn deferred_reset_to_bootloader(spawner: Spawner, delay: Duration) {
     // Implement a deferred reset mechanism if needed
     // For example, setting a flag to reset later
-    spawner
-        .spawn(deferred_reset_to_bootloader_task(delay))
-        .unwrap();
+    spawner.spawn(deferred_reset_to_bootloader_task(delay)).unwrap();
 }
 
 #[embassy_executor::task]

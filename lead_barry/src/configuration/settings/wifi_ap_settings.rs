@@ -33,12 +33,8 @@ impl WiFiApSettings {
 impl Default for WiFiApSettings {
     fn default() -> Self {
         Self {
-            ssid: heapless::String::from_str(
-                option_env!("DBG_WIFI_AP_SSID").unwrap_or(DEFAULT_AP_SSID),
-            )
-            .unwrap(),
-            password: option_env!("DBG_WIFI_AP_PASSWORD")
-                .map(|str| heapless::String::from_str(str).unwrap()),
+            ssid: heapless::String::from_str(option_env!("DBG_WIFI_AP_SSID").unwrap_or(DEFAULT_AP_SSID)).unwrap(),
+            password: option_env!("DBG_WIFI_AP_PASSWORD").map(|str| heapless::String::from_str(str).unwrap()),
             channel: option_env!("DBG_WIFI_AP_CHANNEL")
                 .map(|str| str.parse().unwrap_or(DEFAULT_AP_CHANNEL))
                 .unwrap_or(DEFAULT_AP_CHANNEL),

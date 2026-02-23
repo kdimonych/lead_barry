@@ -9,9 +9,7 @@ use cyw43_pio::PioSpi;
 use defmt_or_log as log;
 use embassy_executor::Spawner;
 use embassy_net::{ConfigV4, DhcpConfig, Ipv4Address, Ipv4Cidr, Stack, StackResources};
-use embassy_rp::{
-    clocks::RoscRng, gpio::Output, interrupt::typelevel::Binding, pio::InterruptHandler,
-};
+use embassy_rp::{clocks::RoscRng, gpio::Output, interrupt::typelevel::Binding, pio::InterruptHandler};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use heapless::Vec;
 use static_cell::StaticCell;
@@ -58,10 +56,7 @@ where
     DMA: embassy_rp::dma::Channel + 'static,
     PIO: embassy_rp::pio::Instance + 'static,
 {
-    pub fn new(
-        wifi_cfg: WiFiConfig<PIO, DMA>,
-        irq: impl Binding<PIO::Interrupt, InterruptHandler<PIO>>,
-    ) -> Self {
+    pub fn new(wifi_cfg: WiFiConfig<PIO, DMA>, irq: impl Binding<PIO::Interrupt, InterruptHandler<PIO>>) -> Self {
         Self {
             wifi_driver_builder: WiFiDriverBuilder::new(wifi_cfg, irq),
         }
@@ -72,11 +67,7 @@ where
     }
 
     #[must_use]
-    pub async fn build<SpawnTokenBuilder, S>(
-        self,
-        spawner: Spawner,
-        wifi_runner_task: SpawnTokenBuilder,
-    ) -> WifiService
+    pub async fn build<SpawnTokenBuilder, S>(self, spawner: Spawner, wifi_runner_task: SpawnTokenBuilder) -> WifiService
     where
         SpawnTokenBuilder: Fn(
             cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO, 0, DMA>>,
@@ -193,9 +184,7 @@ impl WifiService {
         H: AsyncFnMut(ApStatus) -> (),
     {
         let mut service_impl = self.service_impl.lock().await;
-        service_impl
-            .start_ap(wifi_ap_settings, wifi_state_handler)
-            .await;
+        service_impl.start_ap(wifi_ap_settings, wifi_state_handler).await;
     }
 }
 
@@ -244,8 +233,7 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
 
         self.wifi_control
             .change_async(async |state| {
-                Self::join_transition(state, self.net_stack, join_status_handler, wifi_settings)
-                    .await
+                Self::join_transition(state, self.net_stack, join_status_handler, wifi_settings).await
             })
             .await;
     }
@@ -256,9 +244,7 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
     {
         wifi_state_handler(ApStatus::StartingAP).await;
         self.wifi_control
-            .change_async(async |state| {
-                Self::ap_transition(state, self.net_stack, wifi_ap_settings).await
-            })
+            .change_async(async |state| Self::ap_transition(state, self.net_stack, wifi_ap_settings).await)
             .await;
 
         // Initialize DHCP server for AP mode
@@ -288,10 +274,7 @@ impl<'a> WifiServiceImpl<'a> {
         }
     }
 
-    async fn idle_transition<'tr>(
-        wifi_control_state: WiFiCtrlState<'tr>,
-        net_stack: Stack<'tr>,
-    ) -> WiFiCtrlState<'tr> {
+    async fn idle_transition<'tr>(wifi_control_state: WiFiCtrlState<'tr>, net_stack: Stack<'tr>) -> WiFiCtrlState<'tr> {
         // Implement transition to Idle state
         log::info!("Transitioning to Idle state...");
         let mut controller = match wifi_control_state {
@@ -337,8 +320,7 @@ impl<'a> WifiServiceImpl<'a> {
 
             log::debug!("Starting AP mode...");
 
-            let password: heapless::String<64> =
-                wifi_ap_settings.password.clone().unwrap_or_default();
+            let password: heapless::String<64> = wifi_ap_settings.password.clone().unwrap_or_default();
 
             let mut ap_controller = if password.is_empty() {
                 log::debug!("Open AP mode...");
@@ -431,9 +413,7 @@ impl<'a> WifiServiceImpl<'a> {
                             log::info!("Using static network settings: {}", static_ip_config);
                             ConfigV4::Static(static_ip_config.into())
                         } else {
-                            log::error!(
-                                "Static IP config selected but not configured, falling back to DHCP"
-                            );
+                            log::error!("Static IP config selected but not configured, falling back to DHCP");
                             ConfigV4::Dhcp(DhcpConfig::default())
                         }
                     } else {
@@ -486,9 +466,7 @@ impl<'a> WifiServiceImpl<'a> {
                 start,
                 end,
             );
-            self.dhcp_server
-                .start(self.spawner, self.net_stack, dhcp_config)
-                .await;
+            self.dhcp_server.start(self.spawner, self.net_stack, dhcp_config).await;
         } else {
             log::error!("Cannot init DHCP server, no valid network config");
             self.reset_dhcp_server().await;

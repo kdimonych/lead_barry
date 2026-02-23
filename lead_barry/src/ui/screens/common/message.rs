@@ -60,8 +60,7 @@ where
         let message_str = self.status.message();
         let lines = split_message_into_lines(message_str.as_str());
 
-        let mut lines_texts: heapless::Vec<Text<'_, MonoTextStyle<'static, BinaryColor>>, 3> =
-            heapless::Vec::new();
+        let mut lines_texts: heapless::Vec<Text<'_, MonoTextStyle<'static, BinaryColor>>, 3> = heapless::Vec::new();
 
         for line in &lines {
             let text = Text::with_text_style(
@@ -82,19 +81,14 @@ where
     }
 }
 
-fn align_text_center_vertically(
-    text_list: &mut heapless::Vec<Text<'_, MonoTextStyle<'static, BinaryColor>>, 3>,
-) {
+fn align_text_center_vertically(text_list: &mut heapless::Vec<Text<'_, MonoTextStyle<'static, BinaryColor>>, 3>) {
     const SPACE: u32 = 2;
 
     if text_list.is_empty() {
         return;
     }
 
-    let mut total_height: u32 = text_list
-        .iter()
-        .map(|text| text.bounding_box().size.height)
-        .sum();
+    let mut total_height: u32 = text_list.iter().map(|text| text.bounding_box().size.height).sum();
     total_height += if text_list.len() > 1 {
         (text_list.len() as u32 - 1) * SPACE
     } else {
@@ -119,9 +113,7 @@ fn split_message_into_lines(message: &str) -> heapless::Vec<heapless::String<MES
 
     let line_it = message.slice_by_lines(MESSAGE_LINE_LENGTH);
     for line in line_it {
-        lines
-            .push(heapless::String::from_str(line).unwrap_or_default())
-            .ok();
+        lines.push(heapless::String::from_str(line).unwrap_or_default()).ok();
     }
     lines
 }
@@ -145,9 +137,7 @@ const MESSAGE_TEXT_STYLE_BUILDER: TextStyleBuilder = TextStyleBuilder::new()
 const MESSAGE_TEXT_STYLE: TextStyle = MESSAGE_TEXT_STYLE_BUILDER.build();
 
 // Fonts
-const MESSAGE_CHARACTER_STYLE_BUILDER: MonoTextStyleBuilder<'static, BinaryColor> =
-    MonoTextStyleBuilder::new()
-        .font(&FONT_7X14_BOLD)
-        .text_color(BinaryColor::On);
-const MESSAGE_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> =
-    MESSAGE_CHARACTER_STYLE_BUILDER.build();
+const MESSAGE_CHARACTER_STYLE_BUILDER: MonoTextStyleBuilder<'static, BinaryColor> = MonoTextStyleBuilder::new()
+    .font(&FONT_7X14_BOLD)
+    .text_color(BinaryColor::On);
+const MESSAGE_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> = MESSAGE_CHARACTER_STYLE_BUILDER.build();

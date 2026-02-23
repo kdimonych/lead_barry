@@ -17,10 +17,7 @@ pub struct ScWifiStatsData {
 }
 
 impl ScWifiStatsData {
-    pub const fn new(
-        wifi_state: ScvState,
-        wifi_network_name: Option<heapless::String<32>>,
-    ) -> Self {
+    pub const fn new(wifi_state: ScvState, wifi_network_name: Option<heapless::String<32>>) -> Self {
         Self {
             wifi_network_name,
             wifi_state,

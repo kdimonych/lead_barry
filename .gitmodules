@@ -11,3 +11,4 @@
 [submodule "lora-rs"]
 	path = lora-rs
 	url = git@github.com:kdimonych/lora-rs.git
+	branch = DmytroKrasnianskyi/compatible_deps

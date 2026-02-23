@@ -42,10 +42,7 @@ impl<'a, ScreenSet> UiControl<'a, ScreenSet> {
         Self { screen_sender }
     }
 
-    pub fn switch(
-        &self,
-        new_screen: ScreenSet,
-    ) -> SendFuture<'a, CriticalSectionRawMutex, ScreenSet, 1> {
+    pub fn switch(&self, new_screen: ScreenSet) -> SendFuture<'a, CriticalSectionRawMutex, ScreenSet, 1> {
         log::trace!("Send switching to new screen ...");
         self.screen_sender.send(new_screen)
     }
@@ -87,8 +84,7 @@ impl UiInterface {
     }
 }
 
-impl<'a, SharedI2cDevice, DisplaySize, ScreenSet>
-    UiRunner<'a, SharedI2cDevice, DisplaySize, ScreenSet>
+impl<'a, SharedI2cDevice, DisplaySize, ScreenSet> UiRunner<'a, SharedI2cDevice, DisplaySize, ScreenSet>
 where
     DisplaySize: ssd1306::size::DisplaySizeAsync + Copy,
     SharedI2cDevice: embedded_hal_async::i2c::I2c,
@@ -98,22 +94,15 @@ where
         ScreenSet: Screen,
     {
         let i2c_dev = self.i2c_dev.take().expect("I2C device already taken");
-        let display_size = self
-            .display_size
-            .take()
-            .expect("Display size already taken");
+        let display_size = self.display_size.take().expect("Display size already taken");
 
         let interface = I2CDisplayInterface::new(i2c_dev);
         let mut display: Ssd1306Async<
             I2CInterface<SharedI2cDevice>,
             DisplaySize,
             ssd1306::mode::BufferedGraphicsModeAsync<DisplaySize>,
-        > = Ssd1306Async::new(
-            interface,
-            display_size,
-            ssd1306::prelude::DisplayRotation::Rotate0,
-        )
-        .into_buffered_graphics_mode();
+        > = Ssd1306Async::new(interface, display_size, ssd1306::prelude::DisplayRotation::Rotate0)
+            .into_buffered_graphics_mode();
 
         log::debug!("Initializing the display ...");
         display.init().await.unwrap_or_else(|e| {

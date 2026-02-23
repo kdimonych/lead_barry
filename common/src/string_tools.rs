@@ -106,7 +106,8 @@ mod tests {
 
     #[test]
     fn test_slice_by_lines() {
-        let s = "This is a test message\n that will be sliced into multiple \nlines based on the maximum length specified.";
+        let s =
+            "This is a test message\n that will be sliced into multiple \nlines based on the maximum length specified.";
         let slicer = s.slice_by_lines(20);
         let lines: Vec<&str> = slicer.collect();
         assert_eq!(lines.len(), 7);

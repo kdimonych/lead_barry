@@ -50,11 +50,8 @@ where
     _marker: core::marker::PhantomData<State>,
 }
 
-pub type WiFiCtrlState<'a> = WiFiControlerState<
-    WiFiController<'a, IdleState>,
-    WiFiController<'a, JoinedState>,
-    WiFiController<'a, ApState>,
->;
+pub type WiFiCtrlState<'a> =
+    WiFiControlerState<WiFiController<'a, IdleState>, WiFiController<'a, JoinedState>, WiFiController<'a, ApState>>;
 
 pub struct WiFiStaticData {
     cyw43_state: cyw43::State,
@@ -88,8 +85,7 @@ pub struct WiFiDriverBuilder<Step = NoWiFiBuilderCreated> {
     step: Step,
 }
 
-pub type WiFiDriverRunner<PIO, DMA> =
-    cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO, 0, DMA>>;
+pub type WiFiDriverRunner<PIO, DMA> = cyw43::Runner<'static, Output<'static>, PioSpi<'static, PIO, 0, DMA>>;
 
 impl WiFiDriverBuilder<NoWiFiBuilderCreated> {
     /// Create a new WiFi service instance
@@ -163,8 +159,7 @@ where
 
         let state = &mut wifi_static_state.cyw43_state;
         log::debug!("Creating WiFi driver...");
-        let (net_device, mut control, cyw43_runner) =
-            cyw43::new(state, self.step.pwr, self.step.pio_spi, fw).await;
+        let (net_device, mut control, cyw43_runner) = cyw43::new(state, self.step.pwr, self.step.pio_spi, fw).await;
         log::debug!("WiFi driver created.");
 
         // Spawn the CYW43 runner task. Spawning this task here guarantees the WiFi driver operates correctly.
@@ -218,12 +213,7 @@ impl<'a> WiFiController<'a, IdleState> {
     }
 
     /// Initialize the WiFi hardware and transition to AP state with WPA2
-    pub async fn start_ap_wpa2(
-        mut self,
-        ssid: &str,
-        password: &str,
-        channel: u8,
-    ) -> WiFiController<'a, ApState> {
+    pub async fn start_ap_wpa2(mut self, ssid: &str, password: &str, channel: u8) -> WiFiController<'a, ApState> {
         self.control.start_ap_wpa2(ssid, password, channel).await;
         WiFiController {
             control: self.control,
@@ -243,10 +233,7 @@ impl<'a> WiFiController<'a, IdleState> {
         self.control.set_power_management(mode).await;
     }
 
-    pub async fn add_multicast_address(
-        &mut self,
-        address: [u8; 6],
-    ) -> Result<usize, AddMulticastAddressError> {
+    pub async fn add_multicast_address(&mut self, address: [u8; 6]) -> Result<usize, AddMulticastAddressError> {
         self.control.add_multicast_address(address).await
     }
 
@@ -287,10 +274,7 @@ impl<'a> WiFiController<'a, JoinedState> {
         self.control.set_power_management(mode).await;
     }
 
-    pub async fn add_multicast_address(
-        &mut self,
-        address: [u8; 6],
-    ) -> Result<usize, AddMulticastAddressError> {
+    pub async fn add_multicast_address(&mut self, address: [u8; 6]) -> Result<usize, AddMulticastAddressError> {
         self.control.add_multicast_address(address).await
     }
 
@@ -331,10 +315,7 @@ impl<'a> WiFiController<'a, ApState> {
         self.control.set_power_management(mode).await;
     }
 
-    pub async fn add_multicast_address(
-        &mut self,
-        address: [u8; 6],
-    ) -> Result<usize, AddMulticastAddressError> {
+    pub async fn add_multicast_address(&mut self, address: [u8; 6]) -> Result<usize, AddMulticastAddressError> {
         self.control.add_multicast_address(address).await
     }
 

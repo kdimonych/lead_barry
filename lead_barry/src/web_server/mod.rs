@@ -6,9 +6,8 @@ use defmt_or_log as log;
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
-    Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
-    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode, WebSocket, WebSocketRead,
-    WebSocketWrite,
+    Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef, HttpResponseBuilder, HttpServer,
+    ServerTimeouts, StatusCode, WebSocket, WebSocketRead, WebSocketWrite,
 };
 
 use crate::configuration::WiFiSettings;
@@ -184,8 +183,7 @@ impl<'a> HttpConfigHandler<'a> {
 
                 //ISO 8601 format could be used as well
                 //"1995-12-17T03:24:00Z"
-                core::fmt::write(&mut date_time_str, format_args!("{}", datetime))
-                    .map_err(|_| Error::NoResponse)?;
+                core::fmt::write(&mut date_time_str, format_args!("{}", datetime)).map_err(|_| Error::NoResponse)?;
                 HttpResponseBuilder::new(response_buffer)
                     .with_status(StatusCode::Ok)?
                     .with_plain_text_body(&date_time_str)
@@ -228,10 +226,7 @@ impl<'a> HttpConfigHandler<'a> {
         let len = web_socket.read(&mut buffer).await.map_err(|_| ())?;
         let str = core::str::from_utf8(&buffer[..len]).unwrap_or("<invalid utf-8>");
         log::info!("Received WebSocket frame: {}", str);
-        web_socket
-            .write_all(b"Hello from WebSocket!")
-            .await
-            .map_err(|_| ())?;
+        web_socket.write_all(b"Hello from WebSocket!").await.map_err(|_| ())?;
 
         web_socket.close().await.map_err(|_| ())?;
 
@@ -274,18 +269,13 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
             .set_animation(Led::Yellow, LedAnimation::Decay(300))
             .await;
 
-        let res = self
-            .handle_websocket_connection_impl(_request, web_socket)
-            .await;
+        let res = self.handle_websocket_connection_impl(_request, web_socket).await;
 
         res
     }
 }
 
-fn to_response<T>(
-    response_buffer: HttpResponseBufferRef<'_>,
-    value: &T,
-) -> Result<HttpResponse, Error>
+fn to_response<T>(response_buffer: HttpResponseBufferRef<'_>, value: &T) -> Result<HttpResponse, Error>
 where
     T: serde::Serialize,
 {

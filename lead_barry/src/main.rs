@@ -83,8 +83,7 @@ static EXECUTOR0: StaticCell<Executor> = StaticCell::new();
 static EXECUTOR1: StaticCell<Executor> = StaticCell::new();
 static UI_SHARED_STATE: StaticCell<UiSharedState> = StaticCell::new();
 static UI_CONTROL: StaticCell<UiControl> = StaticCell::new();
-static VCP_SENSORS_STATE: StaticCell<VcpSensorsState<VCP_SENSORS_EVENT_QUEUE_SIZE>> =
-    StaticCell::new();
+static VCP_SENSORS_STATE: StaticCell<VcpSensorsState<VCP_SENSORS_EVENT_QUEUE_SIZE>> = StaticCell::new();
 static VCP_SENSORS_CONTROL: StaticCell<VcpControl> = StaticCell::new();
 static I2C0_BUS: StaticCell<I2c0Bus> = StaticCell::new();
 static I2C1_BUS: StaticCell<I2c1Bus> = StaticCell::new();
@@ -220,11 +219,8 @@ fn main() -> ! {
 
     // Initialize the VCP sensors
     let vcp_state_ref = VCP_SENSORS_STATE.init_with(VcpSensorsState::new);
-    let (vcp_runner, vcp_control) = VcpSensorsService::new(
-        I2cDevice::new(i2c0_bus),
-        vcp_state_ref,
-        VcpConfig::default(),
-    );
+    let (vcp_runner, vcp_control) =
+        VcpSensorsService::new(I2cDevice::new(i2c0_bus), vcp_state_ref, VcpConfig::default());
     let vcp_control: &'static VcpControl = VCP_SENSORS_CONTROL.init(vcp_control);
 
     let wifi_cfg: WiFiConfig<PIO0, DMA_CH0> = WiFiConfig::<PIO0, DMA_CH0> {
@@ -308,28 +304,18 @@ async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
 
     // Initialize button controller
     let button_controller_state = BUTTON_CONTROLLER.init(ButtonControllerState::new());
-    let (button_controller, button_controller_runner) = resources
-        .button_controller_builder
-        .build(button_controller_state);
+    let (button_controller, button_controller_runner) =
+        resources.button_controller_builder.build(button_controller_state);
     log::info!("Spawn buttons controller task on core 0");
     spawner
         .spawn(buttons_controller_task(button_controller_runner))
         .unwrap();
 
     log::info!("Create wifi service");
-    let wifi_service = resources
-        .wifi_service_builder
-        .build(spawner, cyw43_task)
-        .await;
+    let wifi_service = resources.wifi_service_builder.build(spawner, cyw43_task).await;
 
     //Call main logic controller
-    main_logic_controller(
-        spawner,
-        resources.shared_resources,
-        wifi_service,
-        button_controller,
-    )
-    .await;
+    main_logic_controller(spawner, resources.shared_resources, wifi_service, button_controller).await;
 }
 
 #[embassy_executor::task]
@@ -415,10 +401,7 @@ fn get_core_1_stack_usage(core1_stack_base: usize, core1_stack_end: usize) -> (u
     let current_sp = cortex_m::register::msp::read() as usize;
     log::debug_assert!(core1_stack_end > core1_stack_base);
 
-    (
-        core1_stack_end - current_sp,
-        core1_stack_end - core1_stack_base,
-    )
+    (core1_stack_end - current_sp, core1_stack_end - core1_stack_base)
 }
 
 #[embassy_executor::task]

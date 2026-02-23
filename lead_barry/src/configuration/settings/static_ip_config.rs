@@ -26,22 +26,22 @@ impl Default for StaticIpConfig {
     fn default() -> Self {
         let mut dns_servers: Vec<u32, 3> = Vec::new();
 
-        if let Some(dns1) = option_env!("DBG_STATIC_IP_DNS_1")
-            .map(|str| str.parse().unwrap_or(Ipv4Address::UNSPECIFIED))
+        if let Some(dns1) =
+            option_env!("DBG_STATIC_IP_DNS_1").map(|str| str.parse().unwrap_or(Ipv4Address::UNSPECIFIED))
             && dns1 != Ipv4Address::UNSPECIFIED
         {
             dns_servers.push(dns1.to_bits()).ok();
         }
 
-        if let Some(dns2) = option_env!("DBG_STATIC_IP_DNS_2")
-            .map(|str| str.parse().unwrap_or(Ipv4Address::UNSPECIFIED))
+        if let Some(dns2) =
+            option_env!("DBG_STATIC_IP_DNS_2").map(|str| str.parse().unwrap_or(Ipv4Address::UNSPECIFIED))
             && dns2 != Ipv4Address::UNSPECIFIED
         {
             dns_servers.push(dns2.to_bits()).ok();
         }
 
-        if let Some(dns3) = option_env!("DBG_STATIC_IP_DNS_3")
-            .map(|str| str.parse().unwrap_or(Ipv4Address::UNSPECIFIED))
+        if let Some(dns3) =
+            option_env!("DBG_STATIC_IP_DNS_3").map(|str| str.parse().unwrap_or(Ipv4Address::UNSPECIFIED))
             && dns3 != Ipv4Address::UNSPECIFIED
         {
             dns_servers.push(dns3.to_bits()).ok();
@@ -64,10 +64,7 @@ impl Default for StaticIpConfig {
 impl From<&StaticIpConfig> for embassy_net::StaticConfigV4 {
     fn from(static_ip_config: &StaticIpConfig) -> Self {
         Self {
-            address: Ipv4Cidr::new(
-                Ipv4Address::from_bits(static_ip_config.ip),
-                static_ip_config.prefix_len,
-            ),
+            address: Ipv4Cidr::new(Ipv4Address::from_bits(static_ip_config.ip), static_ip_config.prefix_len),
             dns_servers: static_ip_config
                 .dns_servers
                 .iter()

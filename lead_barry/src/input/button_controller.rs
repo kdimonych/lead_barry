@@ -135,21 +135,12 @@ trait ButtonStateProvider<'a, AliasType> {
     /// - state: The new state to set
     ///   Returns: Poll<Result<(), ()>> - Ready(Ok(())) if state is set successfully,
     ///   Ready(Err(())) if button not found, Pending if state cannot be set yet
-    fn update_state(
-        &self,
-        button_id: AliasType,
-        state: ButtonState,
-    ) -> core::task::Poll<Result<(), ()>>;
+    fn update_state(&self, button_id: AliasType, state: ButtonState) -> core::task::Poll<Result<(), ()>>;
 }
 
-pub struct ButtonControllerState<
-    AliasType,
-    const INPUTS: usize,
-    const BUTTON_EVENT_QUEUE_SIZE: usize,
-> {
+pub struct ButtonControllerState<AliasType, const INPUTS: usize, const BUTTON_EVENT_QUEUE_SIZE: usize> {
     event_channel: EventChannel<AliasType, BUTTON_EVENT_QUEUE_SIZE>,
-    buttonst_state:
-        Mutex<CriticalSectionRawMutex, heapless::FnvIndexMap<AliasType, ButtonState, INPUTS>>,
+    buttonst_state: Mutex<CriticalSectionRawMutex, heapless::FnvIndexMap<AliasType, ButtonState, INPUTS>>,
 }
 
 impl<const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
@@ -163,8 +154,7 @@ impl<const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
     }
 }
 
-impl<'a, const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
-    ButtonStateProvider<'a, AliasType>
+impl<'a, const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize> ButtonStateProvider<'a, AliasType>
     for ButtonControllerState<AliasType, INPUTS, BUTTON_EVENT_QUEUE_SIZE>
 where
     AliasType: core::cmp::Eq + core::hash::Hash + Copy,
@@ -176,11 +166,7 @@ where
             core::task::Poll::Pending
         }
     }
-    fn update_state(
-        &self,
-        button_id: AliasType,
-        state: ButtonState,
-    ) -> core::task::Poll<Result<(), ()>> {
+    fn update_state(&self, button_id: AliasType, state: ButtonState) -> core::task::Poll<Result<(), ()>> {
         if let Ok(mut guard) = self.buttonst_state.try_lock() {
             if guard.contains_key(&button_id) {
                 guard.insert(button_id, state).ok();
@@ -203,8 +189,7 @@ where
     state: &'a dyn ButtonStateProvider<'a, AliasType>,
 }
 
-impl<'a, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
-    ButtonController<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>
+impl<'a, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize> ButtonController<'a, AliasType, BUTTON_EVENT_QUEUE_SIZE>
 where
     AliasType: 'a,
 {
@@ -213,9 +198,7 @@ where
         self.receiver.receive().await
     }
 
-    pub fn try_receive(
-        &self,
-    ) -> Result<ButtonEvent<AliasType>, embassy_sync::channel::TryReceiveError> {
+    pub fn try_receive(&self) -> Result<ButtonEvent<AliasType>, embassy_sync::channel::TryReceiveError> {
         self.receiver.try_receive()
     }
 
@@ -243,10 +226,7 @@ where
 {
     type Item = ButtonEvent<AliasType>;
 
-    fn poll_next(
-        self: core::pin::Pin<&mut Self>,
-        cx: &mut core::task::Context<'_>,
-    ) -> Poll<Self::Item> {
+    fn poll_next(self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>) -> Poll<Self::Item> {
         // SAFETY: We are not moving out of the pinned field.
         let this = unsafe { self.get_unchecked_mut() };
         // SAFETY: We are not moving out of the pinned field. The receiver itself is pinned because its parent is pinned.
@@ -297,11 +277,7 @@ impl<const INPUTS: usize, AliasType> ButtonControllerBuilder<INPUTS, AliasType> 
     {
         // Initialize button state to current levels
         for button in &self.buttons {
-            state
-                .buttonst_state
-                .get_mut()
-                .insert(button.alias, button.into())
-                .ok();
+            state.buttonst_state.get_mut().insert(button.alias, button.into()).ok();
         }
 
         (
@@ -364,12 +340,8 @@ impl EdgeDetector {
     }
 }
 
-pub struct ButtonControllerRunner<
-    'a,
-    AliasType,
-    const INPUTS: usize,
-    const BUTTON_EVENT_QUEUE_SIZE: usize,
-> where
+pub struct ButtonControllerRunner<'a, AliasType, const INPUTS: usize, const BUTTON_EVENT_QUEUE_SIZE: usize>
+where
     AliasType: 'a,
 {
     buttons: heapless::Vec<Button<AliasType>, INPUTS>,

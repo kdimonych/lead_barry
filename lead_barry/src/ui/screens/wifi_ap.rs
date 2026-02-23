@@ -30,11 +30,7 @@ impl TrStatus for ScWifiApData {
             ScWifiApData::NotReady => StatusString::from_str("Initializing..."),
             ScWifiApData::WaitingForClient(credentials) => {
                 let mut status_str = StatusString::complimentary_str();
-                core::fmt::write(
-                    &mut status_str,
-                    format_args!("SSID: {}", credentials.ssid.as_str()),
-                )
-                .ok();
+                core::fmt::write(&mut status_str, format_args!("SSID: {}", credentials.ssid.as_str())).ok();
                 status_str.into()
             }
             ScWifiApData::Connected(client_info) => {
@@ -49,11 +45,7 @@ impl TrStatus for ScWifiApData {
             ScWifiApData::NotReady => None,
             ScWifiApData::WaitingForClient(credentials) => {
                 let mut status_str = DetailString::complimentary_str();
-                core::fmt::write(
-                    &mut status_str,
-                    format_args!("Psw: {}", credentials.password.as_str()),
-                )
-                .ok();
+                core::fmt::write(&mut status_str, format_args!("Psw: {}", credentials.password.as_str())).ok();
                 Some(status_str.into())
             }
             ScWifiApData::Connected(client_info) => {

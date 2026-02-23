@@ -45,8 +45,7 @@ pub async fn main_logic_controller(
         }
     }
 
-    let set_screen =
-        |new_screen: ScCollection| async { shared.ui_control.switch(new_screen).await };
+    let set_screen = |new_screen: ScCollection| async { shared.ui_control.switch(new_screen).await };
     let settings = shared.configuration_storage.get_settings().await;
 
     let net_stack = wifi_service.net_stack().await;
@@ -100,9 +99,7 @@ pub async fn main_logic_controller(
                         log::error!("Failed to join WiFi network. Falling back to AP mode");
                         let msg = ScMessageData {
                             title: MsgTitleString::from_str("ERROR"),
-                            message: MessageString::from_str(
-                                "Failed to join WiFi network. Starting AP...",
-                            ),
+                            message: MessageString::from_str("Failed to join WiFi network. Starting AP..."),
                         };
                         set_screen(ScMessage::new(msg).into()).await;
                         Timer::after(2.s()).await;
@@ -186,8 +183,7 @@ pub async fn main_logic_controller(
                         // Set wifi ap screen with not ready state
                         log::trace!("Ap ready. Client connected.");
                         network_ready = true;
-                        let wifi_ap_data =
-                            ScWifiApData::Connected(ScvClientInfo { ip, mac: Some(mac) });
+                        let wifi_ap_data = ScWifiApData::Connected(ScvClientInfo { ip, mac: Some(mac) });
                         set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
                     }
                 }
@@ -214,10 +210,7 @@ pub async fn main_logic_controller(
 
     let mut channel: u8 = 0;
 
-    let mut current_screan = button_controller
-        .map_and_filter(button_event_to_screan)
-        .next()
-        .await;
+    let mut current_screan = button_controller.map_and_filter(button_event_to_screan).next().await;
 
     loop {
         match current_screan {
@@ -273,21 +266,13 @@ where
     }
 }
 
-async fn do_until_bt_action<F, Fut>(
-    button_controller: &ButtonController<'_>,
-    mut f: F,
-) -> ActiveScrean
+async fn do_until_bt_action<F, Fut>(button_controller: &ButtonController<'_>, mut f: F) -> ActiveScrean
 where
     F: FnMut() -> Fut,
     Fut: core::future::Future<Output = core::convert::Infallible>,
 {
-    let res = embassy_futures::select::select(
-        button_controller
-            .map_and_filter(button_event_to_screan)
-            .next(),
-        f(),
-    )
-    .await;
+    let res =
+        embassy_futures::select::select(button_controller.map_and_filter(button_event_to_screan).next(), f()).await;
     match res {
         Either::First(new_screan) => new_screan,
         Either::Second(_) => log::unreachable!(),
@@ -373,11 +358,7 @@ async fn show_voltage_reading(shared: &'static SharedResources, channel: u8) -> 
 async fn show_visit_screen(shared: &'static SharedResources) {
     if let Some(ip) = global_state().get_device_ip().await {
         let mut invitation = MessageString::complimentary_str();
-        core::fmt::write(
-            &mut invitation,
-            format_args!("http://\n{} on your device.", ip),
-        )
-        .ok();
+        core::fmt::write(&mut invitation, format_args!("http://\n{} on your device.", ip)).ok();
 
         let msg = ScMessageData {
             title: MsgTitleString::from_str("Visit"),
@@ -389,11 +370,7 @@ async fn show_visit_screen(shared: &'static SharedResources) {
 
 //HTTP configuration server task
 #[embassy_executor::task(pool_size = 1)]
-async fn start_http_config_server(
-    spawner: Spawner,
-    shared: &'static SharedResources,
-    stack: Stack<'static>,
-) {
+async fn start_http_config_server(spawner: Spawner, shared: &'static SharedResources, stack: Stack<'static>) {
     let mut http_server = HttpConfigServer::new(spawner, shared);
 
     const SOCKETS: usize = 3;
@@ -403,8 +380,7 @@ async fn start_http_config_server(
     const MAX_RESPONSE_SIZE: usize = 8192;
 
     //As long as this is an async task, the buffers will be kept in a static memory area
-    let mut buffers =
-        HttpServerBuffers::<SOCKETS, RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE>::new();
+    let mut buffers = HttpServerBuffers::<SOCKETS, RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE>::new();
     http_server.run(stack, &mut buffers).await;
 }
 
@@ -485,14 +461,8 @@ enum AfterResetActions {
 }
 
 async fn detect_after_reset_actions(button_controller: ButtonController<'_>) -> AfterResetActions {
-    let y_state = button_controller
-        .get_last_state(Buttons::Yellow)
-        .await
-        .unwrap();
-    let b_state = button_controller
-        .get_last_state(Buttons::Blue)
-        .await
-        .unwrap();
+    let y_state = button_controller.get_last_state(Buttons::Yellow).await.unwrap();
+    let b_state = button_controller.get_last_state(Buttons::Blue).await.unwrap();
 
     if y_state == ButtonState::Pressed && b_state == ButtonState::Pressed {
         log::info!("Factory reset was triggered");

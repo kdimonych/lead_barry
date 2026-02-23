@@ -65,12 +65,7 @@ impl PwmLedDriver {
         pwm_config.top = period;
         pwm_config.divider = divider.into();
 
-        let pwm1 = Pwm::new_output_ab(
-            config.slice1,
-            config.led_red,
-            config.led_yellow,
-            pwm_config.clone(),
-        );
+        let pwm1 = Pwm::new_output_ab(config.slice1, config.led_red, config.led_yellow, pwm_config.clone());
         let pwm2 = Pwm::new_output_a(config.slice3, config.led_blue, pwm_config.clone());
 
         let (pwm_red_opt, pwm_yellow_opt) = pwm1.split();
@@ -94,12 +89,7 @@ impl PwmLedDriver {
         self.leds[led as usize].set_duty_cycle_percent(percent)
     }
 
-    pub fn set_intensity_fraction(
-        &mut self,
-        led: PwmLed,
-        num: u16,
-        denom: u16,
-    ) -> Result<(), LedError> {
+    pub fn set_intensity_fraction(&mut self, led: PwmLed, num: u16, denom: u16) -> Result<(), LedError> {
         self.leds[led as usize].set_duty_cycle_fraction(num, denom)
     }
 

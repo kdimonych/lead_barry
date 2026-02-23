@@ -35,10 +35,7 @@ impl ConfigurationStorageBuilder {
             Ok(settings) => settings,
 
             Err(error) => {
-                log::error!(
-                    "Can't load settings from storage: {}. Using default settings.",
-                    error
-                );
+                log::error!("Can't load settings from storage: {}. Using default settings.", error);
                 let default_settings = Settings::default();
                 if let Err(error) = sync_save(&mut self.flash_storage, &default_settings) {
                     log::error!("Can't save default settings to storage: {}", error);
@@ -50,10 +47,7 @@ impl ConfigurationStorageBuilder {
         #[cfg(all(feature_overwrite_with_debug_settings, feature_use_debug_settings))]
         let initial_settings = Settings::default();
 
-        let storage = SHARED_STORAGE.init(ConfigurationStorage::new(
-            self.flash_storage,
-            initial_settings,
-        ));
+        let storage = SHARED_STORAGE.init(ConfigurationStorage::new(self.flash_storage, initial_settings));
         storage
     }
 }
@@ -104,8 +98,8 @@ impl<'a> ConfigurationStorage<'a> {
             .map_err(Error::StorageRead)?;
 
         let crc = Crc::<u32>::new(&CRC_32_ISCSI);
-        storage.settings_cache = postcard::from_bytes_crc32::<Settings>(&buffer, crc.digest())
-            .map_err(|_| Error::Deserialization)?;
+        storage.settings_cache =
+            postcard::from_bytes_crc32::<Settings>(&buffer, crc.digest()).map_err(|_| Error::Deserialization)?;
 
         Ok(storage.settings_cache.clone())
     }
@@ -119,16 +113,9 @@ impl<'a> ConfigurationStorage<'a> {
         let used = postcard::to_slice_crc32(&storage.settings_cache, &mut buffer, crc.digest())
             .map_err(|_| Error::Serialization)?;
 
-        log::debug!(
-            "Used during save size: {} , \n\tdata: {:?}",
-            used.len(),
-            &used
-        );
+        log::debug!("Used during save size: {} , \n\tdata: {:?}", used.len(), &used);
 
-        storage
-            .flash_storage
-            .blocking_erase()
-            .map_err(Error::StorageErase)?;
+        storage.flash_storage.blocking_erase().map_err(Error::StorageErase)?;
         storage
             .flash_storage
             .blocking_write(0, used)
@@ -166,8 +153,7 @@ fn sync_load(flash_storage: &mut Storage<'_>) -> Result<Settings, Error> {
         .map_err(Error::StorageRead)?;
 
     let crc = Crc::<u32>::new(&CRC_32_ISCSI);
-    let settings = postcard::from_bytes_crc32::<Settings>(&buffer, crc.digest())
-        .map_err(|_| Error::Deserialization)?;
+    let settings = postcard::from_bytes_crc32::<Settings>(&buffer, crc.digest()).map_err(|_| Error::Deserialization)?;
 
     Ok(settings)
 }
@@ -176,21 +162,12 @@ fn sync_save(flash_storage: &mut Storage<'_>, settings: &Settings) -> Result<(),
     let mut buffer = [0u8; Storage::storage_size()]; // Reserve 4 bytes for checksum
 
     let crc = Crc::<u32>::new(&CRC_32_ISCSI);
-    let used = postcard::to_slice_crc32(settings, &mut buffer, crc.digest())
-        .map_err(|_| Error::Serialization)?;
+    let used = postcard::to_slice_crc32(settings, &mut buffer, crc.digest()).map_err(|_| Error::Serialization)?;
 
-    log::debug!(
-        "Used during sync save size: {} , \n\tdata: {:?}",
-        used.len(),
-        &used
-    );
+    log::debug!("Used during sync save size: {} , \n\tdata: {:?}", used.len(), &used);
 
-    flash_storage
-        .blocking_erase()
-        .map_err(Error::StorageErase)?;
-    flash_storage
-        .blocking_write(0, used)
-        .map_err(Error::StorageWrite)?;
+    flash_storage.blocking_erase().map_err(Error::StorageErase)?;
+    flash_storage.blocking_write(0, used).map_err(Error::StorageWrite)?;
 
     Ok(())
 }

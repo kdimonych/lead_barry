@@ -75,17 +75,12 @@ impl<'a> Storage<'a> {
     pub fn blocking_erase(&mut self) -> Result<(), embassy_rp::flash::Error> {
         // Erase the entire storage area
         for offset in (FLASH_STORAGE_START_OFFSET..FLASH_STORAGE_END_OFFSET).step_by(ERASE_SIZE) {
-            self.flash
-                .blocking_erase(offset as u32, (offset + ERASE_SIZE) as u32)?;
+            self.flash.blocking_erase(offset as u32, (offset + ERASE_SIZE) as u32)?;
         }
         Ok(())
     }
 
-    pub fn blocking_write(
-        &mut self,
-        offset: usize,
-        data: &[u8],
-    ) -> Result<(), embassy_rp::flash::Error> {
+    pub fn blocking_write(&mut self, offset: usize, data: &[u8]) -> Result<(), embassy_rp::flash::Error> {
         // Ensure offset and data length are within bounds
         if offset + data.len() > FLASH_STORAGE_SIZE {
             return Err(embassy_rp::flash::Error::OutOfBounds);
@@ -97,19 +92,13 @@ impl<'a> Storage<'a> {
         Ok(())
     }
 
-    pub async fn background_read(
-        &mut self,
-        offset: usize,
-        buffer: &mut [u8],
-    ) -> Result<(), embassy_rp::flash::Error> {
+    pub async fn background_read(&mut self, offset: usize, buffer: &mut [u8]) -> Result<(), embassy_rp::flash::Error> {
         // Ensure offset and buffer length are within bounds
         if offset + buffer.len() > FLASH_STORAGE_SIZE {
             return Err(embassy_rp::flash::Error::OutOfBounds);
         }
         // Check alignment
-        if !offset.is_multiple_of(ASYNC_READ_SIZE)
-            || !(buffer.as_ptr() as usize).is_multiple_of(ASYNC_READ_SIZE)
-        {
+        if !offset.is_multiple_of(ASYNC_READ_SIZE) || !(buffer.as_ptr() as usize).is_multiple_of(ASYNC_READ_SIZE) {
             return Err(embassy_rp::flash::Error::Unaligned);
         }
 
@@ -122,11 +111,7 @@ impl<'a> Storage<'a> {
         Ok(())
     }
 
-    pub fn blocking_read(
-        &mut self,
-        offset: usize,
-        buffer: &mut [u8],
-    ) -> Result<(), embassy_rp::flash::Error> {
+    pub fn blocking_read(&mut self, offset: usize, buffer: &mut [u8]) -> Result<(), embassy_rp::flash::Error> {
         // Ensure offset and buffer length are within bounds
         if offset + buffer.len() > FLASH_STORAGE_SIZE {
             return Err(embassy_rp::flash::Error::OutOfBounds);

@@ -17,9 +17,7 @@ pub type ButtonEvent = button_controller::ButtonEvent<Buttons>;
 
 pub type ButtonControllerState =
     button_controller::ButtonControllerState<Buttons, BUTTONS_COUNT, BUTTON_EVENT_QUEUE_SIZE>;
-pub type ButtonController<'a> =
-    button_controller::ButtonController<'a, Buttons, BUTTON_EVENT_QUEUE_SIZE>;
-pub type ButtonControllerBuilder =
-    button_controller::ButtonControllerBuilder<BUTTONS_COUNT, Buttons>;
+pub type ButtonController<'a> = button_controller::ButtonController<'a, Buttons, BUTTON_EVENT_QUEUE_SIZE>;
+pub type ButtonControllerBuilder = button_controller::ButtonControllerBuilder<BUTTONS_COUNT, Buttons>;
 pub type ButtonControllerRunner<'a> =
     button_controller::ButtonControllerRunner<'a, Buttons, BUTTONS_COUNT, BUTTON_EVENT_QUEUE_SIZE>;

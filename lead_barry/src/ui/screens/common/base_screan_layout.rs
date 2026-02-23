@@ -30,10 +30,9 @@ pub const TITLE_BOX_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::
     .fill_color(BinaryColor::On)
     .build();
 
-pub const FRAME_BORDER_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> =
-    PrimitiveStyleBuilder::new()
-        .stroke_color(BinaryColor::On)
-        .stroke_width(MESSAGE_FRAME_THICKNESS);
+pub const FRAME_BORDER_STYLE_BUILDER: PrimitiveStyleBuilder<BinaryColor> = PrimitiveStyleBuilder::new()
+    .stroke_color(BinaryColor::On)
+    .stroke_width(MESSAGE_FRAME_THICKNESS);
 pub const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = FRAME_BORDER_STYLE_BUILDER.build();
 
 pub const TITLE_CHARACTER_STYLE: MonoTextStyle<'static, BinaryColor> = MonoTextStyleBuilder::new()
@@ -54,10 +53,7 @@ where
     D: DrawTarget<Color = BinaryColor>,
 {
     // Draw title box
-    TITLE_BOX
-        .into_styled(TITLE_BOX_STYLE)
-        .draw(draw_target)
-        .ok();
+    TITLE_BOX.into_styled(TITLE_BOX_STYLE).draw(draw_target).ok();
 
     // Draw a frame border
     MESSAGE_FRAME_BORDER
@@ -70,12 +66,7 @@ pub fn draw_title_text<D>(draw_target: &mut D, title_str: &str)
 where
     D: DrawTarget<Color = BinaryColor>,
 {
-    Text::with_text_style(
-        title_str,
-        TITLE_TEXT_POSITION,
-        TITLE_CHARACTER_STYLE,
-        TITLE_TEXT_STYLE,
-    )
-    .draw(draw_target)
-    .ok();
+    Text::with_text_style(title_str, TITLE_TEXT_POSITION, TITLE_CHARACTER_STYLE, TITLE_TEXT_STYLE)
+        .draw(draw_target)
+        .ok();
 }
