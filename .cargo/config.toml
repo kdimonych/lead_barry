@@ -1,16 +1,17 @@
 [alias]
 # Builds the lead_barry firmware in debug mode, with defmt logging enabled and runs with probe-rs.
-run_lead_barry_dbg = "--config ./lead_barry/.cargo/config.toml run --package lead_barry --target thumbv6m-none-eabi --features defmt"
+lead_barry_run = "--config ./lead_barry/.cargo/config.toml run --package lead_barry --target thumbv6m-none-eabi --features defmt"
 # Builds the lead_barry firmware in release mode, with no logging enabled and runs with probe-rs.
-run_lead_barry_release = "--config ./lead_barry/.cargo/config.toml run --package lead_barry --target thumbv6m-none-eabi --release"
+lead_barry_release_run = "--config ./lead_barry/.cargo/config.toml run --package lead_barry --target thumbv6m-none-eabi --release"
 # Builds the lead_barry firmware in release mode, flash it with picotool. Requires both picotool to be installed
 # and manual switch the RP2040 to boot mode.
-build_flash_lead_barry = "--config ./lead_barry/.cargo/config_flash.toml run --package lead_barry --target thumbv6m-none-eabi --release"
+flash_lead_barry_build = "--config ./lead_barry/.cargo/config_flash.toml run --package lead_barry --target thumbv6m-none-eabi --release"
+
 
 # Builds the lead_barry firmware in debug mode, with defmt logging enabled.
-build_lead_barry_dbg = "--config ./lead_barry/.cargo/config.toml build --package lead_barry --target thumbv6m-none-eabi --features defmt"
+lead_barry_build = "--config ./lead_barry/.cargo/config.toml build --package lead_barry --target thumbv6m-none-eabi --features defmt"
 # Builds the lead_barry firmware in release mode, with no logging enabled.
-build_lead_barry_release = "--config ./lead_barry/.cargo/config.toml build --package lead_barry --target thumbv6m-none-eabi --release"
+lead_barry_release_build = "--config ./lead_barry/.cargo/config.toml build --package lead_barry --target thumbv6m-none-eabi --release"
 
 test-host = "test --target x86_64-apple-darwin"
 debug-test-host = "test --target x86_64-apple-darwin --no-run"

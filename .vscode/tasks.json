@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "cargo",
             "args": [
-                "build_lead_barry_dbg"
+                "lead_barry_build"
             ],
             "group": {
                 "kind": "build",
@@ -27,7 +27,7 @@
             "type": "shell",
             "command": "cargo",
             "args": [
-                "build_lead_barry_release"
+                "lead_barry_release_build"
             ],
             "group": {
                 "kind": "build",
