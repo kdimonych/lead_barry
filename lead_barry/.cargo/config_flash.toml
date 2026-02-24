@@ -8,14 +8,8 @@ target = "thumbv6m-none-eabi"
 [target.thumbv6m-none-eabi]
 runner = "picotool load --update --verify --execute -t elf"
 linker = "flip-link"
-rustflags = [
-  "-C",
-  "link-arg=--nmagic",
-  "-C",
-  "link-arg=-Tlink.x",
-  "-C",
-  "no-vectorize-loops",
-]
+
+rustflags = ["-C", "no-vectorize-loops"]
 
 [env]
 DEFMT_LOG = "debug"

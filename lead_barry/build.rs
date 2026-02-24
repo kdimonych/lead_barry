@@ -20,6 +20,7 @@ use flate2::write::GzEncoder;
 
 use build_log as log;
 use cargo_command as cargo;
+use file_operations::copy_memory_x;
 
 fn forvard_dbg_var() {
     let forward_list = [
@@ -122,27 +123,6 @@ fn compress(files: &[&str]) -> Result<(), ()> {
     Ok(())
 }
 
-fn copy_file(src: &str, dst: &str) -> Result<(), ()> {
-    std::fs::copy(src, dst).map_err(|e| {
-        log::error!("Failed to copy file from {} to {}. Error: {}", src, dst, e);
-        ()
-    })?;
-    Ok(())
-}
-
-fn copy_memory_x() -> Result<(), ()> {
-    let out_dir: std::ffi::OsString = env::var_os("OUT_DIR").unwrap();
-    log::info!(
-        "The memory.x was copied to the: {} directory",
-        out_dir.to_string_lossy()
-    );
-    let out = &std::path::PathBuf::from(&out_dir);
-    copy_file("memory.x", &out.join("memory.x").to_string_lossy())?;
-    cargo::cmd!("rustc-link-search={}", out.display());
-    cargo::cmd!("rerun-if-changed=memory.x");
-    Ok(())
-}
-
 fn main() {
     let files_to_compress = ["./src/web_server/web/main_configuration.html"];
     compress(&files_to_compress).expect("Failed to compress files");
@@ -174,6 +154,9 @@ fn main() {
     copy_memory_x().expect("Failed to copy memory.x");
 
     // Specify link flags for the linker script and other settings.
+    cargo::cmd!("rustc-link-arg-bins=--nmagic");
+    cargo::cmd!("rustc-link-arg-bins=-Tlink.x");
+    cargo::cmd!("rustc-link-arg-bins=-Tlink-rp.x");
     if env::var("CARGO_FEATURE_DEFMT").is_ok() {
         cargo::cmd!("rustc-link-arg-bins=-Tdefmt.x");
         log::info!("defmt feature is enabled");
