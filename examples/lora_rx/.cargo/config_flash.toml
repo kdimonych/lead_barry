@@ -1,0 +1,16 @@
+# This is default configuration for the lead_barry package.
+# You can override it by passing `--config <path>` to cargo commands,
+# or by setting the CARGO_BUILD_CONFIG environment variable.
+
+[build]
+target = "thumbv6m-none-eabi"
+
+[target.thumbv6m-none-eabi]
+runner = "picotool load --update --verify --execute -t elf"
+linker = "flip-link"
+
+rustflags = ["-C", "no-vectorize-loops"]
+
+[env]
+DEFMT_LOG = "info"
+DBG_PRINT = "1"

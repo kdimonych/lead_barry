@@ -11,6 +11,8 @@ members = [
   "lora-rs/lorawan-device",
   "lora-rs/lorawan-encoding",
   "lora-rs/lorawan-macros",
+  "examples/lora_tx",
+  "examples/lora_rx",
 ]
 
 [workspace.package]
