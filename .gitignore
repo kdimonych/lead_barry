@@ -14,7 +14,7 @@
 *.ear
 
 # Rust specific
-/target/
+firmware/target/
 **/*.rs.bk
 .#*
 .gdb_history
@@ -51,7 +51,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Generated assets
-src/web_server/web/main_configuration.html.gz
+*.html.gz
 
 # KiCad files
 hardware/kicad/*/*.kicad_pcb-bak

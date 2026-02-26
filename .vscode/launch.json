@@ -19,7 +19,7 @@
             "args": [
                 "--nocapture"
             ],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/firmware",
             "stopOnEntry": false,
             "sourceLanguages": [
                 "rust"
@@ -30,7 +30,6 @@
             "type": "probe-rs-debug",
             "request": "launch",
             "name": "LeadBarry",
-            "cwd": "${workspaceFolder}",
             "chip": "rp2040",
             // RP2040 doesn't support connectUnderReset
             "connectUnderReset": false,
@@ -46,7 +45,7 @@
             "coreConfigs": [
                 {
                     "coreIndex": 0,
-                    "programBinary": "target/thumbv6m-none-eabi/debug/lead_barry",
+                    "programBinary": "${workspaceFolder}/firmware/target/thumbv6m-none-eabi/debug/lead_barry",
                     "rttEnabled": true
                 }
             ],

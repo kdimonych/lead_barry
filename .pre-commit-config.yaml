@@ -6,12 +6,12 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt
-        entry: cargo fmt -- --config edition=2024
+        entry: bash -c 'cd firmware && cargo fmt -- --config edition=2024'
         language: system
         types: [rust]
       # - id: cargo-clippy
       #   name: cargo clippy
-      #   entry: cargo clippy -- -D warnings
+      #   entry: bash -c 'cd firmware && cargo clippy -- -D warnings
       #   language: system
       #   types: [rust]
 

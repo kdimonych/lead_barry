@@ -1,18 +1,18 @@
 [workspace]
 resolver = "3"
 members = [
-  "lead_barry",
-  "nanofish",
-  "leasehund",
-  "common",
-  "ds323x-rs",
-  "lora-rs/lora-modulation",
-  "lora-rs/lora-phy",
-  "lora-rs/lorawan-device",
-  "lora-rs/lorawan-encoding",
-  "lora-rs/lorawan-macros",
-  "examples/lora_tx",
-  "examples/lora_rx",
+  "libs/nanofish",
+  "libs/leasehund",
+  "libs/common",
+  "libs/ds323x-rs",
+  "libs/lora-rs/lora-modulation",
+  "libs/lora-rs/lora-phy",
+  "libs/lora-rs/lorawan-device",
+  "libs/lora-rs/lorawan-encoding",
+  "libs/lora-rs/lorawan-macros",
+  "apps/firmware/lead_barry",
+  "apps/firmware/lora_tx",
+  "apps/firmware/lora_rx",
 ]
 
 [workspace.package]

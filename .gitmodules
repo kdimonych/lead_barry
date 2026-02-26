@@ -1,14 +1,14 @@
-[submodule "leasehund"]
-	path = leasehund
-	url = git@github.com:kdimonych/leasehund.git
-[submodule "nanofish"]
-	path = nanofish
-	url = git@github.com:kdimonych/nanofish.git
-	branch = DmytroKrasnianskyi/response_builder
-[submodule "ds323x-rs"]
-	path = ds323x-rs
+[submodule "firmware/libs/ds323x-rs"]
+	path = firmware/libs/ds323x-rs
 	url = git@github.com:kdimonych/ds323x-rs.git
-[submodule "lora-rs"]
-	path = lora-rs
+[submodule "firmware/libs/leasehund"]
+	path = firmware/libs/leasehund
+	url = git@github.com:kdimonych/leasehund.git
+[submodule "firmware/libs/lora-rs"]
+	path = firmware/libs/lora-rs
 	url = git@github.com:kdimonych/lora-rs.git
 	branch = DmytroKrasnianskyi/compatible_deps
+[submodule "firmware/libs/nanofish"]
+	path = firmware/libs/nanofish
+	url = git@github.com:kdimonych/nanofish.git
+	branch = DmytroKrasnianskyi/response_builder

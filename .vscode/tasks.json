@@ -4,6 +4,9 @@
         {
             "label": "BuildLeadBarryDebug",
             "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/firmware"
+            },
             "command": "cargo",
             "args": [
                 "lead_barry_build"
@@ -25,6 +28,9 @@
         {
             "label": "BuildLeadBarryRelease",
             "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/firmware"
+            },
             "command": "cargo",
             "args": [
                 "lead_barry_release_build"
@@ -46,6 +52,9 @@
         {
             "label": "RunTests",
             "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/firmware"
+            },
             "command": "cargo",
             "args": [
                 "test",
@@ -67,6 +76,9 @@
         {
             "label": "cargo run embedded",
             "type": "shell",
+            "options": {
+                "cwd": "${workspaceFolder}/firmware"
+            },
             "command": "cargo",
             "args": [
                 "run",
