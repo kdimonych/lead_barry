@@ -29,6 +29,15 @@ enum AnyStringInner<'a, const SIZE: usize> {
     Heapless(heapless::String<SIZE>),
 }
 
+impl<const SIZE: usize> Clone for AnyString<'static, SIZE> {
+    fn clone(&self) -> Self {
+        match &self.inner {
+            AnyStringInner::Static(s) => AnyString::from_str(*s),
+            AnyStringInner::Heapless(s) => AnyString::from_heapless(s.clone()),
+        }
+    }
+}
+
 impl<'a, const SIZE: usize> From<heapless::String<SIZE>> for AnyString<'a, SIZE> {
     /// Creates an `AnyString` from a `heapless::String` with the same capacity.
     fn from(s: heapless::String<SIZE>) -> Self {
