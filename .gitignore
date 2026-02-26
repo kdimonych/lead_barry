@@ -67,3 +67,5 @@ hardware/kicad/*/*.kicad_wks-bkp
 hardware/kicad/*/~*.kicad_*lck
 hardware/kicad/*/*-backups
 hardware/kicad/*/fp-info-cache
+hardware/kicad/*/\#auto_saved_files\#
+hardware/kicad/*/_autosave-*
