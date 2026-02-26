@@ -4,6 +4,7 @@
 mod common;
 mod ip_satus;
 mod message;
+mod qr_code;
 mod vcp;
 mod welcome;
 mod wifi_ap;
@@ -11,6 +12,7 @@ mod wifi_status;
 
 pub use ip_satus::{IpTitleString, ScIpData, ScIpStatus, ScvIpState};
 pub use message::{MessageString, MsgTitleString, ScMessage, ScMessageData};
+pub use qr_code::{QrCodeString, ScQrCode, TrQrCode};
 pub use vcp::{ScVcp, ScvBaseUnits, VcpTitleString};
 pub use welcome::ScWelcome;
 pub use wifi_ap::{ScWifiAp, ScWifiApData, ScvClientInfo, ScvCredentials};
@@ -44,6 +46,7 @@ pub enum ScCollection {
     WiFiAp(ScWifiAp),
     IpStatus(ScIpStatus),
     Message(ScMessage),
+    QrCode(ScQrCode),
     Empty,
 }
 
@@ -83,6 +86,12 @@ impl From<ScMessage> for ScCollection {
     }
 }
 
+impl From<ScQrCode> for ScCollection {
+    fn from(value: ScQrCode) -> Self {
+        ScCollection::QrCode(value)
+    }
+}
+
 impl Screen for ScCollection {
     fn enter<D>(&mut self, draw_target: &mut D)
     where
@@ -95,6 +104,7 @@ impl Screen for ScCollection {
             ScCollection::WiFiAp(screen) => screen.enter(draw_target),
             ScCollection::IpStatus(screen) => screen.enter(draw_target),
             ScCollection::Message(screen) => screen.enter(draw_target),
+            ScCollection::QrCode(screen) => screen.enter(draw_target),
             ScCollection::Empty => (),
         }
     }
@@ -110,6 +120,7 @@ impl Screen for ScCollection {
             ScCollection::WiFiAp(screen) => screen.redraw(draw_target),
             ScCollection::IpStatus(screen) => screen.redraw(draw_target),
             ScCollection::Message(screen) => screen.redraw(draw_target),
+            ScCollection::QrCode(screen) => screen.redraw(draw_target),
             ScCollection::Empty => (),
         }
     }
@@ -125,6 +136,7 @@ impl Screen for ScCollection {
             ScCollection::WiFiAp(screen) => screen.exit(draw_target),
             ScCollection::IpStatus(screen) => screen.exit(draw_target),
             ScCollection::Message(screen) => screen.exit(draw_target),
+            ScCollection::QrCode(screen) => screen.exit(draw_target),
             ScCollection::Empty => (),
         }
     }

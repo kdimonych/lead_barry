@@ -102,6 +102,7 @@ crc = "3.3.0"
 
 # EEPROM
 eeprom24x = "0.7.2"
+qrcodegen-no-heap = "1.8.1"
 
 [features]
 default = []
