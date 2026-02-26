@@ -2,8 +2,9 @@
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.buildScripts.enable": true,
     "rust-analyzer.runnables.test.command": "test-host",
+    "rust-analyzer.cargo.allTargets": true,
     "rust-analyzer.linkedProjects": [
-        "firmware/Cargo.toml"
+        "./firmware/Cargo.toml"
     ],
     "[rust]": {
         "editor.defaultFormatter": "rust-lang.rust-analyzer",
