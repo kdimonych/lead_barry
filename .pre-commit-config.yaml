@@ -19,6 +19,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
+        exclude: '^.*\.svg$'
         name: check for common misspelled words
 
   - repo: https://github.com/executablebooks/mdformat
