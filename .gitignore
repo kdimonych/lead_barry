@@ -52,3 +52,18 @@ yarn-error.log*
 
 # Generated assets
 src/web_server/web/main_configuration.html.gz
+
+# KiCad files
+hardware/kicad/*/*.kicad_pcb-bak
+hardware/kicad/*/*.kicad_sch-bak
+hardware/kicad/*/*.kicad_mod-bak
+hardware/kicad/*/*.kicad_sym-bak
+hardware/kicad/*/*.kicad_wks-bak
+hardware/kicad/*/*.kicad_pcb-bkp
+hardware/kicad/*/*.kicad_sch-bkp
+hardware/kicad/*/*.kicad_mod-bkp
+hardware/kicad/*/*.kicad_sym-bkp
+hardware/kicad/*/*.kicad_wks-bkp
+hardware/kicad/*/~*.kicad_*lck
+hardware/kicad/*/*-backups
+hardware/kicad/*/fp-info-cache
