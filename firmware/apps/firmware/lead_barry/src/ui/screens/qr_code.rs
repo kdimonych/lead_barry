@@ -24,15 +24,14 @@ pub type QrCodeString<'a> = AnyString<'a, QR_CODE_STRING_LENGTH>;
 pub type ScQrCode = ScQrCodeImpl<QrCodeString<'static>>;
 
 pub trait TrQrCode {
-    fn qr_code(&self) -> QrCodeString<'_>;
+    fn qr_code<'b>(&'b self) -> &'b QrCodeString<'b>;
 }
 
-impl TrQrCode for QrCodeString<'static> {
-    fn qr_code(&self) -> QrCodeString<'_> {
-        self.clone()
+impl<'a> TrQrCode for QrCodeString<'a> {
+    fn qr_code<'b>(&'b self) -> &'b QrCodeString<'a> {
+        self
     }
 }
-
 pub struct ScQrCodeImpl<QrCodeT> {
     qr_code_model: QrCodeT,
 }

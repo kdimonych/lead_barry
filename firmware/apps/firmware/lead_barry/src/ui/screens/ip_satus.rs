@@ -28,14 +28,14 @@ pub struct ScIpData {
 }
 
 impl TrStatus for ScIpData {
-    fn title(&'_ self) -> IpTitleString<'_> {
+    fn title<'b>(&'b self) -> IpTitleString<'b> {
         match self.state {
             ScvIpState::GettingIp => IpTitleString::from_str("Getting IP..."),
             ScvIpState::IpAssigned => IpTitleString::from_str("IP Assigned"),
         }
     }
 
-    fn status(&'_ self) -> StatusString<'_> {
+    fn status<'b>(&'b self) -> StatusString<'b> {
         match self.state {
             ScvIpState::GettingIp => StatusString::from_str("DHCP handshake..."),
             ScvIpState::IpAssigned => {
@@ -45,7 +45,7 @@ impl TrStatus for ScIpData {
             }
         }
     }
-    fn detail(&'_ self) -> Option<DetailString<'_>> {
+    fn detail<'b>(&'b self) -> Option<DetailString<'b>> {
         match self.state {
             ScvIpState::GettingIp => None,
             ScvIpState::IpAssigned => {

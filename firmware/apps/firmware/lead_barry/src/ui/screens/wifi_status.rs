@@ -26,11 +26,11 @@ impl ScWifiStatsData {
 }
 
 impl TrStatus for ScWifiStatsData {
-    fn title(&'_ self) -> TitleString<'_> {
+    fn title<'b>(&'b self) -> TitleString<'b> {
         TitleString::from_str("WiFi Status")
     }
 
-    fn status(&'_ self) -> StatusString<'_> {
+    fn status<'b>(&'b self) -> StatusString<'b> {
         match self.wifi_state {
             ScvState::Disconnected => StatusString::from_str("Disconnected"),
             ScvState::Connecting => StatusString::from_str("Connecting to:"),
@@ -38,7 +38,7 @@ impl TrStatus for ScWifiStatsData {
             ScvState::Connected => StatusString::from_str("Connected to:"),
         }
     }
-    fn detail(&'_ self) -> Option<DetailString<'_>> {
+    fn detail<'b>(&'b self) -> Option<DetailString<'b>> {
         self.wifi_network_name
             .as_ref()
             .map(|name| DetailString::from_str_truncate(name.as_str()))

@@ -17,7 +17,7 @@ pub enum ScWifiApData {
 }
 
 impl TrStatus for ScWifiApData {
-    fn title(&self) -> TitleString<'_> {
+    fn title<'b>(&'b self) -> TitleString<'b> {
         match self {
             ScWifiApData::NotReady => TitleString::from_str("WiFi AP"),
             ScWifiApData::WaitingForClient(_) => TitleString::from_str("WiFi AP Ready"),
@@ -25,7 +25,7 @@ impl TrStatus for ScWifiApData {
         }
     }
 
-    fn status(&self) -> StatusString<'_> {
+    fn status<'b>(&'b self) -> StatusString<'b> {
         match self {
             ScWifiApData::NotReady => StatusString::from_str("Initializing..."),
             ScWifiApData::WaitingForClient(credentials) => {
@@ -40,7 +40,7 @@ impl TrStatus for ScWifiApData {
             }
         }
     }
-    fn detail(&self) -> Option<DetailString<'_>> {
+    fn detail<'b>(&'b self) -> Option<DetailString<'b>> {
         match self {
             ScWifiApData::NotReady => None,
             ScWifiApData::WaitingForClient(credentials) => {

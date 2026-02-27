@@ -22,9 +22,9 @@ pub type StatusString<'a> = AnyString<'a, STATUS_LENGTH>;
 pub type DetailString<'a> = AnyString<'a, DETAIL_LENGTH>;
 
 pub trait TrStatus {
-    fn title(&self) -> TitleString<'_>;
-    fn status(&self) -> StatusString<'_>;
-    fn detail(&self) -> Option<DetailString<'_>>;
+    fn title<'b>(&'b self) -> TitleString<'b>;
+    fn status<'b>(&'b self) -> StatusString<'b>;
+    fn detail<'b>(&'b self) -> Option<DetailString<'b>>;
 }
 
 pub struct ScStatusImpl<StatusT> {

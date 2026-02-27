@@ -8,12 +8,12 @@ pub struct ScMessageData {
 }
 
 impl TrMessage for ScMessageData {
-    fn title(&'_ self) -> MsgTitleString<'_> {
-        MsgTitleString::from_str(self.title.as_str())
+    fn title<'b>(&'b self) -> &'b MsgTitleString<'b> {
+        &self.title
     }
 
-    fn message(&'_ self) -> MessageString<'_> {
-        MessageString::from_str(self.message.as_str())
+    fn message<'b>(&'b self) -> &'b MessageString<'b> {
+        &self.message
     }
 }
 

@@ -25,8 +25,8 @@ pub type MsgTitleString<'a> = base_screan_layout::TitleString<'a>;
 pub type MessageString<'a> = AnyString<'a, MESSAGE_SIZE>;
 
 pub trait TrMessage {
-    fn title(&'_ self) -> MsgTitleString<'_>;
-    fn message(&'_ self) -> MessageString<'_>;
+    fn title<'b>(&'b self) -> &'b MsgTitleString<'b>;
+    fn message<'b>(&'b self) -> &'b MessageString<'b>;
 }
 
 pub struct ScMessageImpl<StatusT> {
