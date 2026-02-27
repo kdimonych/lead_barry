@@ -3,5 +3,5 @@ mod message;
 pub mod screan_constants;
 mod status;
 
-pub use message::{MessageString, MsgTitleString, ScMessageImpl, TrMessage};
-pub use status::{DetailString, ScStatusImpl, StatusString, TitleString, TrStatus};
+pub use message::{DataModelMessage, MessageString, MsgTitleString, SvMessageImpl};
+pub use status::{DataModelStatus, DetailString, StatusString, SvStatusImpl, TitleString};

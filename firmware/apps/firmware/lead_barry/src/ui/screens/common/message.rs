@@ -13,7 +13,7 @@ use embedded_graphics::{
 
 use super::base_screan_layout::*;
 use super::screan_constants::*;
-use crate::ui::{Screen, screens::common::base_screan_layout};
+use crate::ui::{ScreenView, screens::common::base_screan_layout};
 
 const MESSAGE_LINE_LENGTH: usize = 18;
 const MESSAGE_LENGTH: usize = MESSAGE_LINE_LENGTH * 3; // Support for three lines of message
@@ -24,27 +24,27 @@ pub type MsgTitleString<'a> = base_screan_layout::TitleString<'a>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
 pub type MessageString<'a> = AnyString<'a, MESSAGE_SIZE>;
 
-pub trait TrMessage {
+pub trait DataModelMessage {
     fn title<'b>(&'b self) -> &'b MsgTitleString<'b>;
     fn message<'b>(&'b self) -> &'b MessageString<'b>;
 }
 
-pub struct ScMessageImpl<StatusT> {
-    status: StatusT,
+pub struct SvMessageImpl<DataModelT> {
+    status: DataModelT,
 }
 
-impl<StatusT> ScMessageImpl<StatusT>
-where
-    StatusT: TrMessage,
-{
-    pub const fn new(status: StatusT) -> Self {
+impl<DataModelT> SvMessageImpl<DataModelT> {
+    pub const fn new(status: DataModelT) -> Self
+    where
+        DataModelT: DataModelMessage,
+    {
         Self { status }
     }
 }
 
-impl<StatusT> Screen for ScMessageImpl<StatusT>
+impl<DataModelT> ScreenView for SvMessageImpl<DataModelT>
 where
-    StatusT: TrMessage,
+    DataModelT: DataModelMessage,
 {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
@@ -116,6 +116,12 @@ fn split_message_into_lines(message: &str) -> heapless::Vec<heapless::String<MES
         lines.push(heapless::String::from_str(line).unwrap_or_default()).ok();
     }
     lines
+}
+
+impl<DataModelT: DataModelMessage> From<DataModelT> for SvMessageImpl<DataModelT> {
+    fn from(value: DataModelT) -> Self {
+        SvMessageImpl::new(value)
+    }
 }
 
 /* Constants */

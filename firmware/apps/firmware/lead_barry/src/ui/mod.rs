@@ -1,12 +1,12 @@
 // Display driver imports
 mod data_model;
-mod screen;
+mod screen_view;
 
 mod screens;
 mod ui_interface;
 
 pub use self::data_model::SharedDataModel;
-pub use self::screen::Screen;
+pub use self::screen_view::ScreenView;
 use crate::global_types::I2c0Device;
 
 pub use self::screens::*;

@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use super::common::{DetailString, ScStatusImpl, StatusString, TrStatus};
+use super::common::{DataModelStatus, DetailString, StatusString, SvStatusImpl};
 
 pub use super::common::TitleString as IpTitleString;
 
@@ -21,13 +21,13 @@ pub enum ScvIpState {
 
 #[derive(Debug, Copy, Clone)]
 #[defmt_or_log::derive_format_or_debug]
-pub struct ScIpData {
+pub struct DmIpData {
     pub state: ScvIpState,
     pub ip: embassy_net::Ipv4Address,
     pub mac: Option<[u8; 6]>,
 }
 
-impl TrStatus for ScIpData {
+impl DataModelStatus for DmIpData {
     fn title<'b>(&'b self) -> IpTitleString<'b> {
         match self.state {
             ScvIpState::GettingIp => IpTitleString::from_str("Getting IP..."),
@@ -68,4 +68,4 @@ impl TrStatus for ScIpData {
     }
 }
 
-pub type ScIpStatus = ScStatusImpl<ScIpData>;
+pub type SvIpStatus = SvStatusImpl<DmIpData>;

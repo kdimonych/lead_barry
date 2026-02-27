@@ -6,7 +6,7 @@ use embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
-use crate::ui::Screen;
+use crate::ui::ScreenView;
 
 const FRAME_BORDER: Rectangle = Rectangle::new(Point::new(4, 4), Size::new(119, 55));
 const VALUE_TEXT_POSITION: Point = Point::new(64, 32);
@@ -31,15 +31,15 @@ const FRAME_BORDER_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyleBuilder::n
     .stroke_width(1)
     .build();
 
-pub struct ScWelcome {}
+pub struct SvWelcome {}
 
-impl ScWelcome {
+impl SvWelcome {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Screen for ScWelcome {
+impl ScreenView for SvWelcome {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
         D: DrawTarget<Color = BinaryColor>,

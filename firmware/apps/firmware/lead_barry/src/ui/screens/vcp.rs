@@ -9,7 +9,7 @@ use embedded_graphics::{
 };
 
 use super::common::base_screan_layout::*;
-use crate::ui::Screen;
+use crate::ui::ScreenView;
 use crate::ui::SharedDataModel;
 
 // Layout constants
@@ -31,30 +31,47 @@ const VALUE_TEXT_STYLE: TextStyle = TextStyleBuilder::new()
     .alignment(Alignment::Center)
     .build();
 
-pub type VcpTitleString<'a> = TitleString<'a>;
+pub type DmVcpTitle<'a> = TitleString<'a>;
+pub type DmVcpDynamicVCP = SharedDataModel<f32>;
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 #[defmt_or_log::derive_format_or_debug]
-pub enum ScvBaseUnits {
+pub enum DmVcpBaseUnits {
     Volts,
     Amps,
     Watts,
 }
 
-/// Example screen that draws a simple welcome message
-pub struct ScVcp {
-    voltage: &'static SharedDataModel<f32>,
-    voltage_cache: f32,
-    base_unit: ScvBaseUnits,
-    unit_prefix: &'static str,
-    title: VcpTitleString<'static>,
+pub struct DmVcp {
+    pub value: &'static DmVcpDynamicVCP,
+    pub base_unit: DmVcpBaseUnits,
+    pub title: DmVcpTitle<'static>,
 }
 
-const fn unit(base_unit: &ScvBaseUnits) -> &'static str {
+impl DmVcp {
+    pub const fn new(value: &'static DmVcpDynamicVCP, base_unit: DmVcpBaseUnits, title: DmVcpTitle<'static>) -> Self {
+        Self {
+            value,
+            base_unit,
+            title,
+        }
+    }
+}
+
+/// Example screen that draws a simple welcome message
+pub struct SvVcp {
+    value: &'static DmVcpDynamicVCP,
+    value_cache: f32,
+    base_unit: DmVcpBaseUnits,
+    unit_prefix: &'static str,
+    title: DmVcpTitle<'static>,
+}
+
+const fn unit(base_unit: &DmVcpBaseUnits) -> &'static str {
     match base_unit {
-        ScvBaseUnits::Volts => "V",
-        ScvBaseUnits::Amps => "A",
-        ScvBaseUnits::Watts => "W",
+        DmVcpBaseUnits::Volts => "V",
+        DmVcpBaseUnits::Amps => "A",
+        DmVcpBaseUnits::Watts => "W",
     }
 }
 
@@ -76,26 +93,22 @@ fn prefix(value: f32) -> (&'static str, f32) {
     }
 }
 
-impl ScVcp {
-    pub fn new(
-        voltage: &'static SharedDataModel<f32>,
-        base_unit: ScvBaseUnits,
-        title: VcpTitleString<'static>,
-    ) -> Self {
+impl SvVcp {
+    pub fn new(model: DmVcp) -> Self {
         let (unit_prefix, _) = prefix(0.0);
 
         Self {
-            voltage,
-            voltage_cache: 0.0,
-            base_unit,
+            value: model.value,
+            value_cache: 0.0,
+            base_unit: model.base_unit,
             unit_prefix,
-            title,
+            title: model.title,
         }
     }
-    pub fn update_voltage(&mut self) {
-        if let Ok(v) = self.voltage.try_lock() {
+    pub fn update_value(&mut self) {
+        if let Ok(v) = self.value.try_lock() {
             let (unit_prefix, v) = prefix(*v);
-            self.voltage_cache = v;
+            self.value_cache = v;
             self.unit_prefix = unit_prefix;
         }
     }
@@ -128,13 +141,13 @@ fn adaptive_precision_format<const N: usize>(
     Ok(())
 }
 
-impl Screen for ScVcp {
+impl ScreenView for SvVcp {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
         D: DrawTarget<Color = BinaryColor>,
     {
-        // Update the voltage reading from data model
-        self.update_voltage();
+        // Update the value reading from data model
+        self.update_value();
 
         // Clear the display
         draw_target.clear(BinaryColor::Off).ok();
@@ -143,10 +156,10 @@ impl Screen for ScVcp {
         let title = self.title.as_str();
         draw_title_text(draw_target, title);
 
-        // Draw voltage
+        // Draw value
         let mut buffer = heapless::String::<32>::new();
 
-        adaptive_precision_format(&mut buffer, self.voltage_cache, self.unit_prefix, unit(&self.base_unit)).ok();
+        adaptive_precision_format(&mut buffer, self.value_cache, self.unit_prefix, unit(&self.base_unit)).ok();
 
         let value_text = Text::with_text_style(&buffer, VALUE_TEXT_POSITION, CHARACTER_STYLE, VALUE_TEXT_STYLE);
         let text_box = value_text.bounding_box().offset(2);
@@ -183,5 +196,11 @@ impl Screen for ScVcp {
         .ok();
 
         value_text.draw(draw_target).ok();
+    }
+}
+
+impl From<DmVcp> for SvVcp {
+    fn from(model: DmVcp) -> Self {
+        Self::new(model)
     }
 }

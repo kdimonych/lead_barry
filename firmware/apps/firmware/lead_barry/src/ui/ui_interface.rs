@@ -3,7 +3,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::{Channel, Receiver, SendFuture, Sender};
 use embassy_time::Ticker;
 
-use crate::ui::screen::Screen;
+use crate::ui::screen_view::ScreenView;
 
 use ssd1306::I2CDisplayInterface;
 use ssd1306::Ssd1306Async;
@@ -91,7 +91,7 @@ where
 {
     pub async fn run(&mut self) -> !
     where
-        ScreenSet: Screen,
+        ScreenSet: ScreenView,
     {
         let i2c_dev = self.i2c_dev.take().expect("I2C device already taken");
         let display_size = self.display_size.take().expect("Display size already taken");

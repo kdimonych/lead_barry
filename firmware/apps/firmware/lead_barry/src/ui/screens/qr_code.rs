@@ -12,42 +12,49 @@ use embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
-use crate::ui::Screen;
+use crate::ui::ScreenView;
 
 const QR_CODE_VERSION: u8 = 3u8;
 const QR_CODE_BUF_LENGTH: usize = Version::new(QR_CODE_VERSION).buffer_len();
 pub const QR_CODE_STRING_LENGTH: usize = 47; // The maximum number of characters that can be encoded in a version 3 QR code with low error correction level is 47.
 
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
-pub type QrCodeString<'a> = AnyString<'a, QR_CODE_STRING_LENGTH>;
+pub type DmQrCodeString<'a> = AnyString<'a, QR_CODE_STRING_LENGTH>;
 
-pub type ScQrCode = ScQrCodeImpl<QrCodeString<'static>>;
-
-pub trait TrQrCode {
-    fn qr_code<'b>(&'b self) -> &'b QrCodeString<'b>;
+pub trait DataModelQrCode {
+    fn qr_code<'b>(&'b self) -> &'b DmQrCodeString<'b>;
 }
 
-impl<'a> TrQrCode for QrCodeString<'a> {
-    fn qr_code<'b>(&'b self) -> &'b QrCodeString<'a> {
+impl<'a> DataModelQrCode for DmQrCodeString<'a> {
+    fn qr_code<'b>(&'b self) -> &'b DmQrCodeString<'a> {
         self
     }
 }
-pub struct ScQrCodeImpl<QrCodeT> {
-    qr_code_model: QrCodeT,
+
+pub type SvQrCode = SvQrCodeImpl<DmQrCodeString<'static>>;
+
+impl<'a> From<DmQrCodeString<'a>> for SvQrCodeImpl<DmQrCodeString<'a>> {
+    fn from(value: DmQrCodeString<'a>) -> Self {
+        SvQrCodeImpl::<DmQrCodeString<'a>>::new(value)
+    }
 }
 
-impl<QrCodeT> ScQrCodeImpl<QrCodeT>
-where
-    QrCodeT: TrQrCode,
-{
-    pub const fn new(qr_code_model: QrCodeT) -> Self {
+pub struct SvQrCodeImpl<DataModelT> {
+    qr_code_model: DataModelT,
+}
+
+impl<DataModelT> SvQrCodeImpl<DataModelT> {
+    pub const fn new(qr_code_model: DataModelT) -> Self
+    where
+        DataModelT: DataModelQrCode,
+    {
         Self { qr_code_model }
     }
 }
 
-impl<QrCodeT> Screen for ScQrCodeImpl<QrCodeT>
+impl<DataModelT> ScreenView for SvQrCodeImpl<DataModelT>
 where
-    QrCodeT: TrQrCode,
+    DataModelT: DataModelQrCode,
 {
     fn enter<D>(&mut self, draw_target: &mut D)
     where
@@ -77,6 +84,9 @@ where
                 SCREEN_HEIGHT / qr_code.size() as u32,
             );
             let x_offset = (SCREEN_WIDTH - (qr_code.size() as u32 * module_size)) / 2;
+            // Keep the QR code vertically centered, but position it towards the bottom of the screen to
+            // leave space for any potential text above it. The y_offset is calculated to position the QR
+            // code such that its bottom edge is a few pixels above the bottom edge of the screen.
             let y_offset = SCREEN_HEIGHT - (qr_code.size() as u32 * module_size);
 
             for y in 0..qr_code.size() {

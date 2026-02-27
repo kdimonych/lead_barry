@@ -74,34 +74,34 @@ pub async fn main_logic_controller(
 
                 match status {
                     JoiningStatus::JoiningAP => {
-                        let wifi_status = ScWifiStatsData::new(
-                            ScvState::Connecting,
+                        let wifi_status = DmWifiStatus::new(
+                            DmWifiStatusState::Connecting,
                             Some(settings.network_settings.wifi_settings.ssid.clone()),
                         );
-                        set_screen(ScWifiStats::new(wifi_status).into()).await;
+                        set_screen(wifi_status.into()).await;
                     }
                     JoiningStatus::Dhcp => {
-                        let wifi_status: ScWifiStatsData = ScWifiStatsData::new(
-                            ScvState::Dhcp,
+                        let wifi_status: DmWifiStatus = DmWifiStatus::new(
+                            DmWifiStatusState::Dhcp,
                             Some(settings.network_settings.wifi_settings.ssid.clone()),
                         );
-                        set_screen(ScWifiStats::new(wifi_status).into()).await;
+                        set_screen(wifi_status.into()).await;
                     }
                     JoiningStatus::Ready => {
                         network_ready = true;
-                        let wifi_status = ScWifiStatsData::new(
-                            ScvState::Connected,
+                        let wifi_status = DmWifiStatus::new(
+                            DmWifiStatusState::Connected,
                             Some(settings.network_settings.wifi_settings.ssid.clone()),
                         );
-                        set_screen(ScWifiStats::new(wifi_status).into()).await;
+                        set_screen(wifi_status.into()).await;
                     }
                     JoiningStatus::Failed => {
                         log::error!("Failed to join WiFi network. Falling back to AP mode");
-                        let msg = ScMessageData {
+                        let msg = DmMessage {
                             title: MsgTitleString::from_str("ERROR"),
                             message: MessageString::from_str("Failed to join WiFi network. Starting AP..."),
                         };
-                        set_screen(ScMessage::new(msg).into()).await;
+                        set_screen(msg.into()).await;
                         Timer::after(2.s()).await;
                         shared
                             .configuration_storage
@@ -157,8 +157,8 @@ pub async fn main_logic_controller(
                 match status {
                     ApStatus::StartingAP => {
                         // Set wifi ap screen with not ready state
-                        let wifi_ap_data = ScWifiApData::NotReady;
-                        set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
+                        let wifi_ap_data = DmWifiAp::NotReady;
+                        set_screen(wifi_ap_data.into()).await;
                     }
                     ApStatus::WaitingForClient => {
                         // Set wifi ap screen with not ready state
@@ -172,19 +172,19 @@ pub async fn main_logic_controller(
                                 .map(|s| s.as_str())
                                 .unwrap_or("<empty>")
                         );
-                        let wifi_ap_data = ScWifiApData::WaitingForClient(ScvCredentials {
+                        let wifi_ap_data = DmWifiAp::WaitingForClient(DmWifiApCredentials {
                             ssid: wifi_ap_settings.ssid.clone(),
                             password: wifi_ap_settings.password.clone().unwrap_or_default(),
                         });
-                        set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
+                        set_screen(wifi_ap_data.into()).await;
                     }
                     ApStatus::Ready((ip, mac)) => {
                         //net_stack.
                         // Set wifi ap screen with not ready state
                         log::trace!("Ap ready. Client connected.");
                         network_ready = true;
-                        let wifi_ap_data = ScWifiApData::Connected(ScvClientInfo { ip, mac: Some(mac) });
-                        set_screen(ScWifiAp::new(wifi_ap_data).into()).await;
+                        let wifi_ap_data = DmWifiAp::Connected(DmWifiApClientInfo { ip, mac: Some(mac) });
+                        set_screen(wifi_ap_data.into()).await;
                     }
                 }
             })
@@ -284,11 +284,11 @@ async fn show_time_screen(shared: &'static SharedResources) -> ! {
 
     let mut time_str = MessageString::complimentary_str();
     let show_time = async |time_str: &heapless::String<_>| {
-        let msg = ScMessageData {
+        let msg = DmMessage {
             title: MsgTitleString::from_str("Current Time"),
             message: time_str.clone().into(),
         };
-        shared.ui_control.switch(ScMessage::new(msg).into()).await;
+        shared.ui_control.switch(msg.into()).await;
     };
 
     let update_time_str = async |time_str: &mut heapless::String<_>| {
@@ -336,13 +336,11 @@ async fn show_voltage_reading(shared: &'static SharedResources, channel: u8) -> 
     static VOLTAGE: LazyLock<SharedDataModel<f32>> = LazyLock::new(|| SharedDataModel::new(0f32));
     let voltage = VOLTAGE.get();
 
-    let mut title = VcpTitleString::complimentary_str();
+    let mut title = DmVcpTitle::complimentary_str();
     core::fmt::write(&mut title, format_args!("Channel {}", channel + 1)).ok();
 
-    shared
-        .ui_control
-        .switch(ScVcp::new(voltage, ScvBaseUnits::Volts, title.into()).into())
-        .await;
+    let vcp = DmVcp::new(voltage, DmVcpBaseUnits::Volts, title.into());
+    shared.ui_control.switch(vcp.into()).await;
 
     // Voltage update loop
     loop {
@@ -360,11 +358,11 @@ async fn show_visit_screen(shared: &'static SharedResources) {
         let mut invitation = MessageString::complimentary_str();
         core::fmt::write(&mut invitation, format_args!("http://\n{} on your device.", ip)).ok();
 
-        let msg = ScMessageData {
+        let msg = DmMessage {
             title: MsgTitleString::from_str("Visit"),
             message: invitation.into(),
         };
-        shared.ui_control.switch(ScMessage::new(msg).into()).await;
+        shared.ui_control.switch(msg.into()).await;
     }
 }
 
@@ -428,26 +426,26 @@ async fn do_factory_reset(
     ui_control: &UiControl<'_>,
     configuration_storage: &'static ConfigurationStorage<'static>,
 ) -> bool {
-    let msg = ScMessageData {
+    let msg = DmMessage {
         title: MsgTitleString::from_str("Factory Reset"),
         message: MessageString::from_str("Performing factory reset..."),
     };
-    ui_control.switch(ScMessage::new(msg).into()).await;
+    ui_control.switch(msg.into()).await;
     let res = if let Err(e) = configuration_storage.factory_reset().await {
         log::error!("Factory reset failed: {:?}", e);
-        let msg = ScMessageData {
+        let msg = DmMessage {
             title: MsgTitleString::from_str("ERROR"),
             message: MessageString::from_str("Factory reset failed."),
         };
-        ui_control.switch(ScMessage::new(msg).into()).await;
+        ui_control.switch(msg.into()).await;
         false
     } else {
         log::info!("Factory reset completed successfully");
-        let msg = ScMessageData {
+        let msg = DmMessage {
             title: MsgTitleString::from_str("INFO"),
             message: MessageString::from_str("Factory reset completed successfully."),
         };
-        ui_control.switch(ScMessage::new(msg).into()).await;
+        ui_control.switch(msg.into()).await;
         true
     };
     Timer::after(3.s()).await;
@@ -475,11 +473,11 @@ async fn detect_after_reset_actions(button_controller: ButtonController<'_>) -> 
 }
 
 async fn reboot_device(ui_control: &UiControl<'_>) -> ! {
-    let msg = ScMessageData {
+    let msg = DmMessage {
         title: MsgTitleString::from_str("Rebooting"),
         message: MessageString::from_str("The device is rebooting..."),
     };
-    ui_control.switch(ScMessage::new(msg).into()).await;
+    ui_control.switch(msg.into()).await;
     Timer::after(2.s()).await;
     trigger_system_reset()
 }

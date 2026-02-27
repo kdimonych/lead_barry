@@ -8,7 +8,7 @@ use embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyle, TextStyleBuilder},
 };
 
-use crate::ui::Screen;
+use crate::ui::ScreenView;
 
 const TITLE_LENGTH: usize = 15;
 const STATUS_LENGTH: usize = 17;
@@ -21,28 +21,28 @@ pub type StatusString<'a> = AnyString<'a, STATUS_LENGTH>;
 /// Type aliases for commonly used string sizes in status displays. See [`AnyString`] for more details.
 pub type DetailString<'a> = AnyString<'a, DETAIL_LENGTH>;
 
-pub trait TrStatus {
+pub trait DataModelStatus {
     fn title<'b>(&'b self) -> TitleString<'b>;
     fn status<'b>(&'b self) -> StatusString<'b>;
     fn detail<'b>(&'b self) -> Option<DetailString<'b>>;
 }
 
-pub struct ScStatusImpl<StatusT> {
-    status: StatusT,
+pub struct SvStatusImpl<DataModelT> {
+    status: DataModelT,
 }
 
-impl<StatusT> ScStatusImpl<StatusT>
+impl<DataModelT> SvStatusImpl<DataModelT>
 where
-    StatusT: TrStatus,
+    DataModelT: DataModelStatus,
 {
-    pub const fn new(status: StatusT) -> Self {
+    pub const fn new(status: DataModelT) -> Self {
         Self { status }
     }
 }
 
-impl<StatusT> Screen for ScStatusImpl<StatusT>
+impl<DataModelT> ScreenView for SvStatusImpl<DataModelT>
 where
-    StatusT: TrStatus,
+    DataModelT: DataModelStatus,
 {
     fn redraw<D>(&mut self, draw_target: &mut D)
     where
@@ -151,6 +151,12 @@ where
             .draw(draw_target)
             .ok();
         }
+    }
+}
+
+impl<DataModelT: DataModelStatus> From<DataModelT> for SvStatusImpl<DataModelT> {
+    fn from(value: DataModelT) -> Self {
+        SvStatusImpl::new(value)
     }
 }
 

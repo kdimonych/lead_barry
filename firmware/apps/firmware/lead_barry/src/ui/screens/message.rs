@@ -1,13 +1,16 @@
-use super::common::{ScMessageImpl, TrMessage};
+use super::common::{DataModelMessage, SvMessageImpl};
 
 pub use super::common::{MessageString, MsgTitleString};
 
-pub struct ScMessageData {
+/// A simple data model for a message screen, containing a title and a message.
+/// This struct implements the `DataModelMessage` trait, which allows it to be used with
+/// the `SvMessageImpl` screen implementation.
+pub struct DmMessage {
     pub title: MsgTitleString<'static>,
     pub message: MessageString<'static>,
 }
 
-impl TrMessage for ScMessageData {
+impl DataModelMessage for DmMessage {
     fn title<'b>(&'b self) -> &'b MsgTitleString<'b> {
         &self.title
     }
@@ -17,4 +20,6 @@ impl TrMessage for ScMessageData {
     }
 }
 
-pub type ScMessage = ScMessageImpl<ScMessageData>;
+/// A screen that displays a message with a title. The content of the message is
+/// provided by the `DmMessage` data model.
+pub type SvMessage = SvMessageImpl<DmMessage>;

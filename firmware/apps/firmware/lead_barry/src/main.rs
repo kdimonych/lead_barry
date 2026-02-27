@@ -213,7 +213,7 @@ fn main() -> ! {
         I2cDevice::new(i2c0_bus),
         ssd1306::size::DisplaySize128x64,
         state_ref,
-        Some(ScWelcome::new().into()),
+        Some(SvWelcome::new().into()),
     );
     let ui_control: &'static UiControl = UI_CONTROL.init(ui_control);
 
