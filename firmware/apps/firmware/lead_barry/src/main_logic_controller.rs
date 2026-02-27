@@ -5,13 +5,15 @@ use defmt_or_log as log;
 use ds323x::DateTimeAccess;
 use ds323x::Timelike;
 use embassy_executor::Spawner;
-use embassy_futures::select::Either;
+use embassy_futures::select::*;
 use embassy_net::Stack;
 
 use embassy_rp::clocks::RoscRng;
+use embassy_sync::channel::Channel;
 use embassy_sync::lazy_lock::LazyLock;
 use embassy_time::Ticker;
 use embassy_time::Timer;
+use static_cell::StaticCell;
 
 use crate::configuration::*;
 use crate::global_state::*;
@@ -24,6 +26,8 @@ use crate::units::TimeExt as _;
 use crate::vcp_sensors::VcpSensorsEvents;
 use crate::web_server::{HttpConfigServer, HttpServerBuffers};
 use crate::wifi::*;
+
+static AP_STATUS_CHANEL: StaticCell<ApStatusChannel> = StaticCell::new();
 
 pub async fn main_logic_controller(
     spawner: Spawner,
@@ -139,58 +143,8 @@ pub async fn main_logic_controller(
             log::info!("Starting AP mode");
         }
 
-        let mut wifi_ap_settings = settings.network_settings.wifi_ap_settings.clone();
-        // Generate_random_password
-        // TODO: Maybe it is possible to eliminate cloning here
-        wifi_ap_settings.password = Some(
-            wifi_ap_settings
-                .password
-                .clone()
-                .unwrap_or(generate_random_password_uppercase()),
-        );
-
-        wifi_service
-            .start_ap(&wifi_ap_settings, async |status| {
-                // Handle AP status updates here
-                log::info!("AP Status: {:?}", status);
-
-                match status {
-                    ApStatus::StartingAP => {
-                        // Set wifi ap screen with not ready state
-                        let wifi_ap_data = DmWifiAp::NotReady;
-                        set_screen(wifi_ap_data.into()).await;
-                    }
-                    ApStatus::WaitingForClient => {
-                        // Set wifi ap screen with not ready state
-                        log::debug!("Waiting for client to connect...");
-                        log::debug!(
-                            "AP SSID: {}, Password: {}",
-                            wifi_ap_settings.ssid,
-                            wifi_ap_settings
-                                .password
-                                .as_ref()
-                                .map(|s| s.as_str())
-                                .unwrap_or("<empty>")
-                        );
-                        let wifi_ap_data = DmWifiAp::WaitingForClient(DmWifiApCredentials {
-                            ssid: wifi_ap_settings.ssid.clone(),
-                            password: wifi_ap_settings.password.clone().unwrap_or_default(),
-                        });
-                        set_screen(wifi_ap_data.into()).await;
-                    }
-                    ApStatus::Ready((ip, mac)) => {
-                        //net_stack.
-                        // Set wifi ap screen with not ready state
-                        log::trace!("Ap ready. Client connected.");
-                        network_ready = true;
-                        let wifi_ap_data = DmWifiAp::Connected(DmWifiApClientInfo { ip, mac: Some(mac) });
-                        set_screen(wifi_ap_data.into()).await;
-                    }
-                }
-            })
-            .await;
-        global_state().set_wifi_mode(WiFiMode::AccessPoint).await;
-        log::info!("AP mode done");
+        let wifi_ap_settings = settings.network_settings.wifi_ap_settings.clone();
+        do_start_ap_mode(shared, &wifi_service, wifi_ap_settings, &button_controller).await;
         Timer::after(3.s()).await;
     };
 
@@ -237,6 +191,106 @@ pub async fn main_logic_controller(
             }
         }
     }
+}
+
+async fn do_start_ap_mode(
+    shared: &'static SharedResources,
+    wifi_service: &WifiService,
+    mut wifi_ap_settings: WiFiApSettings,
+    button_controller: &ButtonController<'_>,
+) {
+    let set_screen = |new_screen: ScCollection| async { shared.ui_control.switch(new_screen).await };
+
+    // Generate random password if not set, to avoid having a blank password which can be a security risk
+    wifi_ap_settings
+        .password
+        .get_or_insert_with(generate_random_password_uppercase);
+
+    log::info!("Waiting for AP to start...");
+    // Set wifi ap screen with not ready state
+    let wifi_ap_data = DmWifiAp::NotReady;
+    set_screen(wifi_ap_data.into()).await;
+
+    let start_ap_status = AP_STATUS_CHANEL.init_with(|| Channel::new());
+    wifi_service
+        .subtask_start_ap(&wifi_ap_settings, start_ap_status.sender())
+        .await;
+
+    // Wait for AP to start before allowing button interactions
+    let status = start_ap_status.receive().await;
+    match status {
+        ApStatus::WaitingForClient => log::info!("AP is ready. Waiting for client to connect..."),
+        ApStatus::Ready(_) => panic!("AP is already ready, expected to start in waiting for client state"),
+    };
+
+    // Set wifi ap screen with not ready state
+    log::debug!("Waiting for client to connect...");
+    log::debug!(
+        "AP SSID: {}, Password: {}",
+        wifi_ap_settings.ssid,
+        wifi_ap_settings
+            .password
+            .as_ref()
+            .map(|s| s.as_str())
+            .unwrap_or("<empty>")
+    );
+
+    let set_wifi_credentials_screen = async move |use_qr_code: bool| {
+        if use_qr_code {
+            let mut qr_code_str = DmQrCodeString::complimentary_str();
+            core::fmt::write(
+                &mut qr_code_str,
+                format_args!(
+                    "WIFI:T:WPA;S:{};P:{};;",
+                    wifi_ap_settings.ssid,
+                    wifi_ap_settings.password.as_ref().unwrap_or(&heapless::String::new())
+                ),
+            )
+            .unwrap();
+            set_screen(DmQrCodeString::from_heapless(qr_code_str).into()).await;
+        } else {
+            let wifi_ap_data = DmWifiAp::WaitingForClient(DmWifiApCredentials {
+                ssid: wifi_ap_settings.ssid.clone(),
+                password: wifi_ap_settings.password.clone().unwrap_or_default(),
+            });
+            set_screen(wifi_ap_data.into()).await;
+        }
+    };
+
+    let mut use_qr_code = false;
+
+    let (ip, mac) = loop {
+        set_wifi_credentials_screen(use_qr_code).await;
+
+        let status_fut = start_ap_status.receive();
+        let button_fut = button_controller.receive();
+        let res = select(status_fut, button_fut).await;
+        match res {
+            Either::First(ApStatus::Ready((ip, mac))) => break (ip, mac),
+            Either::First(ApStatus::WaitingForClient) => {
+                panic!("Received unexpected AP status update: WaitingForClient when we were expecting Ready")
+            }
+            Either::Second(new_screan) => {
+                // Toggle screen between QR code and credentials on button press
+                if let ButtonEvent::Pressed(Buttons::Yellow) = new_screan {
+                    use_qr_code = !use_qr_code;
+                }
+            }
+        }
+    };
+
+    //net_stack.
+    // Set wifi ap screen with not ready state
+    log::trace!("Ap ready. Client connected.");
+    // network_ready = true;
+    let wifi_ap_data = DmWifiAp::Connected(DmWifiApClientInfo { ip, mac: Some(mac) });
+    set_screen(wifi_ap_data.into()).await;
+
+    wifi_service.wait_for_subtask_finish().await;
+
+    // Handle AP status updates here
+    global_state().set_wifi_mode(WiFiMode::AccessPoint).await;
+    log::info!("AP mode done");
 }
 
 fn button_event_to_screan(event: &ButtonEvent) -> Option<ActiveScrean> {

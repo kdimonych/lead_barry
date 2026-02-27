@@ -1,3 +1,7 @@
+#![allow(dead_code)]
+
+use core::fmt::Debug;
+
 use super::wifi_controller::*;
 use crate::{
     configuration::{WiFiApSettings, WiFiSettings},
@@ -10,7 +14,11 @@ use defmt_or_log as log;
 use embassy_executor::Spawner;
 use embassy_net::{ConfigV4, DhcpConfig, Ipv4Address, Ipv4Cidr, Stack, StackResources};
 use embassy_rp::{clocks::RoscRng, gpio::Output, interrupt::typelevel::Binding, pio::InterruptHandler};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
+use embassy_sync::channel::{Channel, Receiver, Sender};
+use embassy_sync::{
+    blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex},
+    mutex::Mutex,
+};
 use heapless::Vec;
 use static_cell::StaticCell;
 
@@ -32,14 +40,19 @@ pub enum JoiningStatus {
     Ready,
     Failed,
 }
+pub type JoiningStatusChannel = Channel<CriticalSectionRawMutex, JoiningStatus, 1>;
+pub type JoiningStatusSender<'ch> = Sender<'ch, CriticalSectionRawMutex, JoiningStatus, 1>;
+pub type JoiningStatusReceiver<'ch> = Receiver<'ch, CriticalSectionRawMutex, JoiningStatus, 1>;
 
 #[derive(Clone, Copy, Debug)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum ApStatus {
-    StartingAP,
     WaitingForClient,
     Ready((Ipv4Address, [u8; 6])),
 }
+pub type ApStatusChannel = Channel<CriticalSectionRawMutex, ApStatus, 1>;
+pub type ApStatusSender<'ch> = Sender<'ch, CriticalSectionRawMutex, ApStatus, 1>;
+pub type ApStatusReceiver<'ch> = Receiver<'ch, CriticalSectionRawMutex, ApStatus, 1>;
 
 pub struct WiFiServiceBuilder<PIO, DMA>
 where
@@ -178,6 +191,26 @@ impl WifiService {
         service_impl.join(wifi_settings, join_status_handler).await;
     }
 
+    /// Spawn a parallel task to switch to join mode (connect to WiFi) almost without blocking the current task.
+    ///
+    /// The blocking may ocure only if the previously spawned task is still running.
+    /// The join status will be sent through the provided `join_status_sender` channel.
+    ///
+    /// It is the caller's responsibility to ensure that the receiver of the channel is actively listening for
+    /// the status updates, otherwise the channel may become full and cause the spawned task to block indefinitely.
+    pub async fn subtask_join(&self, wifi_settings: &WiFiSettings, join_status_sender: JoiningStatusSender<'static>) {
+        let wifi_service = self.service_impl;
+        let action = WiFiAction::DoJoin(wifi_settings.clone(), join_status_sender);
+        {
+            let mut service = wifi_service.lock().await;
+            service.enque_action(action).await;
+            service.spawner.spawn(wifi_service_task(wifi_service)).ok();
+        }
+
+        // Give a task chance to start and acquire the lock
+        embassy_futures::yield_now().await;
+    }
+
     /// Switch to access point mode
     pub async fn start_ap<H>(&self, wifi_ap_settings: &WiFiApSettings, wifi_state_handler: H)
     where
@@ -185,6 +218,31 @@ impl WifiService {
     {
         let mut service_impl = self.service_impl.lock().await;
         service_impl.start_ap(wifi_ap_settings, wifi_state_handler).await;
+    }
+
+    /// Spawn a parallel task to switch to access point mode almost without blocking the current task.
+    ///
+    /// The blocking may ocure only if the previously spawned task is still running.
+    /// The access point status will be sent through the provided `ap_status_sender` channel.
+    ///
+    /// It is the caller's responsibility to ensure that the receiver of the channel is actively listening for
+    /// the status updates, otherwise the channel may become full and cause the spawned task to block indefinitely.
+    pub async fn subtask_start_ap(&self, wifi_ap_settings: &WiFiApSettings, ap_status_sender: ApStatusSender<'static>) {
+        let wifi_service = self.service_impl;
+        let action = WiFiAction::DoStartAp(wifi_ap_settings.clone(), ap_status_sender);
+        {
+            let mut service = wifi_service.lock().await;
+            service.enque_action(action).await;
+            service.spawner.spawn(wifi_service_task(wifi_service)).ok();
+        }
+
+        // Give a task chance to start and acquire the lock
+        embassy_futures::yield_now().await;
+    }
+
+    /// Wait for the currently running subtask (if any) to finish
+    pub async fn wait_for_subtask_finish(&self) {
+        let _ = self.service_impl.lock().await;
     }
 }
 
@@ -201,11 +259,57 @@ trait WiFiServiceImplementation<'a> {
         H: AsyncFnMut(ApStatus) -> ();
 }
 
+enum WiFiAction {
+    DoJoin(WiFiSettings, JoiningStatusSender<'static>),
+    DoStartAp(WiFiApSettings, ApStatusSender<'static>),
+}
+
+impl Debug for WiFiAction {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            WiFiAction::DoJoin(settings, _) => f.debug_tuple("DoJoin").field(&settings.ssid.as_str()).finish(),
+            WiFiAction::DoStartAp(settings, _) => f.debug_tuple("DoStartAp").field(&settings.ssid.as_str()).finish(),
+        }
+    }
+}
+
 struct WifiServiceImpl<'a> {
     wifi_control: WiFiCtrlState<'a>,
     net_stack: Stack<'static>,
     dhcp_server: DhcpServer,
     spawner: Spawner,
+    parallel_task_queue: Channel<CriticalSectionRawMutex, WiFiAction, 1>,
+}
+
+#[embassy_executor::task]
+async fn wifi_service_task(wifi_service: &'static WiFiServiceImplType) {
+    loop {
+        // Extract task
+        let mut service = wifi_service.lock().await;
+        let Ok(action) = service.parallel_task_queue.try_receive() else {
+            // No task in the queue, can terminate task until next spawn
+            log::error!("No WiFi action in the queue, terminating task.");
+            return;
+        };
+
+        log::debug!("Start action from the queue: {}", defmt_or_log::Debug2Format(&action));
+        match action {
+            WiFiAction::DoJoin(wifi_settings, join_status_sender) => {
+                service
+                    .join(&wifi_settings, async move |status| {
+                        join_status_sender.send(status).await;
+                    })
+                    .await;
+            }
+            WiFiAction::DoStartAp(wifi_ap_settings, ap_status_sender) => {
+                service
+                    .start_ap(&wifi_ap_settings, async move |status| {
+                        ap_status_sender.send(status).await;
+                    })
+                    .await;
+            }
+        }
+    }
 }
 
 impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
@@ -242,7 +346,6 @@ impl<'a> WiFiServiceImplementation<'a> for WifiServiceImpl<'a> {
     where
         H: AsyncFnMut(ApStatus) -> (),
     {
-        wifi_state_handler(ApStatus::StartingAP).await;
         self.wifi_control
             .change_async(async |state| Self::ap_transition(state, self.net_stack, wifi_ap_settings).await)
             .await;
@@ -271,7 +374,13 @@ impl<'a> WifiServiceImpl<'a> {
             net_stack,
             dhcp_server,
             spawner,
+            parallel_task_queue: Channel::new(),
         }
+    }
+
+    #[inline(always)]
+    fn enque_action(&mut self, action: WiFiAction) -> impl core::future::Future<Output = ()> + '_ {
+        self.parallel_task_queue.send(action)
     }
 
     async fn idle_transition<'tr>(wifi_control_state: WiFiCtrlState<'tr>, net_stack: Stack<'tr>) -> WiFiCtrlState<'tr> {
