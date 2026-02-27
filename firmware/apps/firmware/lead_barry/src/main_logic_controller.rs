@@ -382,25 +382,6 @@ async fn start_http_config_server(spawner: Spawner, shared: &'static SharedResou
     http_server.run(stack, &mut buffers).await;
 }
 
-/* Helper Functions */
-// Generate random password
-// fn generate_random_password() -> heapless::String<64> {
-//     let mut rng = RoscRng;
-//     let mut pwd = heapless::String::<64>::new();
-//     for _ in 0..8 {
-//         let idx = (rng.next_u32() % 62) as u8;
-//         let c = if idx < 10 {
-//             (b'0' + idx) as char
-//         } else if idx < 36 {
-//             (b'a' + idx - 10) as char
-//         } else {
-//             (b'A' + idx - 36) as char
-//         };
-//         pwd.push(c).ok();
-//     }
-//     pwd
-// }
-
 fn generate_random_password_uppercase() -> heapless::String<64> {
     let mut rng = RoscRng;
     let mut pwd = heapless::String::<64>::new();
