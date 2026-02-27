@@ -140,7 +140,7 @@ trait ButtonStateProvider<'a, AliasType> {
 
 pub struct ButtonControllerState<AliasType, const INPUTS: usize, const BUTTON_EVENT_QUEUE_SIZE: usize> {
     event_channel: EventChannel<AliasType, BUTTON_EVENT_QUEUE_SIZE>,
-    buttonst_state: Mutex<CriticalSectionRawMutex, heapless::FnvIndexMap<AliasType, ButtonState, INPUTS>>,
+    buttons_state: Mutex<CriticalSectionRawMutex, heapless::FnvIndexMap<AliasType, ButtonState, INPUTS>>,
 }
 
 impl<const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
@@ -149,7 +149,7 @@ impl<const INPUTS: usize, AliasType, const BUTTON_EVENT_QUEUE_SIZE: usize>
     pub fn new() -> Self {
         Self {
             event_channel: Channel::new(),
-            buttonst_state: Mutex::new(heapless::FnvIndexMap::new()),
+            buttons_state: Mutex::new(heapless::FnvIndexMap::new()),
         }
     }
 }
@@ -160,16 +160,16 @@ where
     AliasType: core::cmp::Eq + core::hash::Hash + Copy,
 {
     fn last_state(&'a self, button_id: AliasType) -> core::task::Poll<Option<ButtonState>> {
-        if let Ok(guard) = self.buttonst_state.try_lock() {
-            core::task::Poll::Ready(guard.get(&button_id).cloned())
+        if let Ok(buttons_state) = self.buttons_state.try_lock() {
+            core::task::Poll::Ready(buttons_state.get(&button_id).cloned())
         } else {
             core::task::Poll::Pending
         }
     }
     fn update_state(&self, button_id: AliasType, state: ButtonState) -> core::task::Poll<Result<(), ()>> {
-        if let Ok(mut guard) = self.buttonst_state.try_lock() {
-            if guard.contains_key(&button_id) {
-                guard.insert(button_id, state).ok();
+        if let Ok(mut buttons_state) = self.buttons_state.try_lock() {
+            if buttons_state.contains_key(&button_id) {
+                buttons_state.insert(button_id, state).ok();
                 core::task::Poll::Ready(Ok(()))
             } else {
                 core::task::Poll::Ready(Err(()))
@@ -277,7 +277,7 @@ impl<const INPUTS: usize, AliasType> ButtonControllerBuilder<INPUTS, AliasType> 
     {
         // Initialize button state to current levels
         for button in &self.buttons {
-            state.buttonst_state.get_mut().insert(button.alias, button.into()).ok();
+            state.buttons_state.get_mut().insert(button.alias, button.into()).ok();
         }
 
         (
@@ -299,6 +299,15 @@ enum Edge {
     Falling,
 }
 
+impl From<Level> for Edge {
+    fn from(level: Level) -> Self {
+        match level {
+            Level::High => Edge::Rising,
+            Level::Low => Edge::Falling,
+        }
+    }
+}
+
 /// Type alias for cycle count
 type Cycles = u8;
 
@@ -317,16 +326,13 @@ impl EdgeDetector {
 
     pub fn update_level(&mut self, level: Level) -> Option<Edge> {
         let result = if self.previous_level != level {
+            // Debounce logic: Only confirm the edge if the level has been stable for DEBOUNCE_CYCLES cycles
             if self.cycles < DEBOUNCE_CYCLES {
                 self.cycles += 1;
                 return None;
             }
 
-            let edge = if level == Level::High {
-                Edge::Rising
-            } else {
-                Edge::Falling
-            };
+            let edge = level.into();
 
             self.previous_level = level;
             Some(edge)
