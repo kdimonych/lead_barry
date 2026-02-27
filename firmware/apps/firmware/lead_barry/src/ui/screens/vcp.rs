@@ -9,8 +9,8 @@ use embedded_graphics::{
 };
 
 use super::common::base_screan_layout::*;
-use crate::ui::DataModel;
 use crate::ui::Screen;
+use crate::ui::SharedDataModel;
 
 // Layout constants
 const VALUE_TEXT_POSITION: Point = Point::new(64, 40);
@@ -43,7 +43,7 @@ pub enum ScvBaseUnits {
 
 /// Example screen that draws a simple welcome message
 pub struct ScVcp {
-    voltage: &'static DataModel<f32>,
+    voltage: &'static SharedDataModel<f32>,
     voltage_cache: f32,
     base_unit: ScvBaseUnits,
     unit_prefix: &'static str,
@@ -77,7 +77,11 @@ fn prefix(value: f32) -> (&'static str, f32) {
 }
 
 impl ScVcp {
-    pub fn new(voltage: &'static DataModel<f32>, base_unit: ScvBaseUnits, title: VcpTitleString<'static>) -> Self {
+    pub fn new(
+        voltage: &'static SharedDataModel<f32>,
+        base_unit: ScvBaseUnits,
+        title: VcpTitleString<'static>,
+    ) -> Self {
         let (unit_prefix, _) = prefix(0.0);
 
         Self {

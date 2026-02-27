@@ -1,3 +1,3 @@
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 
-pub type DataModel<T> = Mutex<CriticalSectionRawMutex, T>;
+pub type SharedDataModel<T> = Mutex<CriticalSectionRawMutex, T>;

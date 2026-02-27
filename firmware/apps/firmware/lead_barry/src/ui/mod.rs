@@ -5,7 +5,7 @@ mod screen;
 mod screens;
 mod ui_interface;
 
-pub use self::data_model::DataModel;
+pub use self::data_model::SharedDataModel;
 pub use self::screen::Screen;
 use crate::global_types::I2c0Device;
 

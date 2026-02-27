@@ -333,7 +333,7 @@ async fn show_voltage_reading(shared: &'static SharedResources, channel: u8) -> 
     shared.vcp_control.enable_channel(channel).await;
     shared.vcp_control.flush_events();
 
-    static VOLTAGE: LazyLock<DataModel<f32>> = LazyLock::new(|| DataModel::new(0f32));
+    static VOLTAGE: LazyLock<SharedDataModel<f32>> = LazyLock::new(|| SharedDataModel::new(0f32));
     let voltage = VOLTAGE.get();
 
     let mut title = VcpTitleString::complimentary_str();
