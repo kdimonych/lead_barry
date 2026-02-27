@@ -13,7 +13,8 @@ pub use static_ip_config::*;
 pub use wifi_ap_settings::*;
 pub use wifi_settings::*;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[defmt_or_log::derive_format_or_debug]
 #[non_exhaustive]
 pub struct Settings {
     pub network_settings: NetworkSettings,

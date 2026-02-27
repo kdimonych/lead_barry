@@ -2,7 +2,7 @@
 
 use super::common::{DataModelStatus, DetailString, StatusString, SvStatusImpl, TitleString};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum DmWifiStatusState {
     Disconnected,

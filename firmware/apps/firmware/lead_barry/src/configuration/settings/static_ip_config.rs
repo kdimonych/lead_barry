@@ -2,7 +2,7 @@ use embassy_net::{Ipv4Address, Ipv4Cidr};
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[defmt_or_log::derive_format_or_debug]
 pub struct StaticIpConfig {
     pub ip: u32,

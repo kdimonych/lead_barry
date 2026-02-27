@@ -32,7 +32,7 @@ static WIFI_SERVICE_IMPL: StaticCell<WiFiServiceImplType> = StaticCell::new();
 static WIFI_STATIC_DATA: StaticCell<WiFiStaticData> = StaticCell::new();
 static DHCP_SERVER_STATE: StaticCell<DhcpServerState> = StaticCell::new();
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum JoiningStatus {
     JoiningAP,
@@ -44,7 +44,7 @@ pub type JoiningStatusChannel = Channel<CriticalSectionRawMutex, JoiningStatus, 
 pub type JoiningStatusSender<'ch> = Sender<'ch, CriticalSectionRawMutex, JoiningStatus, 1>;
 pub type JoiningStatusReceiver<'ch> = Receiver<'ch, CriticalSectionRawMutex, JoiningStatus, 1>;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum ApStatus {
     WaitingForClient,

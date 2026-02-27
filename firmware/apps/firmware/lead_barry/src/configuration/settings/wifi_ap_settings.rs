@@ -8,7 +8,8 @@ const DEFAULT_WIFI_AP_PREFIX_LEN: u8 = 24;
 const DEFAULT_AP_SSID: &str = "LeadBarry";
 const DEFAULT_AP_CHANNEL: u8 = 6;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[defmt_or_log::derive_format_or_debug]
 #[non_exhaustive]
 pub struct WiFiApSettings {
     pub ssid: heapless::String<32>,

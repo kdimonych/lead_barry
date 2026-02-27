@@ -4,7 +4,7 @@ use super::common::{DataModelStatus, DetailString, StatusString, SvStatusImpl};
 
 pub use super::common::TitleString as IpTitleString;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum ScvState {
     Disconnected,
@@ -12,14 +12,14 @@ pub enum ScvState {
     Dhcp,
     Connected,
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum ScvIpState {
     IpAssigned,
     GettingIp,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 #[defmt_or_log::derive_format_or_debug]
 pub struct DmIpData {
     pub state: ScvIpState,

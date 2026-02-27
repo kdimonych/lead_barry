@@ -2,7 +2,8 @@ use super::static_ip_config::StaticIpConfig;
 use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[defmt_or_log::derive_format_or_debug]
 #[non_exhaustive]
 pub struct WiFiSettings {
     pub ssid: heapless::String<32>,

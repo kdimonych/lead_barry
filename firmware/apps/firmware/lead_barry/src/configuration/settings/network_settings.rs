@@ -3,7 +3,8 @@ use super::wifi_settings::WiFiSettings;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Default)]
+#[defmt_or_log::derive_format_or_debug]
 #[non_exhaustive]
 pub struct NetworkSettings {
     pub wifi_settings: WiFiSettings,

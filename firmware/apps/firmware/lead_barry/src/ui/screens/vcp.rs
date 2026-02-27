@@ -34,7 +34,7 @@ const VALUE_TEXT_STYLE: TextStyle = TextStyleBuilder::new()
 pub type DmVcpTitle<'a> = TitleString<'a>;
 pub type DmVcpDynamicVCP = SharedDataModel<f32>;
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum DmVcpBaseUnits {
     Volts,

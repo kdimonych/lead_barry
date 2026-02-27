@@ -19,7 +19,6 @@ use crate::{
 const POLL_TIMEOUT_MS: u64 = 40;
 const HARDWARE_RESPONSE_TIMEOUT_MS: u64 = 100;
 
-#[derive(Debug)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum VcpCommand {
     EnableChannel(ChannelNum),

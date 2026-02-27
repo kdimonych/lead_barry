@@ -11,7 +11,6 @@ use static_cell::StaticCell;
 
 static SHARED_STORAGE: StaticCell<ConfigurationStorage<'static>> = StaticCell::new();
 
-#[derive(Debug)]
 #[defmt_or_log::derive_format_or_debug]
 pub enum Error {
     StorageRead(embassy_rp::flash::Error),
