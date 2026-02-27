@@ -53,9 +53,6 @@ portable-atomic = { version = "1.5", features = [
 
 smart-leds = "0.4.0"
 
-[profile.release]
-debug = 2
-
 [build-dependencies]
 build_log = { path = "../../../build/build_utils/build_log" }
 cargo_command = { path = "../../../build/build_utils/cargo_command" }
