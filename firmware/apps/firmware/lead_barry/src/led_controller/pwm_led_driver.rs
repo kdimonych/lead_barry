@@ -54,7 +54,7 @@ impl PwmLedDriver {
         let period = (clock_freq_hz / (desired_freq_hz * divider as u32)) as u16 - 1;
 
         log::debug!(
-            "PwmLedDriver: Configuring PWM: clock_freq={} Hz, desired_freq={} Hz, divider={}, period={}",
+            "PwmLedDriver: clock_freq={} Hz, desired_freq={} Hz, divider={}, period={}",
             clock_freq_hz,
             desired_freq_hz,
             divider,

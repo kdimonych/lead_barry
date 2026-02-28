@@ -109,7 +109,6 @@ where
         );
 
         // Spawn network driver task
-        log::info!("Spawn network driver task");
         spawner.spawn(net_driver_task(runner)).unwrap();
 
         // Initialize DHCP server state
@@ -283,6 +282,7 @@ struct WifiServiceImpl<'a> {
 
 #[embassy_executor::task]
 async fn wifi_service_task(wifi_service: &'static WiFiServiceImplType) {
+    log::info!("Starting WiFi service task...");
     loop {
         // Extract task
         let mut service = wifi_service.lock().await;
@@ -595,5 +595,6 @@ impl<'a> WifiServiceImpl<'a> {
 /* Tasks */
 #[embassy_executor::task]
 async fn net_driver_task(mut runner: embassy_net::Runner<'static, cyw43::NetDriver<'static>>) -> ! {
+    log::info!("Starting network driver task...");
     runner.run().await
 }

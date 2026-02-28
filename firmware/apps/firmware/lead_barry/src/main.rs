@@ -109,6 +109,260 @@ struct ResourcesCore1 {
     core1_stack_end: usize,
 }
 
+#[cortex_m_rt::entry]
+fn main() -> ! {
+    debug_memory_layout();
+    let p: embassy_rp::Peripherals = embassy_rp::init(Default::default());
+
+    log::info!("Initializing LED controller...");
+    // Bind led pins
+    let config = PwmHardwareConfig {
+        slice1: p.PWM_SLICE1,
+        slice3: p.PWM_SLICE3,
+        led_red: p.PIN_18,
+        led_yellow: p.PIN_19,
+        led_blue: p.PIN_22,
+    };
+    // Initialize the LED controller builder and build the controller and runner
+    let led_controller_builder = LedControllerBuilder::new(config);
+    let (led_controller, led_controller_runner) = led_controller_builder.build_once();
+
+    // Set heartbeat animation on blue LED to verify it's working
+    led_controller
+        .try_set_animation(Led::Blue, LedAnimation::Sine(5000, Repetitions::Infinite))
+        .unwrap();
+
+    log_system_frequencies();
+
+    // Bind button pins
+    log::info!("Initializing Button controller...");
+    let mut button_controller_builder = ButtonControllerBuilder::new();
+    button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
+    button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
+
+    //User FLASH storage
+    log::info!("Initializing FLASH storage...");
+    let storage = Storage::new(p.FLASH, p.DMA_CH1);
+    let configuration_storage_builder = ConfigurationStorageBuilder::new(storage);
+    let configuration_storage = configuration_storage_builder.build();
+
+    // Setup I2C0 with standard frequency for sensors
+    log::info!("Initializing I2C0...");
+    let mut i2c0_cfg = i2c::Config::default();
+    i2c0_cfg.frequency = 1.mhz(); // Fast I2C clk for better performance
+    let i2c0 = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, I2c0Irqs, i2c0_cfg);
+    let i2c0_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
+        I2C0_BUS.init(Mutex::new(i2c0));
+
+    // Setup I2C1 with standard frequency for sensors
+    log::info!("Initializing I2C1...");
+    let mut i2c1_cfg = i2c::Config::default();
+    i2c1_cfg.frequency = 400.khz(); // Fast I2C clk for better performance
+    let i2c1 = I2c::new_async(p.I2C1, p.PIN_15, p.PIN_14, I2c1Irqs, i2c1_cfg);
+    let i2c1_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C1, i2c::Async>> =
+        I2C1_BUS.init(Mutex::new(i2c1));
+
+    // Initialize the stack
+    log::info!("Initializing memory stack of core 1...");
+    let core1_stack = CORE1_STACK.init_with(Stack::new);
+    let core1_stack_base = core1_stack.mem.as_ptr() as usize;
+    let core1_stack_end = core1_stack_base + core1_stack.mem.len();
+
+    // Initialize the ui
+    log::info!("Initializing UI...");
+    let ui_shared_state = UiSharedState::new();
+    let state_ref = UI_SHARED_STATE.init(ui_shared_state);
+    let (ui_control, ui_runner) = UiInterface::new(
+        I2cDevice::new(i2c0_bus),
+        ssd1306::size::DisplaySize128x64,
+        state_ref,
+        Some(SvWelcome::new().into()),
+    );
+    let ui_control: &'static UiControl = UI_CONTROL.init(ui_control);
+
+    // Initialize the VCP sensors
+    log::info!("Initializing VCP sensors...");
+    let vcp_state_ref = VCP_SENSORS_STATE.init_with(VcpSensorsState::new);
+    let (vcp_runner, vcp_control) =
+        VcpSensorsService::new(I2cDevice::new(i2c0_bus), vcp_state_ref, VcpConfig::default());
+    let vcp_control: &'static VcpControl = VCP_SENSORS_CONTROL.init(vcp_control);
+
+    // Initialize the WiFi service builder
+    log::info!("Initializing WiFi service builder...");
+    let wifi_cfg: WiFiConfig<PIO0, DMA_CH0> = WiFiConfig::<PIO0, DMA_CH0> {
+        pwr_pin: p.PIN_23, // Power pin, pin 23
+        cs_pin: p.PIN_25,  // Chip select pin, pin 25
+        dio_pin: p.PIN_24, // Data In/Out pin, pin 24
+        clk_pin: p.PIN_29, // Clock pin, pin 29
+        pio: p.PIO0,       // PIO instance
+        dma_ch: p.DMA_CH0, // DMA channel
+    };
+
+    let wifi_service_builder = WiFiServiceBuilder::new(wifi_cfg, Pio0Irqs);
+
+    // Initialize the RTC DS3231
+    log::info!("Initializing RTC DS3231...");
+    let rtc_ds3231 = rtc::create_rtc_ds3231(I2cDevice::new(i2c1_bus));
+    let rtc_ds3231_ref: &'static RtcDs3231Ref<I2c1Device<'static>> = RTC_DS3231.init(rtc_ds3231);
+
+    let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
+        rtc: rtc_ds3231_ref,
+        ui_control,
+        vcp_control,
+        configuration_storage,
+        led_controller,
+    });
+
+    // Spawn core threads
+    embassy_rp::multicore::spawn_core1(p.CORE1, core1_stack, move || {
+        let executor1 = EXECUTOR1.init(Executor::new());
+        executor1.run(|spawner| {
+            spawner
+                .spawn(core1_init(
+                    spawner,
+                    ResourcesCore1 {
+                        ui_runner: Some(ui_runner),
+                        core1_stack_base,
+                        core1_stack_end,
+                    },
+                ))
+                .unwrap();
+        });
+    });
+
+    let executor0 = EXECUTOR0.init(Executor::new());
+    executor0.run(move |spawner| {
+        spawner
+            .spawn(core0_init(
+                spawner,
+                ResourcesCore0 {
+                    button_controller_builder,
+                    vcp_runner: Some(vcp_runner),
+                    wifi_service_builder,
+                    shared_resources,
+                    led_controller_runner,
+                },
+            ))
+            .unwrap();
+    });
+}
+
+#[embassy_executor::task]
+async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
+    log::info!("Starting core 0 thread...");
+    // Spawn stack monitor task
+    spawner.spawn(core_0_stack_monitor_task()).unwrap();
+
+    // Spawn the LED blink task on Core 0
+    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
+    spawner
+        .spawn(led_controller_task(resources.led_controller_runner))
+        .unwrap();
+
+    // Spawn the VCP sensors task on Core 0
+    if let Some(vcp_runner) = resources.vcp_runner {
+        // Spawn the VCP sensors task on core 0
+        spawner.spawn(vcp_sensors_runner_task(vcp_runner)).unwrap();
+    }
+
+    // Initialize button controller
+    let button_controller_state = BUTTON_CONTROLLER.init(ButtonControllerState::new());
+    let (button_controller, button_controller_runner) =
+        resources.button_controller_builder.build(button_controller_state);
+    spawner
+        .spawn(buttons_controller_task(button_controller_runner))
+        .unwrap();
+
+    log::info!("Build wifi service");
+    let wifi_service = resources.wifi_service_builder.build(spawner, cyw43_task).await;
+
+    //Call main logic controller
+    main_logic_controller(spawner, resources.shared_resources, wifi_service, button_controller).await;
+}
+
+#[embassy_executor::task]
+async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
+    log::info!("Starting core 1 thread...");
+    // Spawn stack monitor task
+    spawner
+        .spawn(core_1_stack_monitor_task(
+            resources.core1_stack_base,
+            resources.core1_stack_end,
+        ))
+        .unwrap();
+
+    // Spawn the UI task on Core 1
+    if let Some(ui_runner) = resources.ui_runner {
+        spawner.spawn(ui_runner_task(ui_runner)).unwrap();
+    }
+}
+
+#[embassy_executor::task]
+async fn core_0_stack_monitor_task() -> ! {
+    log::info!("Starting core 0 stack monitor task...");
+    loop {
+        let (stack_used, stack_size) = get_core_0_stack_usage();
+        if stack_used > (stack_size as f32 * 0.8) as usize {
+            log::warn!(
+                "❗ [ATTENTION!] High stack usage at core 0: {} bytes of {} bytes",
+                stack_used,
+                stack_size
+            );
+        }
+
+        // Your task work here
+        embassy_time::Timer::after(Duration::from_millis(3000)).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn core_1_stack_monitor_task(core1_stack_base: usize, core1_stack_end: usize) -> ! {
+    log::info!("Starting core 1 stack monitor task...");
+    loop {
+        let (stack_used, stack_size) = get_core_1_stack_usage(core1_stack_base, core1_stack_end);
+        if stack_used > (stack_size as f32 * 0.8) as usize {
+            log::warn!(
+                "❗ [ATTENTION!] High stack usage at core 1: {} bytes of {} bytes",
+                stack_used,
+                stack_size
+            );
+        }
+
+        // Your task work here
+        embassy_time::Timer::after(Duration::from_millis(3000)).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn buttons_controller_task(button_controller_runner: ButtonControllerRunner<'static>) -> ! {
+    log::info!("Starting buttons controller task...");
+    button_controller_runner.run().await
+}
+
+#[embassy_executor::task]
+async fn led_controller_task(led_controller_runner: LedControllerRunner) -> ! {
+    log::info!("Starting led controller task...");
+    led_controller_runner.run().await;
+}
+
+#[embassy_executor::task]
+async fn ui_runner_task(mut ui_runner: UiRunner<'static>) -> ! {
+    log::info!("Starting UI task...");
+    ui_runner.run().await;
+}
+
+#[embassy_executor::task]
+async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunner<'static>) -> ! {
+    log::info!("Starting VCP sensors task...");
+    vcp_sensors_runner.run().await
+}
+
+#[embassy_executor::task]
+async fn cyw43_task(runner: WiFiDriverRunner<PIO0, DMA_CH0>) -> ! {
+    log::info!("Starting CYW43 driver task...");
+    runner.run().await
+}
+
 fn log_system_frequencies() {
     let sys_freq = embassy_rp::clocks::clk_sys_freq();
     let peri_freq = embassy_rp::clocks::clk_peri_freq();
@@ -152,220 +406,6 @@ fn debug_memory_layout() {
     log::info!("Stack Size:   {} bytes", stack_size);
 }
 
-#[cortex_m_rt::entry]
-fn main() -> ! {
-    debug_memory_layout();
-    let p: embassy_rp::Peripherals = embassy_rp::init(Default::default());
-
-    // Bind led pins
-    let config = PwmHardwareConfig {
-        slice1: p.PWM_SLICE1,
-        slice3: p.PWM_SLICE3,
-        led_red: p.PIN_18,
-        led_yellow: p.PIN_19,
-        led_blue: p.PIN_22,
-    };
-
-    // Initialize the LED controller builder and build the controller and runner
-    let led_controller_builder = LedControllerBuilder::new(config);
-    let (led_controller, led_controller_runner) = led_controller_builder.build_once();
-
-    // Set heartbeat animation on blue LED to verify it's working
-    led_controller
-        .try_set_animation(Led::Blue, LedAnimation::Sine(5000, Repetitions::Infinite))
-        .unwrap();
-
-    log_system_frequencies();
-
-    // Bind button pins
-    let mut button_controller_builder = ButtonControllerBuilder::new();
-    button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
-    button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
-
-    //User FLASH storage
-    let storage = Storage::new(p.FLASH, p.DMA_CH1);
-    let configuration_storage_builder = ConfigurationStorageBuilder::new(storage);
-    let configuration_storage = configuration_storage_builder.build();
-
-    // Setup I2C0 with standard frequency for sensors
-    let mut i2c0_cfg = i2c::Config::default();
-    i2c0_cfg.frequency = 1.mhz(); // Fast I2C clk for better performance
-    let i2c0 = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, I2c0Irqs, i2c0_cfg);
-    let i2c0_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
-        I2C0_BUS.init(Mutex::new(i2c0));
-
-    // Setup I2C1 with standard frequency for sensors
-    let mut i2c1_cfg = i2c::Config::default();
-    i2c1_cfg.frequency = 400.khz(); // Fast I2C clk for better performance
-    let i2c1 = I2c::new_async(p.I2C1, p.PIN_15, p.PIN_14, I2c1Irqs, i2c1_cfg);
-    let i2c1_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C1, i2c::Async>> =
-        I2C1_BUS.init(Mutex::new(i2c1));
-
-    // Initialize the stack
-    let core1_stack = CORE1_STACK.init_with(Stack::new);
-    let core1_stack_base = core1_stack.mem.as_ptr() as usize;
-    let core1_stack_end = core1_stack_base + core1_stack.mem.len();
-
-    // Initialize the ui
-    let ui_shared_state = UiSharedState::new();
-    let state_ref = UI_SHARED_STATE.init(ui_shared_state);
-    let (ui_control, ui_runner) = UiInterface::new(
-        I2cDevice::new(i2c0_bus),
-        ssd1306::size::DisplaySize128x64,
-        state_ref,
-        Some(SvWelcome::new().into()),
-    );
-    let ui_control: &'static UiControl = UI_CONTROL.init(ui_control);
-
-    // Initialize the VCP sensors
-    let vcp_state_ref = VCP_SENSORS_STATE.init_with(VcpSensorsState::new);
-    let (vcp_runner, vcp_control) =
-        VcpSensorsService::new(I2cDevice::new(i2c0_bus), vcp_state_ref, VcpConfig::default());
-    let vcp_control: &'static VcpControl = VCP_SENSORS_CONTROL.init(vcp_control);
-
-    let wifi_cfg: WiFiConfig<PIO0, DMA_CH0> = WiFiConfig::<PIO0, DMA_CH0> {
-        pwr_pin: p.PIN_23, // Power pin, pin 23
-        cs_pin: p.PIN_25,  // Chip select pin, pin 25
-        dio_pin: p.PIN_24, // Data In/Out pin, pin 24
-        clk_pin: p.PIN_29, // Clock pin, pin 29
-        pio: p.PIO0,       // PIO instance
-        dma_ch: p.DMA_CH0, // DMA channel
-    };
-
-    let wifi_service_builder = WiFiServiceBuilder::new(wifi_cfg, Pio0Irqs);
-
-    // Initialize the RTC DS3231
-    let rtc_ds3231 = rtc::create_rtc_ds3231(I2cDevice::new(i2c1_bus));
-    let rtc_ds3231_ref: &'static RtcDs3231Ref<I2c1Device<'static>> = RTC_DS3231.init(rtc_ds3231);
-
-    let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
-        rtc: rtc_ds3231_ref,
-        ui_control,
-        vcp_control,
-        configuration_storage,
-        led_controller,
-    });
-
-    // Spawn core threads
-    embassy_rp::multicore::spawn_core1(p.CORE1, core1_stack, move || {
-        let executor1 = EXECUTOR1.init(Executor::new());
-        log::debug!("Starting executor on core 1");
-        executor1.run(|spawner| {
-            spawner
-                .spawn(core1_init(
-                    spawner,
-                    ResourcesCore1 {
-                        ui_runner: Some(ui_runner),
-                        core1_stack_base,
-                        core1_stack_end,
-                    },
-                ))
-                .unwrap();
-        });
-    });
-
-    let executor0 = EXECUTOR0.init(Executor::new());
-    executor0.run(move |spawner| {
-        log::debug!("Starting executor on core 0");
-        spawner
-            .spawn(core0_init(
-                spawner,
-                ResourcesCore0 {
-                    button_controller_builder,
-                    vcp_runner: Some(vcp_runner),
-                    wifi_service_builder,
-                    shared_resources,
-                    led_controller_runner,
-                },
-            ))
-            .unwrap();
-    });
-}
-
-#[embassy_executor::task]
-async fn core0_init(spawner: Spawner, resources: ResourcesCore0) -> ! {
-    // Spawn stack monitor task
-    spawner.spawn(core_0_stack_monitor_task()).unwrap();
-
-    // Spawn the LED blink task on Core 0
-    log::info!("Spawn LED task on core 0");
-    // For regular GPIO LED (if you connect an external LED to a GPIO pin)
-
-    spawner
-        .spawn(led_controller_task(resources.led_controller_runner))
-        .unwrap();
-
-    // Spawn the VCP sensors task on Core 0
-    if let Some(vcp_runner) = resources.vcp_runner {
-        // Spawn the VCP sensors task on core 0
-        log::info!("Spawn vcp sensors task on core 0");
-        spawner.spawn(vcp_sensors_runner_task(vcp_runner)).unwrap();
-    }
-
-    // Initialize button controller
-    let button_controller_state = BUTTON_CONTROLLER.init(ButtonControllerState::new());
-    let (button_controller, button_controller_runner) =
-        resources.button_controller_builder.build(button_controller_state);
-    log::info!("Spawn buttons controller task on core 0");
-    spawner
-        .spawn(buttons_controller_task(button_controller_runner))
-        .unwrap();
-
-    log::info!("Create wifi service");
-    let wifi_service = resources.wifi_service_builder.build(spawner, cyw43_task).await;
-
-    //Call main logic controller
-    main_logic_controller(spawner, resources.shared_resources, wifi_service, button_controller).await;
-}
-
-#[embassy_executor::task]
-async fn buttons_controller_task(button_controller_runner: ButtonControllerRunner<'static>) -> ! {
-    log::debug!("Starting buttons controller task...");
-    button_controller_runner.run().await
-}
-
-#[embassy_executor::task]
-async fn led_controller_task(led_controller_runner: LedControllerRunner) -> ! {
-    log::debug!("Starting led controller task...");
-    led_controller_runner.run().await;
-}
-
-#[embassy_executor::task]
-async fn core1_init(spawner: Spawner, resources: ResourcesCore1) {
-    // Spawn stack monitor task
-    spawner
-        .spawn(core_1_stack_monitor_task(
-            resources.core1_stack_base,
-            resources.core1_stack_end,
-        ))
-        .unwrap();
-
-    // Spawn the UI task on Core 1
-    if let Some(ui_runner) = resources.ui_runner {
-        // Spawn the display task on Core 1
-        log::debug!("Spawn display task on core 1");
-        spawner.spawn(display_runner_task(ui_runner)).unwrap();
-    }
-}
-
-#[embassy_executor::task]
-async fn display_runner_task(mut ui_runner: UiRunner<'static>) -> ! {
-    log::debug!("Starting display task...");
-    ui_runner.run().await;
-}
-
-#[embassy_executor::task]
-async fn vcp_sensors_runner_task(mut vcp_sensors_runner: VcpSensorsRunner<'static>) -> ! {
-    log::debug!("Starting VCP sensors task...");
-    vcp_sensors_runner.run().await
-}
-
-#[embassy_executor::task]
-async fn cyw43_task(runner: WiFiDriverRunner<PIO0, DMA_CH0>) -> ! {
-    log::debug!("Starting CYW43 driver task...");
-    runner.run().await
-}
-
 fn get_core_0_stack_usage() -> (usize, usize) {
     unsafe extern "C" {
         static mut _stack_start: u32;
@@ -380,43 +420,9 @@ fn get_core_0_stack_usage() -> (usize, usize) {
     (stack_start - current_sp, &raw const _stack_size as usize)
 }
 
-#[embassy_executor::task]
-async fn core_0_stack_monitor_task() -> ! {
-    loop {
-        let (stack_used, stack_size) = get_core_0_stack_usage();
-        if stack_used > (stack_size as f32 * 0.8) as usize {
-            log::warn!(
-                "❗ [ATTENTION!] High stack usage at core 0: {} bytes of {} bytes",
-                stack_used,
-                stack_size
-            );
-        }
-
-        // Your task work here
-        embassy_time::Timer::after(Duration::from_millis(3000)).await;
-    }
-}
-
 fn get_core_1_stack_usage(core1_stack_base: usize, core1_stack_end: usize) -> (usize, usize) {
     let current_sp = cortex_m::register::msp::read() as usize;
     log::debug_assert!(core1_stack_end > core1_stack_base);
 
     (core1_stack_end - current_sp, core1_stack_end - core1_stack_base)
-}
-
-#[embassy_executor::task]
-async fn core_1_stack_monitor_task(core1_stack_base: usize, core1_stack_end: usize) -> ! {
-    loop {
-        let (stack_used, stack_size) = get_core_1_stack_usage(core1_stack_base, core1_stack_end);
-        if stack_used > (stack_size as f32 * 0.8) as usize {
-            log::warn!(
-                "❗ [ATTENTION!] High stack usage at core 1: {} bytes of {} bytes",
-                stack_used,
-                stack_size
-            );
-        }
-
-        // Your task work here
-        embassy_time::Timer::after(Duration::from_millis(3000)).await;
-    }
 }
