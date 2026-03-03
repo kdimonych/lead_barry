@@ -64,15 +64,9 @@ use {panic_rtt_target as _, rtt_target as _};
 const CORE1_STACK_SIZE: usize = 4096 * 4;
 
 // Interrupt handlers
-bind_interrupts!(struct I2c0Irqs {
+bind_interrupts!(struct Irqs {
     I2C0_IRQ => I2cInterruptHandler<I2C0>;
-});
-
-bind_interrupts!(struct I2c1Irqs {
     I2C1_IRQ => I2cInterruptHandler<I2C1>;
-});
-
-bind_interrupts!(struct Pio0Irqs {
     PIO0_IRQ_0 => PioInterruptHandler<PIO0>;
 });
 
@@ -150,7 +144,7 @@ fn main() -> ! {
     log::info!("Initializing I2C0...");
     let mut i2c0_cfg = i2c::Config::default();
     i2c0_cfg.frequency = 1.mhz(); // Fast I2C clk for better performance
-    let i2c0 = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, I2c0Irqs, i2c0_cfg);
+    let i2c0 = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c0_cfg);
     let i2c0_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
         I2C0_BUS.init(Mutex::new(i2c0));
 
@@ -158,7 +152,7 @@ fn main() -> ! {
     log::info!("Initializing I2C1...");
     let mut i2c1_cfg = i2c::Config::default();
     i2c1_cfg.frequency = 400.khz(); // Fast I2C clk for better performance
-    let i2c1 = I2c::new_async(p.I2C1, p.PIN_15, p.PIN_14, I2c1Irqs, i2c1_cfg);
+    let i2c1 = I2c::new_async(p.I2C1, p.PIN_15, p.PIN_14, Irqs, i2c1_cfg);
     let i2c1_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C1, i2c::Async>> =
         I2C1_BUS.init(Mutex::new(i2c1));
 
@@ -198,7 +192,7 @@ fn main() -> ! {
         dma_ch: p.DMA_CH0, // DMA channel
     };
 
-    let wifi_service_builder = WiFiServiceBuilder::new(wifi_cfg, Pio0Irqs);
+    let wifi_service_builder = WiFiServiceBuilder::new(wifi_cfg, Irqs);
 
     // Initialize the RTC DS3231
     log::info!("Initializing RTC DS3231...");
