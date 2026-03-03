@@ -106,6 +106,8 @@ struct ResourcesCore1 {
 #[cortex_m_rt::entry]
 fn main() -> ! {
     debug_memory_layout();
+    log_system_frequencies();
+
     let p: embassy_rp::Peripherals = embassy_rp::init(Default::default());
 
     log::info!("Initializing LED controller...");
@@ -125,8 +127,6 @@ fn main() -> ! {
     led_controller
         .try_set_animation(Led::Blue, LedAnimation::Sine(5000, Repetitions::Infinite))
         .unwrap();
-
-    log_system_frequencies();
 
     // Bind button pins
     log::info!("Initializing Button controller...");
@@ -366,12 +366,12 @@ fn log_system_frequencies() {
     let xosc_freq = embassy_rp::clocks::xosc_freq();
 
     log::info!("=== System Clock Frequencies ===");
-    log::info!("System Clock:     {} MHz", sys_freq / 1_000_000);
-    log::info!("Peripheral Clock: {} MHz", peri_freq / 1_000_000);
-    log::info!("USB Clock:        {} MHz", usb_freq / 1_000_000);
-    log::info!("ADC Clock:        {} MHz", adc_freq / 1_000_000);
+    log::info!("System Clock:     {} MHz", sys_freq as f32 / 1_000_000.0);
+    log::info!("Peripheral Clock: {} MHz", peri_freq as f32 / 1_000_000.0);
+    log::info!("USB Clock:        {} MHz", usb_freq as f32 / 1_000_000.0);
+    log::info!("ADC Clock:        {} MHz", adc_freq as f32 / 1_000_000.0);
     log::info!("RTC Clock:        {} Hz", rtc_freq);
-    log::info!("XOSC Clock:       {} MHz", xosc_freq / 1_000_000);
+    log::info!("XOSC Clock:       {} MHz", xosc_freq as f32 / 1_000_000.0);
     log::info!("================================");
 }
 
