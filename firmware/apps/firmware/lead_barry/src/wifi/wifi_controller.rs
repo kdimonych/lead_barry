@@ -118,9 +118,10 @@ impl WiFiDriverBuilder<NoWiFiBuilderCreated> {
         // let clm = unsafe { core::slice::from_raw_parts(0x10140000 as *const u8, 4752) };
 
         //let pwr = Output::new(wifi_cfg.pwr_pin, Level::Low);
+
+        let pwr: Output<'_> = Output::new(wifi_cfg.pwr_pin, Level::Low);
         let cs = Output::new(wifi_cfg.cs_pin, Level::High);
         let mut pio = Pio::new(wifi_cfg.pio, irq);
-        let pwr: Output<'_> = Output::new(wifi_cfg.pwr_pin, Level::Low);
 
         let spi: PioSpi<'_, PIO, 0, DMA> = PioSpi::new(
             &mut pio.common,
