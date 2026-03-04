@@ -2,4 +2,4 @@
 
 __The hardware blockschema:__
 
-![General idea](device_block_schema.drawio.svg "General idea diagrm")
+![General idea](./device_block_schema.drawio.svg "General idea diagrm")
