@@ -69,3 +69,6 @@ hardware/kicad/*/*-backups
 hardware/kicad/*/fp-info-cache
 hardware/kicad/*/\#auto_saved_files\#
 hardware/kicad/*/_autosave-*
+
+# Python virtual environment
+.venv/

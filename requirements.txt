@@ -1,0 +1,8 @@
+# This packages are required for the Jupyter project to run properly. You can install them using pip:
+numpy
+scipy
+matplotlib
+plotly
+
+# For Jupyter Notebook support, you also need to install:
+ipykernel
