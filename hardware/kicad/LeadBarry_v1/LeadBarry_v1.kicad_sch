@@ -858,7 +858,7 @@
 	)
 	(symbol
 		(lib_id "RPi_PicoW:PicoW")
-		(at 82.55 87.63 0)
+		(at 57.15 125.73 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -867,7 +867,7 @@
 		(fields_autoplaced yes)
 		(uuid "d933406d-fe71-4622-88f6-f03bc372a0c5")
 		(property "Reference" "U1"
-			(at 82.55 55.88 0)
+			(at 57.15 93.98 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -875,7 +875,7 @@
 			)
 		)
 		(property "Value" "PicoW"
-			(at 82.55 58.42 0)
+			(at 57.15 96.52 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -883,7 +883,7 @@
 			)
 		)
 		(property "Footprint" "RPi_PicoW:RPi_Pico_SMD_TH"
-			(at 82.55 87.63 90)
+			(at 57.15 125.73 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -892,7 +892,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 82.55 87.63 0)
+			(at 57.15 125.73 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -901,7 +901,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 82.55 87.63 0)
+			(at 57.15 125.73 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1048,7 +1048,7 @@
 		)
 	)
 	(sheet
-		(at 166.37 29.21)
+		(at 137.16 40.64)
 		(size 16.51 13.97)
 		(fields_autoplaced yes)
 		(stroke
@@ -1060,7 +1060,7 @@
 		)
 		(uuid "18a75ca0-8877-4b16-92d9-f7fd628b49f4")
 		(property "Sheetname" "BatterySwitch"
-			(at 166.37 28.4984 0)
+			(at 137.16 39.9284 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1069,7 +1069,7 @@
 			)
 		)
 		(property "Sheetfile" "BatterySwitch.kicad_sch"
-			(at 166.37 43.7646 0)
+			(at 137.16 55.1946 0)
 			(effects
 				(font
 					(size 1.27 1.27)

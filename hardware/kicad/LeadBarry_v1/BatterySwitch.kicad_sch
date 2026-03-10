@@ -2198,7 +2198,7 @@
 			)
 		)
 	)
-	(global_label "P-"
+	(global_label "B-"
 		(shape input)
 		(at 195.58 110.49 0)
 		(fields_autoplaced yes)
@@ -2242,7 +2242,7 @@
 			)
 		)
 	)
-	(global_label "P+"
+	(global_label "P-"
 		(shape input)
 		(at 95.25 110.49 180)
 		(fields_autoplaced yes)
