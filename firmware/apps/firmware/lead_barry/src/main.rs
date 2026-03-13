@@ -177,8 +177,12 @@ fn main() -> ! {
     // Initialize the VCP sensors
     log::info!("Initializing VCP sensors...");
     let vcp_state_ref = VCP_SENSORS_STATE.init_with(VcpSensorsState::new);
-    let (vcp_runner, vcp_control) =
-        VcpSensorsService::new(I2cDevice::new(i2c0_bus), vcp_state_ref, VcpConfig::default());
+    let mut vcp_config = VcpConfig::default();
+    vcp_config.global_pv_limit = Some(VcpPowerLimits {
+        upper_voltage: 3.0, // Volts, were 13.6 (Ok battery /power voltage)
+        lower_voltage: 1.0, // Volts, were 10.45 (Low battery voltage)
+    });
+    let (vcp_runner, vcp_control) = VcpSensorsService::new(I2cDevice::new(i2c0_bus), vcp_state_ref, vcp_config);
     let vcp_control: &'static VcpControl = VCP_SENSORS_CONTROL.init(vcp_control);
 
     // Initialize the WiFi service builder

@@ -11,6 +11,7 @@ use embassy_sync::{
 
 use embassy_time::{Ticker, with_timeout};
 use ina3221_async::*;
+use postcard::fixint::le;
 
 use crate::{
     units::TimeExt, vcp_sensors::config::*, vcp_sensors::data_model::*, vcp_sensors::error::*, vcp_sensors::events::*,
@@ -198,6 +199,20 @@ where
             })?;
         }
 
+        if let Some(power_valid_limit) = &self.config.global_pv_limit {
+            ina.set_power_valid_limits(
+                Voltage::from_micro_volts((power_valid_limit.lower_voltage * 1_000_000.0) as i32),
+                Voltage::from_micro_volts((power_valid_limit.upper_voltage * 1_000_000.0) as i32),
+            )
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "INA3221 set power valid limits error: {:?}",
+                    defmt_or_log::Debug2Format(&e)
+                );
+                VcpError::I2c
+            })?;
+        }
         Ok(())
     }
 

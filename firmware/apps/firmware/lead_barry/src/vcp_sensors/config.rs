@@ -3,7 +3,8 @@
 use crate::vcp_sensors::data_model::ChannelNum;
 use defmt_or_log as log;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
 pub struct VcpLimits {
     pub min_voltage: f32,
     pub max_voltage: f32,
@@ -17,11 +18,18 @@ const DEFAULT_MAX_VOLTAGE: f32 = 5.0; // Volts
 const DEFAULT_MIN_CURRENT: f32 = 0.0; // Amps
 const DEFAULT_MAX_CURRENT: f32 = 2.0; // Amps
 
-#[derive(Debug)]
+#[derive(Copy, Clone)]
+#[defmt_or_log::derive_format_or_debug]
+pub struct VcpPowerLimits {
+    pub upper_voltage: f32,
+    pub lower_voltage: f32,
+}
+#[defmt_or_log::derive_format_or_debug]
 pub struct VcpConfig {
     pub limits: [VcpLimits; 3],
     shunt_resistance: &'static [f32; 3],
     pub enabled_channels: [bool; 3],
+    pub global_pv_limit: Option<VcpPowerLimits>,
 }
 
 impl VcpLimits {
@@ -65,7 +73,12 @@ impl VcpLimits {
 }
 
 impl VcpConfig {
-    pub const fn new(limits: [VcpLimits; 3], enabled_channels: [bool; 3], shunt_resistance: &'static [f32; 3]) -> Self {
+    pub const fn new(
+        limits: [VcpLimits; 3],
+        enabled_channels: [bool; 3],
+        shunt_resistance: &'static [f32; 3],
+        global_pv_limit: Option<VcpPowerLimits>,
+    ) -> Self {
         if shunt_resistance[0] <= 0.0 {
             panic!("Shunt 0 resistance values must be positive and non-zero");
         }
@@ -80,6 +93,7 @@ impl VcpConfig {
             limits,
             shunt_resistance,
             enabled_channels,
+            global_pv_limit,
         }
     }
 
@@ -109,7 +123,12 @@ impl VcpConfig {
 
     /// Const version of default
     pub const fn const_default() -> Self {
-        Self::new([VcpLimits::const_default(); 3], [true; 3], &DEFAULT_SHUNT_RESISTANCE)
+        Self::new(
+            [VcpLimits::const_default(); 3],
+            [true; 3],
+            &DEFAULT_SHUNT_RESISTANCE,
+            None,
+        )
     }
 
     pub fn shunt_resistance(&self, channel: ChannelNum) -> f32 {
