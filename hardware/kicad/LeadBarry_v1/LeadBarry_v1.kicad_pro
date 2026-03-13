@@ -408,8 +408,20 @@
       "Root"
     ],
     [
-      "18a75ca0-8877-4b16-92d9-f7fd628b49f4",
+      "1a5c9110-8742-4ce5-925b-2759184d3a24",
+      "CurrentAndVoltageControl"
+    ],
+    [
+      "48150e73-2c53-4e4d-bee6-829776194574",
       "BatterySwitch"
+    ],
+    [
+      "eb8485a7-1f6f-4550-85c1-bca6d21a536f",
+      "LoadSwitch"
+    ],
+    [
+      "eebf9a5b-85c1-451b-802d-a0649c09e85e",
+      "ControlledDcDc"
     ]
   ],
   "text_variables": {}
