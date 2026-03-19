@@ -8,7 +8,9 @@ edition.workspace = true
 # Internal dependencies
 #-----------------------------------------------------------------------------#
 # RTC
-ds323x = { path = "../../../libs/ds323x-rs", features = ["async"] }
+ds323x = { git = "https://github.com/kdimonych/ds323x-rs", branch = "master", features = [
+  "async",
+] }
 
 # DHCP server
 leasehund = { path = "../../../libs/leasehund" }

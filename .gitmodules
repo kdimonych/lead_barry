@@ -1,6 +1,3 @@
-[submodule "firmware/libs/ds323x-rs"]
-	path = firmware/libs/ds323x-rs
-	url = git@github.com:kdimonych/ds323x-rs.git
 [submodule "firmware/libs/leasehund"]
 	path = firmware/libs/leasehund
 	url = git@github.com:kdimonych/leasehund.git

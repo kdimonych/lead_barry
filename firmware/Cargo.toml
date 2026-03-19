@@ -4,7 +4,6 @@ members = [
   "libs/nanofish",
   "libs/leasehund",
   "libs/common",
-  "libs/ds323x-rs",
   "libs/lora-rs/lora-modulation",
   "libs/lora-rs/lora-phy",
   "libs/lora-rs/lorawan-device",
