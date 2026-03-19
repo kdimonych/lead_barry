@@ -2,7 +2,7 @@
 
 ## Install debug tool for MacOS
 
-You need to install probe rs debugger
+You need to install probe-rs debugger
 
 ```sh
 brew install probe-rs/probe-rs/probe-rs

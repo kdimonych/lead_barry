@@ -76,7 +76,7 @@ impl Screen for ScreenType {
 **Pros:**
 
 - Runtime screen switching
-- Stillll zero-cost (enum dispatch is fast)
+- Still zero-cost (enum dispatch is fast)
 - Type-safe
 - Works with embedded-graphics
 

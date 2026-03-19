@@ -18,7 +18,7 @@ act --list
 
 ## Running Specific Jobs
 
-_Start Is the docker daemon:_
+_Start the docker daemon:_
 ```sh
 open -a Docker
 act -j formatting
@@ -34,7 +34,7 @@ Or run for all jobs:
 act --verbose
 ```
 
-Dry run to see what would happen
+Dry run to see what would happen:
 ```sh
 act --dryrun
 ```
