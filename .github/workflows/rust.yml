@@ -24,6 +24,9 @@ jobs:
         with:
           target: thumbv6m-none-eabi
 
+      - name: Install flip-link
+        run: cargo install flip-link
+
       - name: Build
         working-directory: firmware
         run: cargo lead_barry_build --verbose
