@@ -12,8 +12,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
       - uses: actions/checkout@v4
       - name: Build
-        run: >-
-          git submodule update --init --recursive; cd firmware; cargo
-          lead_barry_build --verbose
+        run: cd firmware;  cargo lead_barry_build --verbose
