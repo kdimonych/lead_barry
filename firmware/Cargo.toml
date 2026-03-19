@@ -2,7 +2,6 @@
 resolver = "3"
 members = [
   "libs/nanofish",
-  "libs/leasehund",
   "libs/common",
   "libs/lora-rs/lora-modulation",
   "libs/lora-rs/lora-phy",

@@ -13,7 +13,8 @@ ds323x = { git = "https://github.com/kdimonych/ds323x-rs", branch = "master", fe
 ] }
 
 # DHCP server
-leasehund = { path = "../../../libs/leasehund" }
+# leasehund = { path = "../../../libs/leasehund" }
+leasehund = { git = "https://github.com/kdimonych/leasehund.git", branch = "DmytroKrasnianskyi/single-lease-mode" }
 
 # HTTP server/client
 nanofish = { path = "../../../libs/nanofish", features = ["ws"] }
