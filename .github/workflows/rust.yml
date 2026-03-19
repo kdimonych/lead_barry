@@ -1,13 +1,14 @@
 name: Rust
-'on':
+
+on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
+
 env:
   CARGO_TERM_COLOR: always
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,6 +18,12 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: thumbv6m-none-eabi
+
       - name: Build
-        run: cd firmware;  cargo lead_barry_build --verbose
+        working-directory: firmware
+        run: cargo lead_barry_build --verbose
