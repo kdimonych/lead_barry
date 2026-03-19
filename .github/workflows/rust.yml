@@ -1,20 +1,19 @@
 name: Rust
-
-on:
+'on':
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
-
+    branches:
+      - main
 env:
   CARGO_TERM_COLOR: always
-
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: "cd firmware; cargo lead_barry_build --verbose"
+      - uses: actions/checkout@v4
+      - name: Build
+        run: >-
+          git submodule update --init --recursive; cd firmware; cargo
+          lead_barry_build --verbose
