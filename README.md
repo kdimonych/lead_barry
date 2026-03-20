@@ -7,7 +7,7 @@ Lead Barry is the Battery Management System (BMS) for 12V lead acid batteries. T
 The the firmware of the project is written in Rust for Raspberry Pi Pico target.
 
 <div style="text-align: center;">
-<img src="./docs/idea.drawio.svg" alt="General idea diagram" style="display: block; margin: 0 auto; width: 50%;"/>
+<img src="./docs/general_idea.drawio.svg" alt="General idea diagram" style="display: block; margin: 0 auto; width: 50%;"/>
 </div>
 
 # Features

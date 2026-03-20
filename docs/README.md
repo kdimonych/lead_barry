@@ -4,7 +4,7 @@ __The lead-acid battery management controller written in Rust for Raspberry Pi P
 
 # General idea of the system:
 
-![General idea](idea.drawio.svg "General idea diagram")
+![General idea](general_idea.drawio.svg "General idea diagram")
 
 # Harddware
 
