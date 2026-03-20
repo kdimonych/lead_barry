@@ -16,4 +16,4 @@ The device has 2 digitally controlled 9/12V DC/DC converters. The shcema and cal
 
 # Regulated 5-15V DC/DC
 
-The device has 2 digitally controlled regulated 5-15V DC/DC converters. The shcema and calculation is described [here](./variadic_voltage_dc_dc/variadic_voltage_dc_dc.ipynb "Regulated 5-15V DC/DC").
+The device has 2 digitally controlled regulated 5-15V DC/DC converters. The shcema and calculation is described [here](./regulated_voltage_dc_dc/regulated_voltage_dc_dc.ipynb "Regulated 5-15V DC/DC").
