@@ -344,6 +344,142 @@
 				)
 			)
 		)
+		(symbol "Device:C"
+			(pin_numbers hide)
+			(pin_names
+				(offset 0.254)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "C"
+				(at 0.635 2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "C"
+				(at 0.635 -2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Footprint" ""
+				(at 0.9652 -3.81 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Unpolarized capacitor"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "cap capacitor"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "C_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "C_0_1"
+				(polyline
+					(pts
+						(xy -2.032 -0.762) (xy 2.032 -0.762)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -2.032 0.762) (xy 2.032 0.762)
+					)
+					(stroke
+						(width 0.508)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "C_1_1"
+				(pin passive line
+					(at 0 3.81 270)
+					(length 2.794)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -3.81 90)
+					(length 2.794)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+		)
 		(symbol "Device:R"
 			(pin_numbers hide)
 			(pin_names
@@ -479,7 +615,7 @@
 					(justify left)
 				)
 			)
-			(property "Value" "2N7002"
+			(property "Value" "AO3420"
 				(at 5.08 0 0)
 				(effects
 					(font
@@ -905,6 +1041,12 @@
 		(uuid "b1404687-ebfb-4606-96a4-87b0ea547a4e")
 	)
 	(junction
+		(at 102.87 85.09)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "da7c5942-29f8-42ca-9e97-00a14cfa6f85")
+	)
+	(junction
 		(at 144.78 102.87)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -998,6 +1140,16 @@
 	)
 	(wire
 		(pts
+			(xy 102.87 85.09) (xy 147.32 85.09)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "8117f07f-d310-4dec-bdc9-71ac4b8dbe52")
+	)
+	(wire
+		(pts
 			(xy 133.35 100.33) (xy 147.32 100.33)
 		)
 		(stroke
@@ -1068,7 +1220,7 @@
 	)
 	(wire
 		(pts
-			(xy 137.16 85.09) (xy 147.32 85.09)
+			(xy 92.71 85.09) (xy 102.87 85.09)
 		)
 		(stroke
 			(width 0)
@@ -1098,7 +1250,7 @@
 	)
 	(global_label "VBAT_MAIN"
 		(shape input)
-		(at 137.16 85.09 180)
+		(at 92.71 85.09 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -1108,7 +1260,7 @@
 		)
 		(uuid "482e6d12-465f-4ed5-a3a2-7502e84b2d9c")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 124.3171 85.09 0)
+			(at 79.8671 85.09 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1182,7 +1334,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder"
 			(at 135.128 105.41 90)
 			(effects
 				(font
@@ -1210,13 +1362,17 @@
 			)
 		)
 		(pin "2"
-			(uuid "63b5c0e4-5c69-46bb-aa5a-216173bff527")
+			(uuid "062aef70-191e-4eee-8309-e56bddcaf382")
 		)
 		(pin "1"
-			(uuid "defcf7d9-8cca-48db-b268-43be0d7e7add")
+			(uuid "17d5bdc4-9dc8-4a09-8016-3aff954569f1")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "R50")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "R20")
 					(unit 1)
@@ -1252,7 +1408,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder"
 			(at 146.558 106.68 90)
 			(effects
 				(font
@@ -1280,13 +1436,17 @@
 			)
 		)
 		(pin "2"
-			(uuid "e8dbabfe-d14e-4c73-b7e9-6cadd5e7aa99")
+			(uuid "d2b5a62f-768a-4922-9439-397a3e9da733")
 		)
 		(pin "1"
-			(uuid "2daa6694-95ea-4131-933c-5ac0ab9c25c7")
+			(uuid "7b724812-1298-4ca2-85a4-64e112d518ba")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "R51")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "R23")
 					(unit 1)
@@ -1322,7 +1482,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder"
 			(at 135.128 96.52 90)
 			(effects
 				(font
@@ -1350,13 +1510,17 @@
 			)
 		)
 		(pin "2"
-			(uuid "6f89d8f8-99d5-434e-9736-de6c07938556")
+			(uuid "a682ccf3-d1a7-4e41-98fe-b7fba40f459a")
 		)
 		(pin "1"
-			(uuid "692cb8e5-e4e9-473c-899a-faa803630125")
+			(uuid "72ed07f7-19fc-4266-b3de-585fd673267e")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "R49")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "R19")
 					(unit 1)
@@ -1419,10 +1583,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "826c1992-007f-4dce-a83d-c8341e2590ec")
+			(uuid "972329d0-3420-4090-9efe-81500df83cc1")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "#PWR051")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "#PWR022")
 					(unit 1)
@@ -1440,7 +1608,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6c56210e-57b9-436a-bb16-53a8bce7d2f4")
-		(property "Reference" "U4"
+		(property "Reference" "U?"
 			(at 160.02 74.93 0)
 			(effects
 				(font
@@ -1483,33 +1651,37 @@
 			)
 		)
 		(pin "5"
-			(uuid "a703c136-cdab-4713-8395-a742169ffdbe")
+			(uuid "bc730db6-3124-490a-90b5-15a7bf36fa14")
 		)
 		(pin "3"
-			(uuid "f391fdb0-d2db-48b5-867e-d502d6beda88")
+			(uuid "07ac5d66-9115-423b-93ef-0ef803818f77")
 		)
 		(pin "4"
-			(uuid "ab37ab26-54de-4ef9-8c5b-46a6a8063fb8")
+			(uuid "3a8d4ea1-7c0a-4c39-af32-97ea074ec2e2")
 		)
 		(pin "2"
-			(uuid "f0b28693-bed2-4850-8a25-660d8b3963f6")
+			(uuid "8ebe46cd-9513-49f1-9d09-1ed664436af8")
 		)
 		(pin "7"
-			(uuid "43e14b35-86c1-4d73-9ad8-0a02032795c8")
+			(uuid "5c004906-7eb1-4275-835f-253ff160b837")
 		)
 		(pin "8"
-			(uuid "dbb07a33-3b3f-4ca3-ae3e-8700992f4e40")
+			(uuid "06a6acbd-7c7a-4fbe-af27-527f1054318d")
 		)
 		(pin "6"
-			(uuid "27b54b72-07a9-4d97-9a63-f9da77eb0179")
+			(uuid "f803820c-0a06-488b-b302-b788ae0e7771")
 		)
 		(pin "1"
-			(uuid "bd1c8138-c11a-4d37-937e-9f7ca91c892b")
+			(uuid "fb159f78-e973-4973-91c1-e423c3860bf0")
 		)
 		(instances
-			(project ""
-				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
 					(reference "U4")
+					(unit 1)
+				)
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
+					(reference "U?")
 					(unit 1)
 				)
 			)
@@ -1543,7 +1715,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder"
 			(at 123.698 121.92 90)
 			(effects
 				(font
@@ -1571,13 +1743,17 @@
 			)
 		)
 		(pin "2"
-			(uuid "3fb15261-3943-450c-99ba-1956393961fd")
+			(uuid "8f3e7d23-9358-4f8f-ad7c-fd194edb7731")
 		)
 		(pin "1"
-			(uuid "146f1124-eea2-4e5a-ac6a-f808322e3a89")
+			(uuid "7bed6994-e62f-4476-a8c4-06534fbaab88")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "R48")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "R22")
 					(unit 1)
@@ -1640,10 +1816,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "7e4e4bb0-a126-495a-a8fa-a522e46fdbec")
+			(uuid "eb86060c-adb9-4a0e-a61b-ce217356a57b")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "#PWR053")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "#PWR020")
 					(unit 1)
@@ -1660,7 +1840,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a17bf61d-0584-4692-b53a-f329c9bfc28e")
-		(property "Reference" "#PWR019"
+		(property "Reference" "#PWR?"
 			(at 128.27 93.98 0)
 			(effects
 				(font
@@ -1705,12 +1885,86 @@
 			)
 		)
 		(pin "1"
-			(uuid "6c255d37-8cab-4190-9eed-b2f951393577")
+			(uuid "b0aeb7d9-e5b9-45a9-95fc-c538db8c37c3")
 		)
 		(instances
-			(project ""
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "#PWR052")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
-					(reference "#PWR019")
+					(reference "#PWR?")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C")
+		(at 102.87 88.9 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "cb69533d-041f-437d-8bee-99192b34baec")
+		(property "Reference" "C25"
+			(at 106.68 87.6299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "330n"
+			(at 106.68 90.1699 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric_Pad1.33x1.80mm_HandSolder"
+			(at 103.8352 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 102.87 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 102.87 88.9 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "c76808e3-5788-4df4-878f-449a9aeafe18")
+		)
+		(pin "1"
+			(uuid "c7853c8c-1d2b-44bf-a9f4-b15044bb2507")
+		)
+		(instances
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "C25")
 					(unit 1)
 				)
 			)
@@ -1744,7 +1998,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+		(property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder"
 			(at 116.84 116.332 90)
 			(effects
 				(font
@@ -1772,13 +2026,17 @@
 			)
 		)
 		(pin "2"
-			(uuid "48bfb836-bf88-4fb6-8e7b-9227d661de49")
+			(uuid "c79f206b-4234-4311-9d35-ba7bec6d0a60")
 		)
 		(pin "1"
-			(uuid "05fe176e-b0c0-4415-abfc-6de0bab2f8da")
+			(uuid "dfe68623-6dc5-4029-83ca-9b5794cdd821")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "R47")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "R21")
 					(unit 1)
@@ -1841,12 +2099,86 @@
 			)
 		)
 		(pin "1"
-			(uuid "70ab3424-4657-408b-8f42-21de59559efc")
+			(uuid "298edf1f-dd5f-431b-8bab-6e29763cdb9e")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "#PWR054")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "#PWR023")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 102.87 92.71 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e2068daa-3836-4caf-9e3c-8181d4630abb")
+		(property "Reference" "#PWR046"
+			(at 102.87 99.06 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 102.87 97.79 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 102.87 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 102.87 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 102.87 92.71 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "21466cf1-8d76-4580-9553-60f5362657a1")
+		)
+		(instances
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "#PWR050")
+					(unit 1)
+				)
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
+					(reference "#PWR046")
 					(unit 1)
 				)
 			)
@@ -1907,10 +2239,14 @@
 			)
 		)
 		(pin "1"
-			(uuid "106cc597-d918-4317-ba67-2a2e172656dd")
+			(uuid "2a910587-8057-48ef-af74-d41e43200209")
 		)
 		(instances
 			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "#PWR055")
+					(unit 1)
+				)
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
 					(reference "#PWR021")
 					(unit 1)
@@ -1927,7 +2263,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "fe4b0543-631d-4597-b094-803762ae9564")
-		(property "Reference" "Q5"
+		(property "Reference" "Q13"
 			(at 137.16 115.5699 0)
 			(effects
 				(font
@@ -1936,7 +2272,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "2N7002"
+		(property "Value" "AO3420"
 			(at 137.16 118.1099 0)
 			(effects
 				(font
@@ -2013,18 +2349,18 @@
 			)
 		)
 		(pin "2"
-			(uuid "bc7e0101-0475-4516-a750-167903589ed1")
+			(uuid "b6b55cdd-a954-490a-8c1d-bb9e684d9f87")
 		)
 		(pin "3"
-			(uuid "4cb6d411-7a59-4991-8e44-536dea83a8d0")
+			(uuid "8047b801-cb6e-4ac7-9e12-b2abd10554f2")
 		)
 		(pin "1"
-			(uuid "7c2c862f-a12f-44b6-a236-de3da9fc75e7")
+			(uuid "75f3cd7b-47a2-4160-ba96-9b5dffeb2ffd")
 		)
 		(instances
-			(project ""
-				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
-					(reference "Q5")
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
+					(reference "Q13")
 					(unit 1)
 				)
 			)

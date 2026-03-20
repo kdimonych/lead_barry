@@ -910,6 +910,18 @@
 		(color 0 0 0 0)
 		(uuid "4bcd3488-c22e-40f2-9388-a158a01d8c26")
 	)
+	(junction
+		(at 119.38 73.66)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "4edbc160-34a4-43d6-8530-d3983f6697cf")
+	)
+	(junction
+		(at 127 81.28)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "d8344628-1bb4-48b1-9747-5db492479a6b")
+	)
 	(wire
 		(pts
 			(xy 78.74 63.5) (xy 81.28 63.5)
@@ -922,7 +934,7 @@
 	)
 	(wire
 		(pts
-			(xy 119.38 73.66) (xy 119.38 71.12)
+			(xy 119.38 62.23) (xy 119.38 73.66)
 		)
 		(stroke
 			(width 0)
@@ -982,13 +994,23 @@
 	)
 	(wire
 		(pts
-			(xy 127 82.55) (xy 127 78.74)
+			(xy 127 83.82) (xy 127 81.28)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "427b7b08-d1bc-41dc-9f17-db62d48a517d")
+	)
+	(wire
+		(pts
+			(xy 119.38 81.28) (xy 127 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "5e863c5a-644f-4286-afa0-d5bf8cc22096")
 	)
 	(wire
 		(pts
@@ -1022,13 +1044,13 @@
 	)
 	(wire
 		(pts
-			(xy 119.38 62.23) (xy 119.38 63.5)
+			(xy 127 81.28) (xy 127 78.74)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "c77c03c6-bcb4-43e4-87bd-786051cb7458")
+		(uuid "8a22238b-9e17-46e1-8a0f-bc32963b53c0")
 	)
 	(wire
 		(pts
@@ -1128,7 +1150,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 127 82.55 0)
+		(at 127 83.82 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1137,7 +1159,7 @@
 		(fields_autoplaced yes)
 		(uuid "0a74379a-5a88-4aaa-8fd9-20cd81e86552")
 		(property "Reference" "#PWR013"
-			(at 127 88.9 0)
+			(at 127 90.17 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1146,7 +1168,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 127 87.63 0)
+			(at 127 88.9 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1154,7 +1176,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 127 82.55 0)
+			(at 127 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1163,7 +1185,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 127 82.55 0)
+			(at 127 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1172,7 +1194,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 127 82.55 0)
+			(at 127 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1347,6 +1369,76 @@
 			(project "LeadBarry_v1"
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eb8485a7-1f6f-4550-85c1-bca6d21a536f"
 					(reference "Q6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 119.38 77.47 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "4e4fd1c2-9bc8-4e14-9858-cf064522bcc1")
+		(property "Reference" "R14"
+			(at 121.92 76.1999 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "5K"
+			(at 121.92 78.7399 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+			(at 117.602 77.47 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 119.38 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 119.38 77.47 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "34a612d8-4bfd-4821-8856-170d76028fcb")
+		)
+		(pin "1"
+			(uuid "faecbfbc-50ea-4fc4-bf89-08badc91ea65")
+		)
+		(instances
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eb8485a7-1f6f-4550-85c1-bca6d21a536f"
+					(reference "R14")
 					(unit 1)
 				)
 			)
@@ -1688,76 +1780,6 @@
 			(project "LeadBarry_v1"
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eb8485a7-1f6f-4550-85c1-bca6d21a536f"
 					(reference "R12")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:R")
-		(at 119.38 67.31 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "c92fb9df-8a11-48ee-8cbb-c895889693a5")
-		(property "Reference" "R14"
-			(at 121.92 66.0399 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "5K"
-			(at 121.92 68.5799 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
-			(at 117.602 67.31 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 119.38 67.31 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Resistor"
-			(at 119.38 67.31 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "9540e487-4033-43e1-a7c8-73b107817739")
-		)
-		(pin "1"
-			(uuid "ccc60389-e467-409b-b3dd-1098a5fe3f6b")
-		)
-		(instances
-			(project "LeadBarry_v1"
-				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eb8485a7-1f6f-4550-85c1-bca6d21a536f"
-					(reference "R14")
 					(unit 1)
 				)
 			)

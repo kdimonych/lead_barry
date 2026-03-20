@@ -408,6 +408,10 @@
       "Root"
     ],
     [
+      "da4b2e66-86d2-4d34-a750-e166135a5974",
+      "Regulated Voltage DC DC"
+    ],
+    [
       "1a5c9110-8742-4ce5-925b-2759184d3a24",
       "CurrentAndVoltageControl"
     ],
@@ -422,6 +426,10 @@
     [
       "eebf9a5b-85c1-451b-802d-a0649c09e85e",
       "ControlledDcDc"
+    ],
+    [
+      "a4bf1372-bbd6-4b42-a288-585c477f5e8d",
+      "ControlledDcDc1"
     ]
   ],
   "text_variables": {}
