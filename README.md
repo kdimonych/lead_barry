@@ -6,7 +6,9 @@ Lead Barry is the Battery Management System (BMS) for 12V lead acid batteries. T
 
 The the firmware of the project is written in Rust for Raspberry Pi Pico target.
 
-![General idea](./docs/idea.drawio.svg "General idea diagram")
+<div style="text-align: center;">
+<img src="./docs/idea.drawio.svg" alt="General idea diagram" style="display: block; margin: 0 auto; width: 50%;"/>
+</div>
 
 # Features
 
@@ -21,7 +23,7 @@ The the firmware of the project is written in Rust for Raspberry Pi Pico target.
 - **100Base Passive PoE**: Has a dedicated PoE injector socket to provide the power to Ethernet devices such as routers, etc. This socket has its own dedicated low-current DC/DC converter with adjustable output voltage in the range 5 - 15V to support various PoE-compatible devices
 - **OLED Display and control buttons**: Has 128x64 monochrome OLED display and three buttons to provide manual control and basic configuration of the BMS
 
-[More details](./docs/README.md "Details")
+[More details](docs/README.md "Details")
 
 # Build and run
 

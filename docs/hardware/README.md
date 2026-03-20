@@ -2,7 +2,9 @@
 
 # Device hardware blockschema:
 
-![General idea](./device_block_schema.drawio.svg "General idea diagram")
+<div style="text-align: center;">
+<img src="./device_block_schema.drawio.svg" alt="Device hardware blockschema" style="display: block; margin: 0 auto; width: 50%;"/>
+</div>
 
 # Battery switch
 
