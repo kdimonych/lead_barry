@@ -10,10 +10,10 @@
 
 As most BMS this one has switch that brakes negative pole of the battery. The shcema and calculation is described [here](./bat_switch/bat_switch.ipynb "Battery switch").
 
-# Controlled 9/12V DC/DC
+# Controlled 9/12V DC/DC converter
 
 The device has 2 digitally controlled 9/12V DC/DC converters. The shcema and calculation is described [here](./9_12v_controlled_dc_dc/9_12v_controlled_dc_dc.ipynb "9/12V DC/DC deteils").
 
-# Regulated 5-15V DC/DC
+# Regulated 5-15V DC/DC converter
 
 The device has 2 digitally controlled regulated 5-15V DC/DC converters. The shcema and calculation is described [here](./regulated_voltage_dc_dc/regulated_voltage_dc_dc.ipynb "Regulated 5-15V DC/DC").

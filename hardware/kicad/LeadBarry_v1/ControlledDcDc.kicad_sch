@@ -4,6 +4,10 @@
 	(generator_version "8.0")
 	(uuid "7256ea6f-16bf-472f-873c-70813e991a1d")
 	(paper "A4")
+	(title_block
+		(title "Controlled 9/12V DC/DC Converter Block")
+		(date "2026-03-21")
+	)
 	(lib_symbols
 		(symbol "Converter_DCDC:XL6019E1_Module"
 			(exclude_from_sim no)
@@ -1316,7 +1320,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "08cdfe00-4bc2-4244-9c6b-89ff0a115c9d")
-		(property "Reference" "R20"
+		(property "Reference" "R50"
 			(at 130.81 104.1399 0)
 			(effects
 				(font
@@ -1390,7 +1394,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "0e0e5c4c-67c1-4b43-a347-5ea63cb83a38")
-		(property "Reference" "R23"
+		(property "Reference" "R51"
 			(at 142.24 105.4099 0)
 			(effects
 				(font
@@ -1464,7 +1468,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "1b7da7ca-3071-405f-aec3-6109a79a1754")
-		(property "Reference" "R19"
+		(property "Reference" "R49"
 			(at 130.81 95.2499 0)
 			(effects
 				(font
@@ -1538,7 +1542,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5999b818-f947-46e5-96b2-612f3adabb4e")
-		(property "Reference" "#PWR022"
+		(property "Reference" "#PWR051"
 			(at 121.92 132.08 0)
 			(effects
 				(font
@@ -1608,7 +1612,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6c56210e-57b9-436a-bb16-53a8bce7d2f4")
-		(property "Reference" "U?"
+		(property "Reference" "U4"
 			(at 160.02 74.93 0)
 			(effects
 				(font
@@ -1697,7 +1701,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "7b62ebac-bf4e-4788-8480-30e7ab3f685c")
-		(property "Reference" "R22"
+		(property "Reference" "R48"
 			(at 127.254 123.19 0)
 			(effects
 				(font
@@ -1771,7 +1775,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "83547fbb-5152-4af8-9b0a-05f426b7bc18")
-		(property "Reference" "#PWR020"
+		(property "Reference" "#PWR053"
 			(at 133.35 132.08 0)
 			(effects
 				(font
@@ -1840,7 +1844,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "a17bf61d-0584-4692-b53a-f329c9bfc28e")
-		(property "Reference" "#PWR?"
+		(property "Reference" "#PWR052"
 			(at 128.27 93.98 0)
 			(effects
 				(font
@@ -1967,6 +1971,10 @@
 					(reference "C25")
 					(unit 1)
 				)
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
+					(reference "C?")
+					(unit 1)
+				)
 			)
 		)
 	)
@@ -1980,7 +1988,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "d103946b-fa1d-45b1-948e-cf568e9dad4b")
-		(property "Reference" "R21"
+		(property "Reference" "R47"
 			(at 119.38 112.776 90)
 			(effects
 				(font
@@ -2054,7 +2062,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "d5140e27-9211-46e6-8896-8c067f97c14e")
-		(property "Reference" "#PWR023"
+		(property "Reference" "#PWR054"
 			(at 144.78 116.84 0)
 			(effects
 				(font
@@ -2124,7 +2132,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e2068daa-3836-4caf-9e3c-8181d4630abb")
-		(property "Reference" "#PWR046"
+		(property "Reference" "#PWR050"
 			(at 102.87 99.06 0)
 			(effects
 				(font
@@ -2194,7 +2202,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "f37afa4c-6950-41ed-a749-94b2f29b9b9c")
-		(property "Reference" "#PWR021"
+		(property "Reference" "#PWR055"
 			(at 175.26 96.52 0)
 			(effects
 				(font
@@ -2361,6 +2369,10 @@
 			(project "LeadBarry_v1"
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/a4bf1372-bbd6-4b42-a288-585c477f5e8d"
 					(reference "Q13")
+					(unit 1)
+				)
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eebf9a5b-85c1-451b-802d-a0649c09e85e"
+					(reference "Q?")
 					(unit 1)
 				)
 			)
