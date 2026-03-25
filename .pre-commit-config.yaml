@@ -1,5 +1,5 @@
 ---
-exclude: '^$'
+exclude: "^$"
 fail_fast: false
 repos:
   - repo: local
@@ -19,14 +19,14 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
-        exclude: '^.*\.svg$'
+        exclude: '^.*\.svg$|^.*\.kicad_pcb$|^.*\.kicad_sch$|^.*\.kicad_mod$|^.*\.kicad_prl$'
         name: check for common misspelled words
 
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.22
     hooks:
       - id: mdformat
-        exclude: '.github/.*'
+        exclude: ".github/.*"
         additional_dependencies:
           - mdformat-tables
           - mdformat-gfm

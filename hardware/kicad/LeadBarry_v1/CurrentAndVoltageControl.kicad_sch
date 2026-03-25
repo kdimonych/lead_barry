@@ -2571,7 +2571,7 @@
 					)
 				)
 			)
-			(property "Footprint" ""
+			(property "Footprint" "Module:INA3221_Mpdule"
 				(at 1.27 -33.02 0)
 				(effects
 					(font
@@ -2610,10 +2610,10 @@
 						(type background)
 					)
 				)
-				(pin power_in line
-					(at -10.16 -3.81 0)
+				(pin output line
+					(at -10.16 -21.59 0)
 					(length 2.54)
-					(name "VS"
+					(name "TC"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2665,9 +2665,9 @@
 					)
 				)
 				(pin input line
-					(at 10.16 -26.67 180)
+					(at 10.16 -13.97 180)
 					(length 2.54)
-					(name "VIN3+"
+					(name "VIN1+"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2683,9 +2683,9 @@
 					)
 				)
 				(pin input line
-					(at 10.16 -29.21 180)
+					(at 10.16 -16.51 180)
 					(length 2.54)
-					(name "VIN3-"
+					(name "VIN1-"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2737,9 +2737,9 @@
 					)
 				)
 				(pin input line
-					(at 10.16 -13.97 180)
+					(at 10.16 -26.67 180)
 					(length 2.54)
-					(name "VIN1+"
+					(name "VIN3+"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2755,9 +2755,9 @@
 					)
 				)
 				(pin input line
-					(at 10.16 -16.51 180)
+					(at 10.16 -29.21 180)
 					(length 2.54)
-					(name "VIN1-"
+					(name "VIN3-"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2765,96 +2765,6 @@
 						)
 					)
 					(number "17"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin power_in line
-					(at -10.16 -6.35 0)
-					(length 2.54)
-					(name "GND"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin input line
-					(at -10.16 -8.89 0)
-					(length 2.54)
-					(name "SCL"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "3"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin bidirectional line
-					(at -10.16 -11.43 0)
-					(length 2.54)
-					(name "SDA"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "4"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin output line
-					(at -10.16 -13.97 0)
-					(length 2.54)
-					(name "PV"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "5"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin output line
-					(at -10.16 -16.51 0)
-					(length 2.54)
-					(name "CRI"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "6"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2872,7 +2782,7 @@
 							)
 						)
 					)
-					(number "7"
+					(number "2"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2881,9 +2791,99 @@
 					)
 				)
 				(pin output line
-					(at -10.16 -21.59 0)
+					(at -10.16 -16.51 0)
 					(length 2.54)
-					(name "TC"
+					(name "CRI"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin output line
+					(at -10.16 -13.97 0)
+					(length 2.54)
+					(name "PV"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin bidirectional line
+					(at -10.16 -11.43 0)
+					(length 2.54)
+					(name "SDA"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin input line
+					(at -10.16 -8.89 0)
+					(length 2.54)
+					(name "SCL"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "6"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -10.16 -6.35 0)
+					(length 2.54)
+					(name "GND"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "7"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_in line
+					(at -10.16 -3.81 0)
+					(length 2.54)
+					(name "VS"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -5151,16 +5151,6 @@
 	)
 	(wire
 		(pts
-			(xy 232.41 58.42) (xy 234.95 58.42)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "aa03d9d3-05cc-419b-8fc0-0e8336f7d54a")
-	)
-	(wire
-		(pts
 			(xy 43.18 132.08) (xy 43.18 128.27)
 		)
 		(stroke
@@ -5768,6 +5758,16 @@
 			(type default)
 		)
 		(uuid "efa30650-ccf2-4af5-8863-8b57f65f0eb3")
+	)
+	(wire
+		(pts
+			(xy 232.41 58.42) (xy 234.95 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f093412d-7246-47d9-94e8-6c93f5c28f1f")
 	)
 	(wire
 		(pts
@@ -10824,7 +10824,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Module:LM2596S_Module"
+		(property "Footprint" "Module:LM2596S_ModuleSide"
 			(at 219.71 74.93 0)
 			(effects
 				(font
@@ -11846,7 +11846,7 @@
 				)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "Module:INA3221_Mpdule"
 			(at 66.04 154.94 0)
 			(effects
 				(font
