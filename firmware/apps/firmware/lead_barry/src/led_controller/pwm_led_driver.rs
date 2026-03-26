@@ -1,6 +1,6 @@
 use defmt_or_log as log;
 use embassy_rp::Peri;
-use embassy_rp::peripherals::{PIN_18, PIN_19, PIN_22, PWM_SLICE1, PWM_SLICE3};
+use embassy_rp::peripherals::{PIN_20, PIN_21, PIN_22, PWM_SLICE2, PWM_SLICE3};
 use embassy_rp::pwm::{Config, Pwm, PwmError, PwmOutput, SetDutyCycle};
 
 const PWM_FREQUENCY_HZ: u32 = 5_000;
@@ -33,11 +33,11 @@ impl TryFrom<usize> for PwmLed {
 const LED_COUNT: usize = PwmLed::Blue as usize + 1;
 
 pub struct PwmHardwareConfig {
-    pub slice1: Peri<'static, PWM_SLICE1>,
+    pub slice2: Peri<'static, PWM_SLICE2>,
     pub slice3: Peri<'static, PWM_SLICE3>,
 
-    pub led_red: Peri<'static, PIN_18>,
-    pub led_yellow: Peri<'static, PIN_19>,
+    pub led_red: Peri<'static, PIN_20>,
+    pub led_yellow: Peri<'static, PIN_21>,
     pub led_blue: Peri<'static, PIN_22>,
 }
 
@@ -65,7 +65,7 @@ impl PwmLedDriver {
         pwm_config.top = period;
         pwm_config.divider = divider.into();
 
-        let pwm1 = Pwm::new_output_ab(config.slice1, config.led_red, config.led_yellow, pwm_config.clone());
+        let pwm1 = Pwm::new_output_ab(config.slice2, config.led_red, config.led_yellow, pwm_config.clone());
         let pwm2 = Pwm::new_output_a(config.slice3, config.led_blue, pwm_config.clone());
 
         let (pwm_red_opt, pwm_yellow_opt) = pwm1.split();

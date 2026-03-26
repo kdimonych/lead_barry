@@ -113,10 +113,10 @@ fn main() -> ! {
     log::info!("Initializing LED controller...");
     // Bind led pins
     let config = PwmHardwareConfig {
-        slice1: p.PWM_SLICE1,
+        slice2: p.PWM_SLICE2,
         slice3: p.PWM_SLICE3,
-        led_red: p.PIN_18,
-        led_yellow: p.PIN_19,
+        led_red: p.PIN_20,
+        led_yellow: p.PIN_21,
         led_blue: p.PIN_22,
     };
     // Initialize the LED controller builder and build the controller and runner
