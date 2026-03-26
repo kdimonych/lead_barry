@@ -46,7 +46,6 @@ pub enum LedAnimation {
     On,
     /// Turn on the LED at full brightness and then decay gradually to off with the given period
     Decay(PeriodMs),
-    // /// Breathe the LED in and out for the given period and repetitions
     // Heartbeat(PeriodMs, Repetitions),
     /// Animate the LED with a sine wave pattern for the given period and repetitions
     Sine(PeriodMs, Repetitions),
