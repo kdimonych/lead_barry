@@ -924,7 +924,13 @@
 		(at 165.1 114.3)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "d8344628-1bb4-48b1-9747-5db492479a6b")
+		(uuid "5d620030-b808-4176-98aa-c40af9a34013")
+	)
+	(junction
+		(at 128.27 96.52)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "be3694ce-c2f5-48f0-a3a9-7432da47aa85")
 	)
 	(wire
 		(pts
@@ -948,6 +954,16 @@
 	)
 	(wire
 		(pts
+			(xy 128.27 96.52) (xy 128.27 99.06)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "05fcae29-1f74-4d41-a709-dbbf1acd8f77")
+	)
+	(wire
+		(pts
 			(xy 147.32 82.55) (xy 147.32 90.17)
 		)
 		(stroke
@@ -955,6 +971,26 @@
 			(type default)
 		)
 		(uuid "068b0167-5a40-4818-b72e-af6c7ba2a4c4")
+	)
+	(wire
+		(pts
+			(xy 128.27 96.52) (xy 129.54 96.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "177b65f5-08e6-4495-9113-03a58872e9e0")
+	)
+	(wire
+		(pts
+			(xy 137.16 101.6) (xy 137.16 102.87)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "24c9c52a-653e-4f30-a9a5-189e2e2ef650")
 	)
 	(wire
 		(pts
@@ -988,6 +1024,16 @@
 	)
 	(wire
 		(pts
+			(xy 128.27 106.68) (xy 128.27 107.95)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2fe70fd5-f059-4ea5-9e20-9c80f242d007")
+	)
+	(wire
+		(pts
 			(xy 138.43 90.17) (xy 137.16 90.17)
 		)
 		(stroke
@@ -995,26 +1041,6 @@
 			(type default)
 		)
 		(uuid "39a39114-8a44-41fa-a603-e45bb2282e7f")
-	)
-	(wire
-		(pts
-			(xy 165.1 116.84) (xy 165.1 114.3)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "427b7b08-d1bc-41dc-9f17-db62d48a517d")
-	)
-	(wire
-		(pts
-			(xy 157.48 114.3) (xy 165.1 114.3)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5e863c5a-644f-4286-afa0-d5bf8cc22096")
 	)
 	(wire
 		(pts
@@ -1048,13 +1074,23 @@
 	)
 	(wire
 		(pts
-			(xy 165.1 114.3) (xy 165.1 111.76)
+			(xy 157.48 114.3) (xy 165.1 114.3)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "8a22238b-9e17-46e1-8a0f-bc32963b53c0")
+		(uuid "7a5b272c-0074-43a9-8356-734e42b2be48")
+	)
+	(wire
+		(pts
+			(xy 165.1 111.76) (xy 165.1 114.3)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "997210fa-5134-44fa-bc0e-df88dd2229fc")
 	)
 	(wire
 		(pts
@@ -1065,6 +1101,16 @@
 			(type default)
 		)
 		(uuid "d228754b-7510-43fa-a87c-b6de4c1e62c4")
+	)
+	(wire
+		(pts
+			(xy 165.1 114.3) (xy 165.1 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d2e2d4b2-d5bf-49f1-8afc-c148fa15e04b")
 	)
 	(wire
 		(pts
@@ -1088,7 +1134,7 @@
 	)
 	(wire
 		(pts
-			(xy 127 96.52) (xy 129.54 96.52)
+			(xy 127 96.52) (xy 128.27 96.52)
 		)
 		(stroke
 			(width 0)
@@ -1295,6 +1341,73 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 128.27 102.87 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "1bb99794-c88f-4baa-b5b8-e71d70d63ebd")
+		(property "Reference" "R59"
+			(at 123.444 102.87 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "5K"
+			(at 125.73 102.87 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
+			(at 130.048 102.87 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 128.27 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 128.27 102.87 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "716b5e13-b743-4633-8151-2bb952d78f38")
+		)
+		(pin "1"
+			(uuid "6c0d31bd-cdfe-4b54-bf07-039deb523d67")
+		)
+		(instances
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eb8485a7-1f6f-4550-85c1-bca6d21a536f"
+					(reference "R59")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Transistor_FET:IRFZ44NSTRLPBF")
 		(at 162.56 106.68 0)
 		(unit 1)
@@ -1381,15 +1494,15 @@
 	(symbol
 		(lib_id "Device:R")
 		(at 157.48 110.49 0)
+		(mirror y)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "4e4fd1c2-9bc8-4e14-9858-cf064522bcc1")
 		(property "Reference" "R14"
-			(at 160.02 109.2199 0)
+			(at 154.94 109.2199 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1398,7 +1511,7 @@
 			)
 		)
 		(property "Value" "5K"
-			(at 160.02 111.7599 0)
+			(at 154.94 111.7599 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1407,7 +1520,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal"
-			(at 155.702 110.49 90)
+			(at 159.258 110.49 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1587,7 +1700,7 @@
 	)
 	(symbol
 		(lib_id "power:GND")
-		(at 137.16 101.6 0)
+		(at 137.16 102.87 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1596,7 +1709,7 @@
 		(fields_autoplaced yes)
 		(uuid "81816caf-f08b-4f5a-af3d-221912fa7a99")
 		(property "Reference" "#PWR014"
-			(at 137.16 107.95 0)
+			(at 137.16 109.22 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1605,7 +1718,7 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 137.16 106.68 0)
+			(at 137.16 107.95 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1613,7 +1726,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 137.16 101.6 0)
+			(at 137.16 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1622,7 +1735,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 137.16 101.6 0)
+			(at 137.16 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1631,7 +1744,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 137.16 101.6 0)
+			(at 137.16 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -1784,6 +1897,72 @@
 			(project "LeadBarry_v1"
 				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eb8485a7-1f6f-4550-85c1-bca6d21a536f"
 					(reference "R12")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 128.27 107.95 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c3f8b3e2-3057-4c7e-a4bd-f9a5b110e5f7")
+		(property "Reference" "#PWR093"
+			(at 128.27 114.3 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 128.27 113.03 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 128.27 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 128.27 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 128.27 107.95 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "bc346651-4584-468f-a2c1-9613f5933ddf")
+		)
+		(instances
+			(project "LeadBarry_v1"
+				(path "/20771d85-0a47-48d4-b39f-5d01020408af/1a5c9110-8742-4ce5-925b-2759184d3a24/eb8485a7-1f6f-4550-85c1-bca6d21a536f"
+					(reference "#PWR093")
 					(unit 1)
 				)
 			)
