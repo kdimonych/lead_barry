@@ -1,7 +1,7 @@
 use embassy_executor::Spawner;
 
 use crate::{
-    configuration::ConfigurationStorage, global_types::I2c1Device, rtc::RtcDs3231Ref, shared_resources::SharedResources,
+    configuration::ConfigurationStorage, global_types::I2c0Device, rtc::RtcDs3231Ref, shared_resources::SharedResources,
 };
 
 pub struct HttpServerContext {
@@ -28,7 +28,7 @@ impl HttpServerContext {
         self.shared
     }
 
-    pub const fn rtc(&self) -> &'static RtcDs3231Ref<I2c1Device<'static>> {
+    pub const fn rtc(&self) -> &'static RtcDs3231Ref<I2c0Device<'static>> {
         self.shared.rtc
     }
 }

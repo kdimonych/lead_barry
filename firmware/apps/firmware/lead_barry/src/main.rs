@@ -82,7 +82,7 @@ static VCP_SENSORS_CONTROL: StaticCell<VcpControl> = StaticCell::new();
 static I2C0_BUS: StaticCell<I2c0Bus> = StaticCell::new();
 static I2C1_BUS: StaticCell<I2c1Bus> = StaticCell::new();
 static SHARED_RESOURCES: StaticCell<SharedResources> = StaticCell::new();
-static RTC_DS3231: StaticCell<RtcDs3231Ref<I2c1Device<'static>>> = StaticCell::new();
+static RTC_DS3231: StaticCell<RtcDs3231Ref<I2c0Device<'static>>> = StaticCell::new();
 
 struct ResourcesCore0 {
     // Owned resources
@@ -131,8 +131,8 @@ fn main() -> ! {
     // Bind button pins
     log::info!("Initializing Button controller...");
     let mut button_controller_builder = ButtonControllerBuilder::new();
-    button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_2, embassy_rp::gpio::Pull::Up);
-    button_controller_builder.bind_pin(Buttons::Blue, p.PIN_3, embassy_rp::gpio::Pull::Up);
+    button_controller_builder.bind_pin(Buttons::Yellow, p.PIN_4, embassy_rp::gpio::Pull::Up);
+    button_controller_builder.bind_pin(Buttons::Blue, p.PIN_5, embassy_rp::gpio::Pull::Up);
 
     //User FLASH storage
     log::info!("Initializing FLASH storage...");
@@ -143,16 +143,16 @@ fn main() -> ! {
     // Setup I2C0 with standard frequency for sensors
     log::info!("Initializing I2C0...");
     let mut i2c0_cfg = i2c::Config::default();
-    i2c0_cfg.frequency = 1.mhz(); // Fast I2C clk for better performance
-    let i2c0 = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c0_cfg);
+    i2c0_cfg.frequency = 400.khz(); // Fast I2C clk for better performance
+    let i2c0 = I2c::new_async(p.I2C0, p.PIN_17, p.PIN_16, Irqs, i2c0_cfg);
     let i2c0_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C0, i2c::Async>> =
         I2C0_BUS.init(Mutex::new(i2c0));
 
     // Setup I2C1 with standard frequency for sensors
     log::info!("Initializing I2C1...");
     let mut i2c1_cfg = i2c::Config::default();
-    i2c1_cfg.frequency = 400.khz(); // Fast I2C clk for better performance
-    let i2c1 = I2c::new_async(p.I2C1, p.PIN_15, p.PIN_14, Irqs, i2c1_cfg);
+    i2c1_cfg.frequency = 1.mhz(); // Fast I2C clk for better performance
+    let i2c1 = I2c::new_async(p.I2C1, p.PIN_3, p.PIN_2, Irqs, i2c1_cfg);
     let i2c1_bus: &'static Mutex<CriticalSectionRawMutex, I2c<'static, I2C1, i2c::Async>> =
         I2C1_BUS.init(Mutex::new(i2c1));
 
@@ -167,7 +167,7 @@ fn main() -> ! {
     let ui_shared_state = UiSharedState::new();
     let state_ref = UI_SHARED_STATE.init(ui_shared_state);
     let (ui_control, ui_runner) = UiInterface::new(
-        I2cDevice::new(i2c0_bus),
+        I2cDevice::new(i2c1_bus),
         ssd1306::size::DisplaySize128x64,
         state_ref,
         Some(SvWelcome::new().into()),
@@ -200,8 +200,8 @@ fn main() -> ! {
 
     // Initialize the RTC DS3231
     log::info!("Initializing RTC DS3231...");
-    let rtc_ds3231 = rtc::create_rtc_ds3231(I2cDevice::new(i2c1_bus));
-    let rtc_ds3231_ref: &'static RtcDs3231Ref<I2c1Device<'static>> = RTC_DS3231.init(rtc_ds3231);
+    let rtc_ds3231 = rtc::create_rtc_ds3231(I2cDevice::new(i2c0_bus));
+    let rtc_ds3231_ref: &'static RtcDs3231Ref<I2c0Device<'static>> = RTC_DS3231.init(rtc_ds3231);
 
     let shared_resources: &'static SharedResources = SHARED_RESOURCES.init(SharedResources {
         rtc: rtc_ds3231_ref,

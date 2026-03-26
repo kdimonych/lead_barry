@@ -7,12 +7,12 @@ mod ui_interface;
 
 pub use self::data_model::SharedDataModel;
 pub use self::screen_view::ScreenView;
-use crate::global_types::I2c0Device;
+use crate::global_types::I2c1Device;
 
 pub use self::screens::*;
 pub use self::ui_interface::UiInterface;
 
 pub type UiSharedState = self::ui_interface::UiSharedState<ScCollection>;
 pub type UiRunner<'a> =
-    self::ui_interface::UiRunner<'a, I2c0Device<'a>, ssd1306::size::DisplaySize128x64, ScCollection>;
+    self::ui_interface::UiRunner<'a, I2c1Device<'a>, ssd1306::size::DisplaySize128x64, ScCollection>;
 pub type UiControl<'a> = self::ui_interface::UiControl<'a, ScCollection>;
