@@ -10,10 +10,11 @@ use nanofish::{
     ServerTimeouts, StatusCode, WebSocket, WebSocketRead, WebSocketWrite,
 };
 
+use crate::board::*;
 use crate::configuration::WiFiSettings;
-use crate::pwm_led_controller::{Led, LedAnimation};
 use crate::rtc::*;
 use crate::shared_resources::SharedResources;
+use crate::ws2812b_led_controller::*;
 use crate::{reset, units::TimeExt as _};
 use http_server_context::HttpServerContext;
 
@@ -250,7 +251,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         self.context
             .shared_resources()
             .led_controller
-            .set_animation(Led::Yellow, LedAnimation::Decay(300))
+            .set_animation(LED_1, LedAnimation::Decay(color::ORANGE, 300))
             .await;
 
         let res = self.handle_request_impl(request, response_buffer).await;
@@ -266,7 +267,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
         self.context
             .shared_resources()
             .led_controller
-            .set_animation(Led::Yellow, LedAnimation::Decay(300))
+            .set_animation(LED_1, LedAnimation::Decay(color::ORANGE, 300))
             .await;
 
         let res = self.handle_websocket_connection_impl(_request, web_socket).await;

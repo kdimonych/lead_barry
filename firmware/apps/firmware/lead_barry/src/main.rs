@@ -7,12 +7,12 @@
 
 mod async_infinite_stream;
 mod async_stream;
+mod board;
 mod configuration;
 mod global_state;
 mod global_types;
 mod input;
 mod main_logic_controller;
-mod pwm_led_controller;
 mod reset;
 mod rtc;
 mod shared_resources;
@@ -21,12 +21,14 @@ mod units;
 mod vcp_sensors;
 mod web_server;
 mod wifi;
+mod ws2812b_led_controller;
 
+use board::*;
 use defmt_or_log as log;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::{Executor, Spawner};
-use embassy_rp::peripherals::{DMA_CH0, I2C1, PIO0};
-use embassy_rp::pio::InterruptHandler as PioInterruptHandler;
+use embassy_rp::peripherals::{DMA_CH0, I2C1, PIO0, PIO1};
+use embassy_rp::pio::{InterruptHandler as PioInterruptHandler, Pio};
 use embassy_rp::{
     bind_interrupts,
     i2c::{self, I2c, InterruptHandler as I2cInterruptHandler},
@@ -35,15 +37,14 @@ use embassy_rp::{
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, mutex::Mutex};
 use embassy_time::Duration;
+
 use static_cell::StaticCell;
 
 use crate::configuration::{ConfigurationStorageBuilder, Storage};
 
-use crate::pwm_led_controller::{
-    Led, LedAnimation, LedControllerBuilder, LedControllerRunner, PwmHardwareConfig, Repetitions,
-};
 use crate::rtc::RtcDs3231Ref;
 use crate::units::FrequencyExt;
+use crate::ws2812b_led_controller::*;
 use global_types::*;
 use input::*;
 use main_logic_controller::*;
@@ -68,7 +69,11 @@ bind_interrupts!(struct Irqs {
     I2C0_IRQ => I2cInterruptHandler<I2C0>;
     I2C1_IRQ => I2cInterruptHandler<I2C1>;
     PIO0_IRQ_0 => PioInterruptHandler<PIO0>;
+    PIO1_IRQ_0 => PioInterruptHandler<PIO1>;
 });
+
+type LedControllerRunnerType = LedControllerRunner<'static, PIO1, 0, LED_NUM>;
+type LedControllerBuilderType = LedControllerBuilder<LED_NUM>;
 
 // Static resources
 static BUTTON_CONTROLLER: StaticCell<ButtonControllerState> = StaticCell::new();
@@ -90,7 +95,7 @@ struct ResourcesCore0 {
 
     vcp_runner: Option<VcpSensorsRunner<'static>>,
     wifi_service_builder: WiFiServiceBuilder<PIO0, DMA_CH0>,
-    led_controller_runner: LedControllerRunner,
+    led_controller_runner: LedControllerRunnerType,
 
     // Shared resources
     shared_resources: &'static SharedResources,
@@ -111,21 +116,15 @@ fn main() -> ! {
     let p: embassy_rp::Peripherals = embassy_rp::init(Default::default());
 
     log::info!("Initializing LED controller...");
-    // Bind led pins
-    let config = PwmHardwareConfig {
-        slice2: p.PWM_SLICE2,
-        slice3: p.PWM_SLICE3,
-        led_red: p.PIN_20,
-        led_yellow: p.PIN_21,
-        led_blue: p.PIN_22,
-    };
     // Initialize the LED controller builder and build the controller and runner
-    let led_controller_builder = LedControllerBuilder::new(config);
-    let (led_controller, led_controller_runner) = led_controller_builder.build_once();
+    let led_controller_builder = LedControllerBuilderType::new();
+    let Pio { mut common, sm0, .. } = Pio::new(p.PIO1, Irqs);
+    let (led_controller, led_controller_runner) =
+        led_controller_builder.build_once(&mut common, sm0, p.DMA_CH3, p.PIN_0);
 
     // Set heartbeat animation on blue LED to verify it's working
     led_controller
-        .try_set_animation(Led::Blue, LedAnimation::Sine(5000, Repetitions::Infinite))
+        .try_set_animation(LED_1, LedAnimation::Sine(color::BLUE, 5000, Repetitions::Infinite))
         .unwrap();
 
     // Bind button pins
@@ -338,7 +337,7 @@ async fn buttons_controller_task(button_controller_runner: ButtonControllerRunne
 }
 
 #[embassy_executor::task]
-async fn led_controller_task(led_controller_runner: LedControllerRunner) -> ! {
+async fn led_controller_task(led_controller_runner: LedControllerRunnerType) -> ! {
     log::info!("Starting led controller task...");
     led_controller_runner.run().await;
 }
