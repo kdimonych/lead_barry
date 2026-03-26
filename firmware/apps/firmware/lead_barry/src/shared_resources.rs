@@ -1,7 +1,7 @@
 use crate::global_types::I2c0Device;
 
 use crate::configuration::ConfigurationStorage;
-pub use crate::led_controller::LedController;
+pub use crate::pwm_led_controller::LedController;
 
 use crate::rtc::RtcDs3231Ref;
 use crate::ui::UiControl;

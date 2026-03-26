@@ -11,8 +11,8 @@ mod configuration;
 mod global_state;
 mod global_types;
 mod input;
-mod led_controller;
 mod main_logic_controller;
+mod pwm_led_controller;
 mod reset;
 mod rtc;
 mod shared_resources;
@@ -39,7 +39,7 @@ use static_cell::StaticCell;
 
 use crate::configuration::{ConfigurationStorageBuilder, Storage};
 
-use crate::led_controller::{
+use crate::pwm_led_controller::{
     Led, LedAnimation, LedControllerBuilder, LedControllerRunner, PwmHardwareConfig, Repetitions,
 };
 use crate::rtc::RtcDs3231Ref;

@@ -11,7 +11,7 @@ use nanofish::{
 };
 
 use crate::configuration::WiFiSettings;
-use crate::led_controller::{Led, LedAnimation};
+use crate::pwm_led_controller::{Led, LedAnimation};
 use crate::rtc::*;
 use crate::shared_resources::SharedResources;
 use crate::{reset, units::TimeExt as _};
