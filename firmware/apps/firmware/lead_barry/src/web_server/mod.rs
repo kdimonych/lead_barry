@@ -55,7 +55,7 @@ impl HttpConfigServer {
     #[inline(always)]
     pub fn create_socket_pool<'buffer, 'stack, const SOCKETS: usize, const RX_SIZE: usize, const TX_SIZE: usize>(
         &self,
-        allocator: &'buffer mut BumpInto,
+        allocator: &mut BumpInto<'buffer>,
         stack: Stack<'stack>,
     ) -> SocketPool<'stack, SOCKETS>
     where
@@ -65,13 +65,15 @@ impl HttpConfigServer {
             .create_socket_pool::<SOCKETS, RX_SIZE, TX_SIZE>(allocator, stack)
     }
 
-    pub async fn run<'buffer, const SOCKETS: usize, const REQ_SIZE: usize, const MAX_RESPONSE_SIZE: usize>(
+    pub async fn run<'buffer, const REQ_SIZE: usize, const MAX_RESPONSE_SIZE: usize, const SOCKETS: usize>(
         &mut self,
-        buffers: &mut HttpServerBuffers<REQ_SIZE, MAX_RESPONSE_SIZE>,
+        allocator: &mut BumpInto<'buffer>,
         socket_pool: &mut SocketPool<'_, SOCKETS>,
     ) -> ! {
         let mut handler = HttpConfigHandler::new(&self.context);
-        self.http_server.serve(socket_pool, buffers, &mut handler).await
+        self.http_server
+            .serve::<SOCKETS, REQ_SIZE, MAX_RESPONSE_SIZE, _>(allocator, socket_pool, &mut handler)
+            .await
     }
 }
 
