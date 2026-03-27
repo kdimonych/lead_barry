@@ -2,7 +2,7 @@ mod http_server_context;
 
 use core::str::FromStr;
 
-use defmt_or_log as log;
+use defmt_or_log::{self as log};
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
@@ -18,7 +18,9 @@ use crate::ws2812b_led_controller::*;
 use crate::{reset, units::TimeExt as _};
 use http_server_context::HttpServerContext;
 
-pub use nanofish::HttpServerBuffers;
+use bump_into::{self, BumpInto};
+
+pub use nanofish::{HttpServerBuffers, SocketPool};
 
 // Get version from Cargo.toml at compile time
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -49,19 +51,27 @@ impl HttpConfigServer {
         self
     }
 
-    pub async fn run<
-        const SOCKETS: usize,
-        const RX_SIZE: usize,
-        const TX_SIZE: usize,
-        const REQ_SIZE: usize,
-        const MAX_RESPONSE_SIZE: usize,
-    >(
+    /// Create a socket pool for managing TCP connections
+    #[inline(always)]
+    pub fn create_socket_pool<'buffer, 'stack, const SOCKETS: usize, const RX_SIZE: usize, const TX_SIZE: usize>(
+        &self,
+        allocator: &'buffer mut BumpInto,
+        stack: Stack<'stack>,
+    ) -> SocketPool<'stack, SOCKETS>
+    where
+        'buffer: 'stack,
+    {
+        self.http_server
+            .create_socket_pool::<SOCKETS, RX_SIZE, TX_SIZE>(allocator, stack)
+    }
+
+    pub async fn run<'buffer, const SOCKETS: usize, const REQ_SIZE: usize, const MAX_RESPONSE_SIZE: usize>(
         &mut self,
-        stack: Stack<'_>,
-        buffers: &mut HttpServerBuffers<SOCKETS, RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE>,
+        buffers: &mut HttpServerBuffers<REQ_SIZE, MAX_RESPONSE_SIZE>,
+        socket_pool: &mut SocketPool<'_, SOCKETS>,
     ) -> ! {
         let mut handler = HttpConfigHandler::new(&self.context);
-        self.http_server.serve(stack, buffers, &mut handler).await
+        self.http_server.serve(socket_pool, buffers, &mut handler).await
     }
 }
 
