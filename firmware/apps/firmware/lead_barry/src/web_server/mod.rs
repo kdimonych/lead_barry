@@ -60,9 +60,8 @@ impl HttpConfigServer {
         stack: Stack<'_>,
         buffers: &mut HttpServerBuffers<SOCKETS, RX_SIZE, TX_SIZE, REQ_SIZE, MAX_RESPONSE_SIZE>,
     ) -> ! {
-        self.http_server
-            .serve(stack, buffers, HttpConfigHandler::new(&self.context))
-            .await
+        let mut handler = HttpConfigHandler::new(&self.context);
+        self.http_server.serve(stack, buffers, &mut handler).await
     }
 }
 
@@ -84,7 +83,6 @@ impl<'a> HttpConfigHandler<'a> {
         if request.path == "/" {
             // Show main page
             log::debug!("Serving main configuration page");
-            //trace_headers(request);
 
             return HttpResponseBuilder::new(response_buffer)
                 .with_status(StatusCode::Ok)?
