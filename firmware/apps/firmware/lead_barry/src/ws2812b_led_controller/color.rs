@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub use smart_leds::RGB8 as Color;
 
 pub const BLUE: Color = Color { r: 0, g: 0, b: 255 };
