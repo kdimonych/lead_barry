@@ -20,7 +20,7 @@ use http_server_context::HttpServerContext;
 
 use bump_into::{self, BumpInto};
 
-pub use nanofish::{HttpServerBuffers, SocketPool};
+pub use nanofish::SocketPool;
 
 // Get version from Cargo.toml at compile time
 const VERSION: &str = env!("CARGO_PKG_VERSION");

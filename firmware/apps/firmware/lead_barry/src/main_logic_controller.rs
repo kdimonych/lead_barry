@@ -25,7 +25,7 @@ use crate::shared_resources::*;
 use crate::ui::*;
 use crate::units::TimeExt as _;
 use crate::vcp_sensors::VcpSensorsEvents;
-use crate::web_server::{HttpConfigServer, HttpServerBuffers};
+use crate::web_server::HttpConfigServer;
 use crate::wifi::*;
 
 static AP_STATUS_CHANEL: StaticCell<ApStatusChannel> = StaticCell::new();
