@@ -1,6 +1,5 @@
 use core::usize;
 
-use bump_into::BumpInto;
 use defmt_or_log as log;
 
 use ds323x::DateTimeAccess;
@@ -14,6 +13,7 @@ use embassy_sync::channel::Channel;
 use embassy_sync::lazy_lock::LazyLock;
 use embassy_time::Ticker;
 use embassy_time::Timer;
+use nanofish::HttpAllocator;
 use static_cell::StaticCell;
 
 use crate::configuration::*;
@@ -424,8 +424,6 @@ async fn show_visit_screen(shared: &'static SharedResources) {
 //HTTP configuration server task
 #[embassy_executor::task(pool_size = 1)]
 async fn start_http_config_server(spawner: Spawner, shared: &'static SharedResources, stack: Stack<'static>) {
-    let mut http_server = HttpConfigServer::new(spawner, shared);
-
     const SOCKETS: usize = 3;
     const RX_SIZE: usize = 256;
     const TX_SIZE: usize = 256;
@@ -434,13 +432,11 @@ async fn start_http_config_server(spawner: Spawner, shared: &'static SharedResou
 
     //Create a bump allocator for the socket pool buffers, since they need to be in a static memory area but we don't want to allocate them all upfront
     let mut bump_into_space = bump_into::space_uninit!(SOCKETS * (RX_SIZE + TX_SIZE) + REQ_SIZE + MAX_RESPONSE_SIZE);
-    let mut allocator = BumpInto::from_slice(&mut bump_into_space[..]);
+    let mut allocator = HttpAllocator::from_slice(&mut bump_into_space[..]);
 
-    // Create the socket pool with buffers allocated from the bump allocator
-    let mut socket_pool = http_server.create_socket_pool::<SOCKETS, RX_SIZE, TX_SIZE>(&mut allocator, stack);
-    http_server
-        .run::<REQ_SIZE, MAX_RESPONSE_SIZE, _>(&mut allocator, &mut socket_pool)
-        .await;
+    let mut http_server = HttpConfigServer::<SOCKETS>::new::<RX_SIZE, TX_SIZE>(&mut allocator, stack, spawner, shared);
+
+    http_server.run::<REQ_SIZE, MAX_RESPONSE_SIZE>(&mut allocator).await;
 }
 
 fn generate_random_password_uppercase() -> heapless::String<64> {

@@ -6,8 +6,8 @@ use defmt_or_log::{self as log};
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
-    Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef, HttpResponseBuilder, HttpServer,
-    ServerTimeouts, StatusCode, WebSocket, WebSocketRead, WebSocketWrite,
+    Error, HttpAllocator, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
+    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode, WebSocket, WebSocketRead, WebSocketWrite,
 };
 
 use crate::board::*;
@@ -18,28 +18,32 @@ use crate::ws2812b_led_controller::*;
 use crate::{reset, units::TimeExt as _};
 use http_server_context::HttpServerContext;
 
-use bump_into::{self, BumpInto};
-
-pub use nanofish::SocketPool;
-
 // Get version from Cargo.toml at compile time
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 //const MAIN_CONFIGURATION_HTML: &str = include_str!("./web/main_configuration.html");
 const MAIN_CONFIGURATION_HTML_GZ: &[u8] = include_bytes!("./web/main_configuration.html.gz");
 
-pub struct HttpConfigServer {
+pub struct HttpConfigServer<'buffer, const SOCKETS: usize> {
     context: HttpServerContext,
-    http_server: HttpServer,
+    http_server: HttpServer<'buffer, SOCKETS>,
 }
 
 #[allow(dead_code)]
-impl HttpConfigServer {
-    pub fn new(spawner: Spawner, shared: &'static SharedResources) -> Self {
+impl<'stack, const SOCKETS: usize> HttpConfigServer<'stack, SOCKETS> {
+    pub fn new<'buffer, const SOCKET_RX_SIZE: usize, const SOCKET_TX_SIZE: usize>(
+        allocator: &mut HttpAllocator<'buffer>,
+        stack: Stack<'stack>,
+        spawner: Spawner,
+        shared: &'static SharedResources,
+    ) -> Self
+    where
+        'buffer: 'stack,
+    {
         let timeouts = ServerTimeouts::default();
         //timeouts.read_timeout = 1;
 
-        let http_server: HttpServer = HttpServer::new(80).with_timeouts(timeouts);
+        let http_server = HttpServer::new::<SOCKET_RX_SIZE, SOCKET_TX_SIZE>(allocator, stack, 80, timeouts);
         Self {
             context: HttpServerContext::new(spawner, shared),
             http_server,
@@ -51,28 +55,13 @@ impl HttpConfigServer {
         self
     }
 
-    /// Create a socket pool for managing TCP connections
-    #[inline(always)]
-    pub fn create_socket_pool<'buffer, 'stack, const SOCKETS: usize, const RX_SIZE: usize, const TX_SIZE: usize>(
-        &self,
-        allocator: &mut BumpInto<'buffer>,
-        stack: Stack<'stack>,
-    ) -> SocketPool<'stack, SOCKETS>
-    where
-        'buffer: 'stack,
-    {
-        self.http_server
-            .create_socket_pool::<SOCKETS, RX_SIZE, TX_SIZE>(allocator, stack)
-    }
-
-    pub async fn run<'buffer, const REQ_SIZE: usize, const MAX_RESPONSE_SIZE: usize, const SOCKETS: usize>(
+    pub async fn run<const REQ_SIZE: usize, const MAX_RESPONSE_SIZE: usize>(
         &mut self,
-        allocator: &mut BumpInto<'buffer>,
-        socket_pool: &mut SocketPool<'_, SOCKETS>,
+        allocator: &mut HttpAllocator<'_>,
     ) -> ! {
         let mut handler = HttpConfigHandler::new(&self.context);
         self.http_server
-            .serve::<SOCKETS, REQ_SIZE, MAX_RESPONSE_SIZE, _>(allocator, socket_pool, &mut handler)
+            .serve::<REQ_SIZE, MAX_RESPONSE_SIZE, _>(allocator, &mut handler)
             .await
     }
 }
