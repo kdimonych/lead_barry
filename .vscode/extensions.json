@@ -17,7 +17,6 @@
     // ========================================================================
     // PYTHON & DATA SCIENCE - For Python scripting and data analysis
     // ========================================================================
-    "ms-toolsai.datawrangler", // Data wrangling and analysis tools
     "ms-python.python", // Python support (for scripts)
     "ms-python.vscode-pylance", // Python language server and debugging
     // ========================================================================
