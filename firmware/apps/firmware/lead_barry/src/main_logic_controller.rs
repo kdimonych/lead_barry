@@ -1,3 +1,4 @@
+use core::mem::MaybeUninit;
 use core::usize;
 
 use defmt_or_log as log;
@@ -28,7 +29,14 @@ use crate::vcp_sensors::VcpSensorsEvents;
 use crate::web_server::HttpConfigServer;
 use crate::wifi::*;
 
-static AP_STATUS_CHANEL: StaticCell<ApStatusChannel> = StaticCell::new();
+const SOCKETS: usize = 3;
+const HTTP_SERVER_WORKERS: usize = 1;
+const HTTP_SERVER_BUFFER_SIZE: usize = HttpConfigServer::<SOCKETS>::MIN_SOCKET_POOL_BUFFER_SIZE;
+
+static AP_STATUS_CHANNEL: StaticCell<ApStatusChannel> = StaticCell::new();
+static HTTP_SERVER_BUFFER: StaticCell<[core::mem::MaybeUninit<u8>; HTTP_SERVER_BUFFER_SIZE]> = StaticCell::new();
+static HTTP_SERVER_ALLOCATOR: StaticCell<HttpAllocator> = StaticCell::new();
+static HTTP_SERVER: StaticCell<HttpConfigServer<'static, SOCKETS>> = StaticCell::new();
 
 pub async fn main_logic_controller(
     spawner: Spawner,
@@ -154,9 +162,11 @@ pub async fn main_logic_controller(
         let ip = net_cfg.address.address();
         global_state().set_device_ip(Some(ip)).await;
 
-        for _ in 0..1 {
+        let http_config_server = create_http_server(net_stack);
+
+        for _ in 0..HTTP_SERVER_WORKERS {
             spawner
-                .spawn(start_http_config_server(spawner, shared, net_stack))
+                .spawn(start_http_config_server(http_config_server, spawner, shared))
                 .unwrap();
         }
 
@@ -212,7 +222,7 @@ async fn do_start_ap_mode(
     let wifi_ap_data = DmWifiAp::NotReady;
     set_screen(wifi_ap_data.into()).await;
 
-    let start_ap_status = AP_STATUS_CHANEL.init_with(|| Channel::new());
+    let start_ap_status = AP_STATUS_CHANNEL.init_with(|| Channel::new());
     wifi_service
         .subtask_start_ap(&wifi_ap_settings, start_ap_status.sender())
         .await;
@@ -421,22 +431,32 @@ async fn show_visit_screen(shared: &'static SharedResources) {
     }
 }
 
+/// Helper function to initialize the HTTP allocator with the correct generic parameters,
+/// since Rust doesn't allow using const generics in async functions directly
+fn init_http_allocator() -> &'static mut HttpAllocator<'static> {
+    let buffer = HTTP_SERVER_BUFFER.init_with(|| bump_into::space_uninit!(HTTP_SERVER_BUFFER_SIZE));
+    HTTP_SERVER_ALLOCATOR.init_with(|| HttpAllocator::from_slice(buffer))
+}
+
+/// Helper function to create the HTTP server with the correct generic parameters,
+/// since Rust doesn't allow using const generics in async functions directly
+#[inline(always)]
+fn create_http_server(stack: Stack<'static>) -> &'static HttpConfigServer<'static, SOCKETS> {
+    HTTP_SERVER.init_with(|| HttpConfigServer::<'static, SOCKETS>::new(init_http_allocator(), stack))
+}
+
 //HTTP configuration server task
-#[embassy_executor::task(pool_size = 1)]
-async fn start_http_config_server(spawner: Spawner, shared: &'static SharedResources, stack: Stack<'static>) {
-    const SOCKETS: usize = 3;
-    const RX_SIZE: usize = 256;
-    const TX_SIZE: usize = 256;
-    const REQ_SIZE: usize = 1024;
-    const MAX_RESPONSE_SIZE: usize = 8192;
+#[embassy_executor::task(pool_size = HTTP_SERVER_WORKERS)]
+async fn start_http_config_server(
+    server: &'static HttpConfigServer<'static, SOCKETS>,
+    spawner: Spawner,
+    shared: &'static SharedResources,
+) {
+    // Initialize the worker allocator for this task
+    let mut worker_buffer = [MaybeUninit::<u8>::uninit(); HttpConfigServer::<SOCKETS>::MIN_WORKER_BUFFER_SIZE];
 
-    //Create a bump allocator for the socket pool buffers, since they need to be in a static memory area but we don't want to allocate them all upfront
-    let mut bump_into_space = bump_into::space_uninit!(SOCKETS * (RX_SIZE + TX_SIZE) + REQ_SIZE + MAX_RESPONSE_SIZE);
-    let mut allocator = HttpAllocator::from_slice(&mut bump_into_space[..]);
-
-    let mut http_server = HttpConfigServer::<SOCKETS>::new::<RX_SIZE, TX_SIZE>(&mut allocator, stack, spawner, shared);
-
-    http_server.run::<REQ_SIZE, MAX_RESPONSE_SIZE>(&mut allocator).await;
+    // Start the HTTP server
+    server.run(&mut worker_buffer, spawner, shared).await;
 }
 
 fn generate_random_password_uppercase() -> heapless::String<64> {

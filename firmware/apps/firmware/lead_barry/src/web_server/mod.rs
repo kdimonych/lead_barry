@@ -1,5 +1,6 @@
 mod http_server_context;
 
+use core::mem::MaybeUninit;
 use core::str::FromStr;
 
 use defmt_or_log::{self as log};
@@ -24,30 +25,34 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 //const MAIN_CONFIGURATION_HTML: &str = include_str!("./web/main_configuration.html");
 const MAIN_CONFIGURATION_HTML_GZ: &[u8] = include_bytes!("./web/main_configuration.html.gz");
 
+/// RX buffer size for each socket in the pool
+const SOCKET_RX_SIZE: usize = 256;
+/// TX buffer size for each socket in the pool
+const SOCKET_TX_SIZE: usize = 256;
+
+// Request buffer size for a single HTTP server worker
+const REQ_SIZE: usize = 1024;
+// Maximum response size for a single HTTP server worker
+const MAX_RESPONSE_SIZE: usize = 8192;
+
 pub struct HttpConfigServer<'buffer, const SOCKETS: usize> {
-    context: HttpServerContext,
     http_server: HttpServer<'buffer, SOCKETS>,
 }
 
 #[allow(dead_code)]
 impl<'stack, const SOCKETS: usize> HttpConfigServer<'stack, SOCKETS> {
-    pub fn new<'buffer, const SOCKET_RX_SIZE: usize, const SOCKET_TX_SIZE: usize>(
-        allocator: &mut HttpAllocator<'buffer>,
-        stack: Stack<'stack>,
-        spawner: Spawner,
-        shared: &'static SharedResources,
-    ) -> Self
+    pub const MIN_SOCKET_POOL_BUFFER_SIZE: usize = (SOCKET_RX_SIZE + SOCKET_TX_SIZE) * SOCKETS;
+    pub const MIN_WORKER_BUFFER_SIZE: usize = REQ_SIZE + MAX_RESPONSE_SIZE;
+
+    pub fn new<'buffer>(server_allocator: &mut HttpAllocator<'buffer>, stack: Stack<'stack>) -> Self
     where
         'buffer: 'stack,
     {
         let timeouts = ServerTimeouts::default();
         //timeouts.read_timeout = 1;
 
-        let http_server = HttpServer::new::<SOCKET_RX_SIZE, SOCKET_TX_SIZE>(allocator, stack, 80, timeouts);
-        Self {
-            context: HttpServerContext::new(spawner, shared),
-            http_server,
-        }
+        let http_server = HttpServer::new::<SOCKET_RX_SIZE, SOCKET_TX_SIZE>(server_allocator, stack, 80, timeouts);
+        Self { http_server }
     }
 
     pub fn with_auto_close_connection(mut self, auto_close: bool) -> Self {
@@ -55,14 +60,15 @@ impl<'stack, const SOCKETS: usize> HttpConfigServer<'stack, SOCKETS> {
         self
     }
 
-    pub async fn run<const REQ_SIZE: usize, const MAX_RESPONSE_SIZE: usize>(
-        &mut self,
-        allocator: &mut HttpAllocator<'_>,
+    pub async fn run(
+        &self,
+        worker_memory_buf: &mut [MaybeUninit<u8>],
+        spawner: Spawner,
+        shared: &'static SharedResources,
     ) -> ! {
-        let mut handler = HttpConfigHandler::new(&self.context);
-        self.http_server
-            .serve::<REQ_SIZE, MAX_RESPONSE_SIZE, _>(allocator, &mut handler)
-            .await
+        let context = HttpServerContext::new(spawner, shared);
+        let mut handler = HttpConfigHandler::new(&context);
+        self.http_server.serve::<_>(worker_memory_buf, &mut handler).await
     }
 }
 

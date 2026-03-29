@@ -5,6 +5,7 @@ use crate::{
 };
 
 pub struct HttpServerContext {
+    //TODO: Get rid of spawner
     spawner: Spawner,
     shared: &'static SharedResources,
 }
