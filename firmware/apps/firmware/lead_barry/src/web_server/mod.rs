@@ -3,12 +3,13 @@ mod http_server_context;
 use core::mem::MaybeUninit;
 use core::str::FromStr;
 
+use bump_into::BumpInto;
 use defmt_or_log::{self as log};
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
-    Error, HttpAllocator, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef,
-    HttpResponseBuilder, HttpServer, ServerTimeouts, StatusCode, WebSocket, WebSocketRead, WebSocketWrite,
+    Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef, HttpResponseBuilder, HttpServer,
+    ServerTimeouts, SocketBuffers, StatusCode, WebSocket, WebSocketRead, WebSocketWrite,
 };
 
 use crate::board::*;
@@ -30,10 +31,11 @@ const SOCKET_RX_SIZE: usize = 256;
 /// TX buffer size for each socket in the pool
 const SOCKET_TX_SIZE: usize = 256;
 
-// Request buffer size for a single HTTP server worker
-const REQ_SIZE: usize = 1024;
-// Maximum response size for a single HTTP server worker
-const MAX_RESPONSE_SIZE: usize = 8192;
+// Maximum request/response size for a single HTTP server worker
+const WORKER_BUFFER_SIZE: usize = 8192;
+
+// Port for the HTTP server to listen on
+const HTTP_SERVER_PORT: u16 = 80;
 
 pub struct HttpConfigServer<'buffer, const SOCKETS: usize> {
     http_server: HttpServer<'buffer, SOCKETS>,
@@ -42,16 +44,26 @@ pub struct HttpConfigServer<'buffer, const SOCKETS: usize> {
 #[allow(dead_code)]
 impl<'stack, const SOCKETS: usize> HttpConfigServer<'stack, SOCKETS> {
     pub const MIN_SOCKET_POOL_BUFFER_SIZE: usize = (SOCKET_RX_SIZE + SOCKET_TX_SIZE) * SOCKETS;
-    pub const MIN_WORKER_BUFFER_SIZE: usize = REQ_SIZE + MAX_RESPONSE_SIZE;
+    pub const MIN_WORKER_BUFFER_SIZE: usize = WORKER_BUFFER_SIZE;
 
-    pub fn new<'buffer>(server_allocator: &mut HttpAllocator<'buffer>, stack: Stack<'stack>) -> Self
+    pub fn new<'buffer>(server_allocator: &mut BumpInto<'buffer>, stack: Stack<'stack>) -> Self
     where
         'buffer: 'stack,
     {
         let timeouts = ServerTimeouts::default();
-        //timeouts.read_timeout = 1;
 
-        let http_server = HttpServer::new::<SOCKET_RX_SIZE, SOCKET_TX_SIZE>(server_allocator, stack, 80, timeouts);
+        let socket_buffers = server_allocator
+            .alloc_with(|| [const { SocketBuffers::<SOCKET_RX_SIZE, SOCKET_TX_SIZE>::new() }; SOCKETS])
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Not enough memory to store the socket pool buffers. Required: {} bytes but only {} bytes available.",
+                    SOCKETS * core::mem::size_of::<SocketBuffers<SOCKET_RX_SIZE, SOCKET_TX_SIZE>>(),
+                    server_allocator.available_bytes()
+                )
+            });
+
+        let http_server =
+            HttpServer::new::<SOCKET_RX_SIZE, SOCKET_TX_SIZE>(socket_buffers, stack, HTTP_SERVER_PORT, timeouts);
         Self { http_server }
     }
 

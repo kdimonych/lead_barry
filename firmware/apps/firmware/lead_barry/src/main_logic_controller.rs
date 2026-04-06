@@ -9,12 +9,12 @@ use embassy_executor::Spawner;
 use embassy_futures::select::*;
 use embassy_net::Stack;
 
+use bump_into::BumpInto;
 use embassy_rp::clocks::RoscRng;
 use embassy_sync::channel::Channel;
 use embassy_sync::lazy_lock::LazyLock;
 use embassy_time::Ticker;
 use embassy_time::Timer;
-use nanofish::HttpAllocator;
 use static_cell::StaticCell;
 
 use crate::configuration::*;
@@ -35,7 +35,7 @@ const HTTP_SERVER_BUFFER_SIZE: usize = HttpConfigServer::<SOCKETS>::MIN_SOCKET_P
 
 static AP_STATUS_CHANNEL: StaticCell<ApStatusChannel> = StaticCell::new();
 static HTTP_SERVER_BUFFER: StaticCell<[core::mem::MaybeUninit<u8>; HTTP_SERVER_BUFFER_SIZE]> = StaticCell::new();
-static HTTP_SERVER_ALLOCATOR: StaticCell<HttpAllocator> = StaticCell::new();
+static HTTP_SERVER_ALLOCATOR: StaticCell<BumpInto> = StaticCell::new();
 static HTTP_SERVER: StaticCell<HttpConfigServer<'static, SOCKETS>> = StaticCell::new();
 
 pub async fn main_logic_controller(
@@ -433,9 +433,9 @@ async fn show_visit_screen(shared: &'static SharedResources) {
 
 /// Helper function to initialize the HTTP allocator with the correct generic parameters,
 /// since Rust doesn't allow using const generics in async functions directly
-fn init_http_allocator() -> &'static mut HttpAllocator<'static> {
+fn init_http_allocator() -> &'static mut BumpInto<'static> {
     let buffer = HTTP_SERVER_BUFFER.init_with(|| bump_into::space_uninit!(HTTP_SERVER_BUFFER_SIZE));
-    HTTP_SERVER_ALLOCATOR.init_with(|| HttpAllocator::from_slice(buffer))
+    HTTP_SERVER_ALLOCATOR.init_with(|| BumpInto::from_slice(buffer))
 }
 
 /// Helper function to create the HTTP server with the correct generic parameters,
