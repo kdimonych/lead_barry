@@ -12,5 +12,5 @@ linker = "flip-link"
 rustflags = ["-C", "no-vectorize-loops"]
 
 [env]
-DEFMT_LOG = "debug"
+DEFMT_LOG = "trace"
 DBG_PRINT = "1"

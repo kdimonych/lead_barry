@@ -8,8 +8,8 @@ use defmt_or_log::{self as log};
 use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
-    Error, HttpHandler, HttpMethod, HttpRequest, HttpResponse, HttpResponseBufferRef, HttpResponseBuilder, HttpServer,
-    ServerTimeouts, SocketBuffers, StatusCode, WebSocket, WebSocketRead, WebSocketWrite,
+    Error, HttpHandler, HttpMethod, HttpRequest, HttpResponseBuilder, HttpServer, HttpWriteSocket, ServerTimeouts,
+    SocketBuffers, StatusCode, WebSocket, WebSocketRead, memory,
 };
 
 use crate::board::*;
@@ -94,24 +94,29 @@ impl<'a> HttpConfigHandler<'a> {
         Self { context }
     }
 
-    async fn handle_request_impl(
+    async fn handle_request_impl<HttpSocket: HttpWriteSocket>(
         &mut self,
+        allocator: &mut memory::HeadArena<'_>,
         request: &HttpRequest<'_>,
-        response_buffer: HttpResponseBufferRef<'_>,
-    ) -> Result<HttpResponse, Error> {
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
         if request.path == "/" {
             // Show main page
             log::debug!("Serving main configuration page");
 
-            return HttpResponseBuilder::new(response_buffer)
-                .with_status(StatusCode::Ok)?
-                .with_compressed_page(MAIN_CONFIGURATION_HTML_GZ);
+            return HttpResponseBuilder::new(http_socket)
+                .with_status(StatusCode::Ok)
+                .await?
+                .with_compressed_page(MAIN_CONFIGURATION_HTML_GZ)
+                .await;
         }
 
         let Some(api) = request.path.strip_prefix("/api/") else {
-            return HttpResponseBuilder::new(response_buffer)
-                .with_status(StatusCode::NotFound)?
-                .with_plain_text_body("Not Found");
+            return HttpResponseBuilder::new(http_socket)
+                .with_status(StatusCode::NotFound)
+                .await?
+                .with_plain_text_body("Not Found")
+                .await;
         };
 
         if request.method == HttpMethod::OPTIONS {
@@ -122,21 +127,25 @@ impl<'a> HttpConfigHandler<'a> {
             (HttpMethod::OPTIONS, command) => {
                 //TODO: Implement more strict header checking
                 log::debug!("Serving {} preflight request", command);
-                HttpResponseBuilder::new(response_buffer).preflight_response()
+                HttpResponseBuilder::new(http_socket).preflight_response().await
             }
             (HttpMethod::GET, "version") => {
                 log::debug!("Serving version info");
-                HttpResponseBuilder::new(response_buffer)
-                    .with_status(StatusCode::Ok)?
+                HttpResponseBuilder::new(http_socket)
+                    .with_status(StatusCode::Ok)
+                    .await?
                     .with_plain_text_body(VERSION)
+                    .await
             }
             (HttpMethod::GET, "reboot") => {
                 log::info!("Serving reboot request");
                 reset::deferred_system_reset(self.context.spawner(), 1.s());
                 // The reset function does not return, but we provide a response for completeness
-                HttpResponseBuilder::new(response_buffer)
-                    .with_status(StatusCode::Ok)?
+                HttpResponseBuilder::new(http_socket)
+                    .with_status(StatusCode::Ok)
+                    .await?
                     .with_plain_text_body("System is resetting...")
+                    .await
             }
             (HttpMethod::GET, "wifi_config") => {
                 log::debug!("Serving configuration request");
@@ -153,7 +162,7 @@ impl<'a> HttpConfigHandler<'a> {
                     psw.clear()
                 }
 
-                to_response(response_buffer, &wifi_settings)
+                send_serialized_type(allocator, http_socket, &wifi_settings).await
             }
             (HttpMethod::POST, "set_wifi_config") => {
                 log::debug!("Serving set configuration request");
@@ -177,14 +186,20 @@ impl<'a> HttpConfigHandler<'a> {
                     })
                     .await;
                 match self.context.configuration_storage().save().await {
-                    Ok(_) => HttpResponseBuilder::new(response_buffer)
-                        .with_status(StatusCode::Ok)?
-                        .with_plain_text_body("WiFi configuration updated"),
+                    Ok(_) => {
+                        HttpResponseBuilder::new(http_socket)
+                            .with_status(StatusCode::Ok)
+                            .await?
+                            .with_plain_text_body("WiFi configuration updated")
+                            .await
+                    }
                     Err(e) => {
                         log::error!("Failed to save configuration: {:?}", e);
-                        HttpResponseBuilder::new(response_buffer)
-                            .with_status(StatusCode::InternalServerError)?
+                        HttpResponseBuilder::new(http_socket)
+                            .with_status(StatusCode::InternalServerError)
+                            .await?
                             .with_plain_text_body("Failed to save WiFi configuration")
+                            .await
                     }
                 }
             }
@@ -194,51 +209,59 @@ impl<'a> HttpConfigHandler<'a> {
                 let mut rtc = self.context.rtc().lock().await;
                 let datetime = rtc.datetime().await.map_err(|e| {
                     log::error!("RTC datetime read error: {}", e);
-                    Error::NoResponse
+                    Error::ServerError
                 })?;
 
                 let mut date_time_str = heapless::String::<64>::new();
 
                 //ISO 8601 format could be used as well
                 //"1995-12-17T03:24:00Z"
-                core::fmt::write(&mut date_time_str, format_args!("{}", datetime)).map_err(|_| Error::NoResponse)?;
-                HttpResponseBuilder::new(response_buffer)
-                    .with_status(StatusCode::Ok)?
+                core::fmt::write(&mut date_time_str, format_args!("{}", datetime)).map_err(|_| Error::ServerError)?;
+                HttpResponseBuilder::new(http_socket)
+                    .with_status(StatusCode::Ok)
+                    .await?
                     .with_plain_text_body(&date_time_str)
+                    .await
             }
 
             (HttpMethod::POST, "set_date_time") => {
                 log::debug!("Serving set_date_time request");
                 let date_time_str = core::str::from_utf8(request.body).map_err(|_| {
                     log::error!("Invalid UTF-8 in request body");
-                    Error::NoResponse
+                    Error::ServerError
                 })?;
                 let date_time = NaiveDateTime::from_str(date_time_str).map_err(|_| {
                     log::error!("Invalid date time format: {}", date_time_str);
-                    Error::NoResponse
+                    Error::ServerError
                 })?;
 
                 let mut rtc = self.context.rtc().lock().await;
                 rtc.set_datetime(&date_time).await.map_err(|e| {
                     log::error!("RTC datetime set error: {}", e);
-                    Error::NoResponse
+                    Error::ServerError
                 })?;
 
-                HttpResponseBuilder::new(response_buffer)
-                    .with_status(StatusCode::Ok)?
+                HttpResponseBuilder::new(http_socket)
+                    .with_status(StatusCode::Ok)
+                    .await?
                     .with_plain_text_body("Date and time updated")
+                    .await
             }
 
-            _ => HttpResponseBuilder::new(response_buffer)
-                .with_status(StatusCode::NotFound)?
-                .with_plain_text_body("Not Found"),
+            _ => {
+                HttpResponseBuilder::new(http_socket)
+                    .with_status(StatusCode::NotFound)
+                    .await?
+                    .with_plain_text_body("Not Found")
+                    .await
+            }
         }
     }
 
     async fn handle_websocket_connection_impl<'h>(
         &mut self,
         _request: &HttpRequest<'_>,
-        mut web_socket: WebSocket<'h, '_>,
+        web_socket: &mut WebSocket<'h, '_>,
     ) -> Result<(), ()> {
         let mut buffer = [0u8; 128];
         let len = web_socket.read(&mut buffer).await.map_err(|_| ())?;
@@ -260,26 +283,25 @@ fn trace_headers(request: &HttpRequest<'_>) {
 }
 
 impl<'a> HttpHandler for HttpConfigHandler<'a> {
-    async fn handle_request(
+    async fn handle_request<HttpSocket: HttpWriteSocket>(
         &mut self,
+        allocator: &mut memory::HeadArena<'_>,
         request: &HttpRequest<'_>,
-        response_buffer: HttpResponseBufferRef<'_>,
-    ) -> Result<HttpResponse, Error> {
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
         self.context
             .shared_resources()
             .led_controller
             .set_animation(LED_1, LedAnimation::Decay(color::ORANGE, 300))
             .await;
 
-        let res = self.handle_request_impl(request, response_buffer).await;
-
-        res
+        self.handle_request_impl(allocator, request, http_socket).await
     }
 
     async fn handle_websocket_connection<'h>(
         &mut self,
-        _request: &HttpRequest<'_>,
-        web_socket: WebSocket<'h, '_>,
+        request: &HttpRequest<'_>,
+        web_socket: &mut WebSocket<'h, '_>,
     ) -> Result<(), ()> {
         self.context
             .shared_resources()
@@ -287,25 +309,35 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
             .set_animation(LED_1, LedAnimation::Decay(color::ORANGE, 300))
             .await;
 
-        let res = self.handle_websocket_connection_impl(_request, web_socket).await;
+        let res = self.handle_websocket_connection_impl(request, web_socket).await;
 
         res
     }
 }
 
-fn to_response<T>(response_buffer: HttpResponseBufferRef<'_>, value: &T) -> Result<HttpResponse, Error>
+async fn send_serialized_type<T, WriteSocket: HttpWriteSocket>(
+    allocator: &mut memory::HeadArena<'_>,
+    http_socket: &mut WriteSocket,
+    value: &T,
+) -> Result<(), Error>
 where
     T: serde::Serialize,
 {
-    HttpResponseBuilder::new(response_buffer)
-        .with_status(StatusCode::Ok)?
-        .with_header("Content-Type", "application/json")?
-        .with_body_filler(|buf| {
-            serde_json_core::to_slice(value, buf).map_err(|e| {
-                log::error!("Serialization error: {}", e);
-                Error::NoResponse
-            })
+    let mut temp_buf = allocator.temporary();
+    let value_buf = temp_buf.init_slice_with(|uninitialized| {
+        serde_json_core::to_slice(value, uninitialized).map_err(|e| {
+            log::error!("Serialization error: {}", e);
+            Error::ServerError
         })
+    })?;
+
+    HttpResponseBuilder::new(http_socket)
+        .with_status(StatusCode::Ok)
+        .await?
+        .with_header("Content-Type", "application/json")
+        .await?
+        .with_body_from_slice(value_buf)
+        .await
 }
 
 fn from_request<'de, T>(request: &HttpRequest<'de>) -> Result<T, nanofish::Error>
@@ -314,17 +346,8 @@ where
 {
     let (value, _) = serde_json_core::from_slice(request.body).map_err(|e| {
         log::error!("Deserialization error: {}", e);
-        nanofish::Error::NoResponse
+        nanofish::Error::ServerError
     })?;
 
     Ok(value)
 }
-
-// fn from_http_response(request: &HttpRequest<'de>) -> Result<T, nanofish::Error> {
-//     let (value, _) = serde_json_core::from_slice(request.body).map_err(|e| {
-//         log::error!("Deserialization error: {}", e);
-//         nanofish::Error::NoResponse
-//     })?;
-
-//     Ok(value)
-// }
