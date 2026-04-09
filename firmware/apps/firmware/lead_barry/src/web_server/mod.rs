@@ -80,19 +80,203 @@ impl<'stack, const SOCKETS: usize> HttpConfigServer<'stack, SOCKETS> {
         shared: &'static SharedResources,
     ) -> ! {
         let context = HttpServerContext::new(spawner, shared);
-        let mut handler = HttpConfigHandler::new(&context);
+        let mut handler = HttpWebAPIHandler::new(&context);
         self.http_server.serve::<_>(worker_memory_buf, &mut handler).await
     }
 }
 
 // Create a simple request handler
-struct HttpConfigHandler<'a> {
+struct HttpWebAPIHandler<'a> {
     context: &'a HttpServerContext,
 }
 
-impl<'a> HttpConfigHandler<'a> {
+impl<'a> HttpWebAPIHandler<'a> {
     fn new(context: &'a HttpServerContext) -> Self {
         Self { context }
+    }
+
+    async fn api_version<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        _allocator: &mut PrefixArena<'_>,
+        _request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
+        log::debug!("Serving version info");
+        HttpResponseBuilder::new(http_socket)
+            .with_status(StatusCode::Ok)
+            .await?
+            .with_plain_text_body(VERSION)
+            .await
+    }
+
+    async fn api_reboot<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        _allocator: &mut PrefixArena<'_>,
+        _request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
+        log::info!("Serving reboot request");
+        reset::deferred_system_reset(self.context.spawner(), 1.s());
+        // The reset function does not return, but we provide a response for completeness
+        HttpResponseBuilder::new(http_socket)
+            .with_status(StatusCode::Ok)
+            .await?
+            .with_plain_text_body("System is resetting...")
+            .await
+    }
+
+    async fn api_wifi_config<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        allocator: &mut PrefixArena<'_>,
+        _request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
+        log::debug!("Serving configuration request");
+        let mut wifi_settings = self
+            .context
+            .configuration_storage()
+            .get_settings()
+            .await
+            .network_settings
+            .wifi_settings;
+
+        // Clear password before sending
+        if let Some(psw) = wifi_settings.password.as_mut() {
+            psw.clear()
+        }
+
+        send_serialized_type(allocator, http_socket, &wifi_settings).await
+    }
+
+    async fn api_set_wifi_config<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        _allocator: &mut PrefixArena<'_>,
+        request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
+        log::debug!("Serving set configuration request");
+        //TODO: Implement data integrity checks
+        let mut wifi_settings: WiFiSettings = from_request(request)?;
+        if wifi_settings.password.is_none() {
+            // Preserve existing password if not provided
+            let current_settings = self
+                .context
+                .configuration_storage()
+                .get_settings()
+                .await
+                .network_settings
+                .wifi_settings;
+            wifi_settings.password = current_settings.password;
+        }
+        self.context
+            .configuration_storage()
+            .modify_settings(|settings| {
+                settings.network_settings.wifi_settings = wifi_settings;
+            })
+            .await;
+        match self.context.configuration_storage().save().await {
+            Ok(_) => {
+                HttpResponseBuilder::new(http_socket)
+                    .with_status(StatusCode::Ok)
+                    .await?
+                    .with_plain_text_body("WiFi configuration updated")
+                    .await
+            }
+            Err(e) => {
+                log::error!("Failed to save configuration: {:?}", e);
+                HttpResponseBuilder::new(http_socket)
+                    .with_status(StatusCode::InternalServerError)
+                    .await?
+                    .with_plain_text_body("Failed to save WiFi configuration")
+                    .await
+            }
+        }
+    }
+
+    async fn api_date_time<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        _allocator: &mut PrefixArena<'_>,
+        _request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
+        log::debug!("Serving date_time request");
+
+        let mut rtc = self.context.rtc().lock().await;
+        let datetime = rtc.datetime().await.map_err(|e| {
+            log::error!("RTC datetime read error: {}", e);
+            Error::ServerError
+        })?;
+
+        let mut date_time_str = heapless::String::<64>::new();
+
+        //ISO 8601 format could be used as well
+        //"1995-12-17T03:24:00Z"
+        core::fmt::write(&mut date_time_str, format_args!("{}", datetime)).map_err(|_| Error::ServerError)?;
+        HttpResponseBuilder::new(http_socket)
+            .with_status(StatusCode::Ok)
+            .await?
+            .with_plain_text_body(&date_time_str)
+            .await
+    }
+
+    async fn api_set_date_time<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        _allocator: &mut PrefixArena<'_>,
+        request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
+        log::debug!("Serving set_date_time request");
+        let date_time_str = core::str::from_utf8(request.body).map_err(|_| {
+            log::error!("Invalid UTF-8 in request body");
+            Error::ServerError
+        })?;
+        let date_time = NaiveDateTime::from_str(date_time_str).map_err(|_| {
+            log::error!("Invalid date time format: {}", date_time_str);
+            Error::ServerError
+        })?;
+
+        let mut rtc = self.context.rtc().lock().await;
+        rtc.set_datetime(&date_time).await.map_err(|e| {
+            log::error!("RTC datetime set error: {}", e);
+            Error::ServerError
+        })?;
+
+        HttpResponseBuilder::new(http_socket)
+            .with_status(StatusCode::Ok)
+            .await?
+            .with_plain_text_body("Date and time updated")
+            .await
+    }
+
+    async fn api_not_found<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        _allocator: &mut PrefixArena<'_>,
+        _request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+    ) -> Result<(), Error> {
+        HttpResponseBuilder::new(http_socket)
+            .with_status(StatusCode::NotFound)
+            .await?
+            .with_plain_text_body("Not Found")
+            .await
+    }
+
+    async fn handle_rest_api<HttpSocket: HttpWriteSocket>(
+        &mut self,
+        allocator: &mut PrefixArena<'_>,
+        request: &HttpRequest<'_>,
+        http_socket: &mut HttpSocket,
+        api: &str,
+    ) -> Result<(), Error> {
+        match (request.method, api) {
+            (HttpMethod::GET, "version") => self.api_version(allocator, request, http_socket).await,
+            (HttpMethod::GET, "reboot") => self.api_reboot(allocator, request, http_socket).await,
+            (HttpMethod::GET, "wifi_config") => self.api_wifi_config(allocator, request, http_socket).await,
+            (HttpMethod::POST, "set_wifi_config") => self.api_set_wifi_config(allocator, request, http_socket).await,
+            (HttpMethod::GET, "date_time") => self.api_date_time(allocator, request, http_socket).await,
+            (HttpMethod::POST, "set_date_time") => self.api_set_date_time(allocator, request, http_socket).await,
+            _ => self.api_not_found(allocator, request, http_socket).await,
+        }
     }
 
     async fn handle_request_impl<HttpSocket: HttpWriteSocket>(
@@ -121,142 +305,13 @@ impl<'a> HttpConfigHandler<'a> {
         };
 
         if request.method == HttpMethod::OPTIONS {
+            log::debug!("Serving {} preflight request", api);
             trace_headers(request);
+            //TODO: Implement more strict header checking
+            return HttpResponseBuilder::new(http_socket).preflight_response().await;
         }
 
-        match (request.method, api) {
-            (HttpMethod::OPTIONS, command) => {
-                //TODO: Implement more strict header checking
-                log::debug!("Serving {} preflight request", command);
-                HttpResponseBuilder::new(http_socket).preflight_response().await
-            }
-            (HttpMethod::GET, "version") => {
-                log::debug!("Serving version info");
-                HttpResponseBuilder::new(http_socket)
-                    .with_status(StatusCode::Ok)
-                    .await?
-                    .with_plain_text_body(VERSION)
-                    .await
-            }
-            (HttpMethod::GET, "reboot") => {
-                log::info!("Serving reboot request");
-                reset::deferred_system_reset(self.context.spawner(), 1.s());
-                // The reset function does not return, but we provide a response for completeness
-                HttpResponseBuilder::new(http_socket)
-                    .with_status(StatusCode::Ok)
-                    .await?
-                    .with_plain_text_body("System is resetting...")
-                    .await
-            }
-            (HttpMethod::GET, "wifi_config") => {
-                log::debug!("Serving configuration request");
-                let mut wifi_settings = self
-                    .context
-                    .configuration_storage()
-                    .get_settings()
-                    .await
-                    .network_settings
-                    .wifi_settings;
-
-                // Clear password before sending
-                if let Some(psw) = wifi_settings.password.as_mut() {
-                    psw.clear()
-                }
-
-                send_serialized_type(allocator, http_socket, &wifi_settings).await
-            }
-            (HttpMethod::POST, "set_wifi_config") => {
-                log::debug!("Serving set configuration request");
-                //TODO: Implement data integrity checks
-                let mut wifi_settings: WiFiSettings = from_request(request)?;
-                if wifi_settings.password.is_none() {
-                    // Preserve existing password if not provided
-                    let current_settings = self
-                        .context
-                        .configuration_storage()
-                        .get_settings()
-                        .await
-                        .network_settings
-                        .wifi_settings;
-                    wifi_settings.password = current_settings.password;
-                }
-                self.context
-                    .configuration_storage()
-                    .modify_settings(|settings| {
-                        settings.network_settings.wifi_settings = wifi_settings;
-                    })
-                    .await;
-                match self.context.configuration_storage().save().await {
-                    Ok(_) => {
-                        HttpResponseBuilder::new(http_socket)
-                            .with_status(StatusCode::Ok)
-                            .await?
-                            .with_plain_text_body("WiFi configuration updated")
-                            .await
-                    }
-                    Err(e) => {
-                        log::error!("Failed to save configuration: {:?}", e);
-                        HttpResponseBuilder::new(http_socket)
-                            .with_status(StatusCode::InternalServerError)
-                            .await?
-                            .with_plain_text_body("Failed to save WiFi configuration")
-                            .await
-                    }
-                }
-            }
-            (HttpMethod::GET, "date_time") => {
-                log::debug!("Serving date_time request");
-
-                let mut rtc = self.context.rtc().lock().await;
-                let datetime = rtc.datetime().await.map_err(|e| {
-                    log::error!("RTC datetime read error: {}", e);
-                    Error::ServerError
-                })?;
-
-                let mut date_time_str = heapless::String::<64>::new();
-
-                //ISO 8601 format could be used as well
-                //"1995-12-17T03:24:00Z"
-                core::fmt::write(&mut date_time_str, format_args!("{}", datetime)).map_err(|_| Error::ServerError)?;
-                HttpResponseBuilder::new(http_socket)
-                    .with_status(StatusCode::Ok)
-                    .await?
-                    .with_plain_text_body(&date_time_str)
-                    .await
-            }
-
-            (HttpMethod::POST, "set_date_time") => {
-                log::debug!("Serving set_date_time request");
-                let date_time_str = core::str::from_utf8(request.body).map_err(|_| {
-                    log::error!("Invalid UTF-8 in request body");
-                    Error::ServerError
-                })?;
-                let date_time = NaiveDateTime::from_str(date_time_str).map_err(|_| {
-                    log::error!("Invalid date time format: {}", date_time_str);
-                    Error::ServerError
-                })?;
-
-                let mut rtc = self.context.rtc().lock().await;
-                rtc.set_datetime(&date_time).await.map_err(|e| {
-                    log::error!("RTC datetime set error: {}", e);
-                    Error::ServerError
-                })?;
-
-                HttpResponseBuilder::new(http_socket)
-                    .with_status(StatusCode::Ok)
-                    .await?
-                    .with_plain_text_body("Date and time updated")
-                    .await
-            }
-
-            _ => {
-                HttpResponseBuilder::new(http_socket)
-                    .with_status(StatusCode::NotFound)
-                    .await?
-                    .with_plain_text_body("Not Found")
-                    .await
-            }
-        }
+        self.handle_rest_api(allocator, request, http_socket, api).await
     }
 
     async fn handle_websocket_connection_impl<'h>(
@@ -283,7 +338,7 @@ fn trace_headers(request: &HttpRequest<'_>) {
     }
 }
 
-impl<'a> HttpHandler for HttpConfigHandler<'a> {
+impl<'a> HttpHandler for HttpWebAPIHandler<'a> {
     async fn handle_request<HttpSocket: HttpWriteSocket>(
         &mut self,
         allocator: &mut PrefixArena<'_>,
