@@ -324,7 +324,7 @@ where
     T: serde::Serialize,
 {
     let mut temp_buf = allocator.temporary();
-    let value_buf = temp_buf.init_slice_with(|uninitialized| {
+    let value_buf = temp_buf.as_mut_with_init(|uninitialized| {
         serde_json_core::to_slice(value, uninitialized).map_err(|e| {
             log::error!("Serialization error: {}", e);
             Error::ServerError
