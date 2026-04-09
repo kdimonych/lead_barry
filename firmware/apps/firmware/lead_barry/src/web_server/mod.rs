@@ -96,7 +96,7 @@ impl<'a> HttpConfigHandler<'a> {
 
     async fn handle_request_impl<HttpSocket: HttpWriteSocket>(
         &mut self,
-        allocator: &mut memory::HeadArena<'_>,
+        allocator: &mut memory::PrefixArena<'_>,
         request: &HttpRequest<'_>,
         http_socket: &mut HttpSocket,
     ) -> Result<(), Error> {
@@ -285,7 +285,7 @@ fn trace_headers(request: &HttpRequest<'_>) {
 impl<'a> HttpHandler for HttpConfigHandler<'a> {
     async fn handle_request<HttpSocket: HttpWriteSocket>(
         &mut self,
-        allocator: &mut memory::HeadArena<'_>,
+        allocator: &mut memory::PrefixArena<'_>,
         request: &HttpRequest<'_>,
         http_socket: &mut HttpSocket,
     ) -> Result<(), Error> {
@@ -316,15 +316,15 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
 }
 
 async fn send_serialized_type<T, WriteSocket: HttpWriteSocket>(
-    allocator: &mut memory::HeadArena<'_>,
+    allocator: &mut memory::PrefixArena<'_>,
     http_socket: &mut WriteSocket,
     value: &T,
 ) -> Result<(), Error>
 where
     T: serde::Serialize,
 {
-    let mut temp_buf = allocator.temporary();
-    let value_buf = temp_buf.as_mut_with_init(|uninitialized| {
+    let mut temp_buf = allocator.view();
+    let value_buf = temp_buf.init_with(|uninitialized| {
         serde_json_core::to_slice(value, uninitialized).map_err(|e| {
             log::error!("Serialization error: {}", e);
             Error::ServerError
