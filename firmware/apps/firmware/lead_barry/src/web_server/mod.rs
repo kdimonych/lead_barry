@@ -9,8 +9,9 @@ use embassy_executor::Spawner;
 use embassy_net::Stack;
 use nanofish::{
     Error, HttpHandler, HttpMethod, HttpRequest, HttpResponseBuilder, HttpServer, HttpWriteSocket, ServerTimeouts,
-    SocketBuffers, StatusCode, WebSocket, WebSocketRead, memory,
+    SocketBuffers, StatusCode, WebSocket, WebSocketRead,
 };
+use prefix_arena::PrefixArena;
 
 use crate::board::*;
 use crate::configuration::WiFiSettings;
@@ -96,7 +97,7 @@ impl<'a> HttpConfigHandler<'a> {
 
     async fn handle_request_impl<HttpSocket: HttpWriteSocket>(
         &mut self,
-        allocator: &mut memory::PrefixArena<'_>,
+        allocator: &mut PrefixArena<'_>,
         request: &HttpRequest<'_>,
         http_socket: &mut HttpSocket,
     ) -> Result<(), Error> {
@@ -285,7 +286,7 @@ fn trace_headers(request: &HttpRequest<'_>) {
 impl<'a> HttpHandler for HttpConfigHandler<'a> {
     async fn handle_request<HttpSocket: HttpWriteSocket>(
         &mut self,
-        allocator: &mut memory::PrefixArena<'_>,
+        allocator: &mut PrefixArena<'_>,
         request: &HttpRequest<'_>,
         http_socket: &mut HttpSocket,
     ) -> Result<(), Error> {
@@ -316,7 +317,7 @@ impl<'a> HttpHandler for HttpConfigHandler<'a> {
 }
 
 async fn send_serialized_type<T, WriteSocket: HttpWriteSocket>(
-    allocator: &mut memory::PrefixArena<'_>,
+    allocator: &mut PrefixArena<'_>,
     http_socket: &mut WriteSocket,
     value: &T,
 ) -> Result<(), Error>

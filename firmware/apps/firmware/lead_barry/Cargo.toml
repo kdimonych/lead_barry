@@ -110,6 +110,9 @@ qrcodegen-no-heap = "1.8.1"
 #WS2812b led driver
 smart-leds = "0.4.0"
 
+#Bump allocator
+prefix-arena = "0.1"
+
 #Bump allocator for heap usage tracking
 bump-into = "0.8"
 
